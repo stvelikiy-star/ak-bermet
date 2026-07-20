@@ -1,0 +1,24 @@
+
+*~
+# Окружение (секреты не коммитим, но .env.example — да)
+build
+.claude/
+.codex/
+coverage/
+dist/
+.DS_Store
+.env
+!.env.example
+.env.local
+# Generated files
+# Local AI tool state
+# Local secrets and environment files
+*.log
+# Logs and temporary files
+.next
+next-env.d.ts
+node_modules
+out
+*.swp
+Thumbs.db
+*.tmp
