@@ -6,8 +6,9 @@ import {
 } from "./manager-auth";
 
 // Серверная проверка сессии менеджера (для route handlers).
-export function isManagerAuthenticated(): boolean {
+export async function isManagerAuthenticated(): Promise<boolean> {
   if (!isManagerAuthEnabled()) return true;
-  const value = cookies().get(getManagerCookieName())?.value;
+  const store = await cookies();
+  const value = store.get(getManagerCookieName())?.value;
   return isValidManagerSession(value);
 }

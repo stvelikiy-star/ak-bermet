@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!isManagerAuthenticated()) {
+  if (!(await isManagerAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Нет доступа" }, { status: 403 });
   }
 

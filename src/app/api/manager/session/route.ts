@@ -10,8 +10,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const store = await cookies();
   const authenticated =
     !isManagerAuthEnabled() ||
-    isValidManagerSession(cookies().get(getManagerCookieName())?.value);
+    isValidManagerSession(store.get(getManagerCookieName())?.value);
   return NextResponse.json({ ok: true, authenticated });
 }
