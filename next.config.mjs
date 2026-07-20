@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["googleapis", "openai"],
-  },
+  serverExternalPackages: ["googleapis", "openai"],
   images: {
     remotePatterns: [
       {

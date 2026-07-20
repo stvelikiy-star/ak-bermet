@@ -18,12 +18,12 @@ export default function RoomsSection() {
               Номера и коттеджи
             </h2>
           </div>
-          <a
+          <Link
             href="/rooms"
             className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-milk px-5 py-2.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
           >
             Смотреть номера <IconArrowRight className="h-4 w-4" />
-          </a>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

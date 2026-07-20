@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 // Безопасные статусы интеграций (без секретов).
 export async function GET() {
-  if (!isManagerAuthenticated()) {
+  if (!(await isManagerAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Нет доступа" }, { status: 403 });
   }
   return NextResponse.json({

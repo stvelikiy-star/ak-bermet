@@ -11,9 +11,9 @@ export const runtime = "nodejs";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!isManagerAuthenticated()) {
+  if (!(await isManagerAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Нет доступа" }, { status: 403 });
   }
 
@@ -41,8 +41,9 @@ export async function PATCH(
 
   if (isGoogleSheetsEnabled()) {
     try {
+      const { id } = await params;
       await updateLeadStatusInSheet({
-        leadId: params.id,
+        leadId: id,
         status,
         managerComment: body.managerComment,
         managerName: body.managerName || "Администратор",
