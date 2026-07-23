@@ -236,6 +236,7 @@ begin
     where id = p_notification_id and recipient_id = auth.uid() and is_read = false;
 end;
 $$;
+revoke all on function public.fn_mark_notification_read(uuid) from public;
 grant execute on function public.fn_mark_notification_read(uuid) to authenticated;
 comment on function public.fn_mark_notification_read is
   'The only write path to operational_notifications available to a '
@@ -360,6 +361,7 @@ begin
   return v_assignment_id;
 end;
 $$;
+revoke all on function public.fn_assign_staff(public.assignment_task_type, uuid, uuid) from public;
 grant execute on function public.fn_assign_staff(public.assignment_task_type, uuid, uuid) to authenticated;
 comment on function public.fn_assign_staff is
   'Dispatch is a management action, not self-service: only owner/'
@@ -396,6 +398,7 @@ begin
     where id = p_cleaning_task_id and status = 'pending';
 end;
 $$;
+revoke all on function public.fn_accept_cleaning_task(uuid) from public;
 grant execute on function public.fn_accept_cleaning_task(uuid) to authenticated;
 
 create or replace function public.fn_start_cleaning_task(p_cleaning_task_id uuid)
@@ -431,6 +434,7 @@ begin
   );
 end;
 $$;
+revoke all on function public.fn_start_cleaning_task(uuid) from public;
 grant execute on function public.fn_start_cleaning_task(uuid) to authenticated;
 
 create or replace function public.fn_complete_cleaning_task(p_cleaning_task_id uuid)
@@ -487,6 +491,7 @@ begin
   end if;
 end;
 $$;
+revoke all on function public.fn_complete_cleaning_task(uuid) from public;
 grant execute on function public.fn_complete_cleaning_task(uuid) to authenticated;
 
 create or replace function public.fn_report_cleaning_problem(
@@ -551,6 +556,7 @@ begin
   return v_request_id;
 end;
 $$;
+revoke all on function public.fn_report_cleaning_problem(uuid, text, boolean) from public;
 grant execute on function public.fn_report_cleaning_problem(uuid, text, boolean) to authenticated;
 comment on function public.fn_report_cleaning_problem is
   '"Housekeeping can... report problems". p_blocks_room lets housekeeping '
@@ -590,6 +596,7 @@ begin
     where id = p_maintenance_request_id and status = 'reported';
 end;
 $$;
+revoke all on function public.fn_accept_maintenance_request(uuid) from public;
 grant execute on function public.fn_accept_maintenance_request(uuid) to authenticated;
 
 create or replace function public.fn_start_maintenance_request(p_maintenance_request_id uuid)
@@ -625,6 +632,7 @@ begin
   );
 end;
 $$;
+revoke all on function public.fn_start_maintenance_request(uuid) from public;
 grant execute on function public.fn_start_maintenance_request(uuid) to authenticated;
 
 create or replace function public.fn_record_maintenance_work_log(
@@ -672,6 +680,9 @@ begin
   return v_log_id;
 end;
 $$;
+revoke all on function public.fn_record_maintenance_work_log(
+  uuid, public.work_log_type, text, text, numeric, text, numeric
+) from public;
 grant execute on function public.fn_record_maintenance_work_log(
   uuid, public.work_log_type, text, text, numeric, text, numeric
 ) to authenticated;
@@ -712,6 +723,7 @@ begin
   );
 end;
 $$;
+revoke all on function public.fn_complete_maintenance_work(uuid) from public;
 grant execute on function public.fn_complete_maintenance_work(uuid) to authenticated;
 comment on function public.fn_complete_maintenance_work is
   'The technician''s own "I am done" signal (repair work + materials + '
@@ -762,6 +774,7 @@ begin
   );
 end;
 $$;
+revoke all on function public.fn_close_maintenance_request(uuid, public.room_operational_status, text) from public;
 grant execute on function public.fn_close_maintenance_request(uuid, public.room_operational_status, text) to authenticated;
 comment on function public.fn_close_maintenance_request is
   'Deactivating the linked room_blocks row here (if any) is what makes '
@@ -834,6 +847,9 @@ begin
   return v_inspection_id;
 end;
 $$;
+revoke all on function public.fn_record_room_inspection(
+  uuid, public.inspection_trigger_reason, public.inspection_result, uuid, uuid, text
+) from public;
 grant execute on function public.fn_record_room_inspection(
   uuid, public.inspection_trigger_reason, public.inspection_result, uuid, uuid, text
 ) to authenticated;

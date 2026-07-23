@@ -76,41 +76,68 @@ create table public.staff_property_assignments (
 
 -- ---------------------------------------------------------------------
 -- RLS helper functions (used by 0008). Declared here because they only
--- depend on tables created in this file. run as invoker under RLS — they
--- only read rows the calling user is already implicitly allowed to know
--- about (their own role/assignment rows).
+-- depend on tables created in this file.
+--
+-- SECURITY DEFINER with a fixed search_path, owned by the migration role
+-- (not subject to RLS): these helpers are invoked from *inside* the RLS
+-- policies on public.user_roles/public.roles themselves (see 0008). If
+-- they ran as invoker (the caller's own privileges), their internal
+-- reads of user_roles would themselves be subject to user_roles' RLS
+-- policies, which call has_role()/is_staff() again — infinite recursion.
+-- Running as SECURITY DEFINER makes these internal reads bypass RLS
+-- entirely (the defining role owns the tables), breaking the cycle.
+-- EXECUTE is revoked from PUBLIC and granted only to anon/authenticated:
+-- anon is required because several Phase 1 policies (e.g.
+-- properties_staff_read) omit a `to` clause and therefore apply to every
+-- role, including anon, when combined via OR with an anon-facing public
+-- policy on the same table.
 -- ---------------------------------------------------------------------
 
 create or replace function public.has_role(p_role public.role_name)
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1
     from public.user_roles ur
     join public.roles r on r.id = ur.role_id
-    where ur.user_id = auth.uid()
+    where auth.uid() is not null
+      and ur.user_id = auth.uid()
       and r.name = p_role
       and ur.deleted_at is null
   );
 $$;
 
+revoke all on function public.has_role(public.role_name) from public;
+grant execute on function public.has_role(public.role_name) to anon, authenticated;
+
 comment on function public.has_role(public.role_name) is
   'RLS helper: true if the authenticated user holds the given role. Roles '
   'are additive (a user may hold more than one), so policies that must '
   'exclude e.g. managers from owner-only data check has_role(''owner'') '
-  'explicitly rather than assuming role exclusivity.';
+  'explicitly rather than assuming role exclusivity. SECURITY DEFINER with '
+  'a fixed search_path to avoid recursive RLS evaluation on user_roles '
+  '(see the comment above); PUBLIC execution is revoked.';
 
 create or replace function public.is_staff()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1 from public.user_roles ur
-    where ur.user_id = auth.uid() and ur.deleted_at is null
+    where auth.uid() is not null
+      and ur.user_id = auth.uid()
+      and ur.deleted_at is null
   );
 $$;
+
+revoke all on function public.is_staff() from public;
+grant execute on function public.is_staff() to anon, authenticated;
 
 commit;

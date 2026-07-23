@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import {
-  isManagerAuthEnabled,
-  getManagerCookieName,
-  isValidManagerSession,
-} from "@/lib/manager-auth";
 import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware-client";
 import type { RoleName } from "@/types/auth";
 
-// Роль-защищённые разделы персонала. /manager дополнительно принимает
-// легаси PIN-cookie (временный резервный вход, см. .env.example) —
-// /housekeeping и /technician новые и входа по PIN не имеют.
+// Роль-защищённые разделы персонала. Supabase Auth — единственный способ
+// входа для всех трёх разделов. Легаси PIN-cookie (FNV-1a) удалён:
+// он был offline-подбираемым (см. AK_BERMET_CODEX_AUDIT_001.md, H-03) и
+// не должен использоваться как production-аутентификация.
 const STAFF_AREAS: { prefix: string; roles: RoleName[] }[] = [
   { prefix: "/manager", roles: ["owner", "administrator", "manager"] },
   { prefix: "/housekeeping", roles: ["housekeeping"] },
@@ -24,25 +20,20 @@ function redirectToLogin(req: NextRequest, pathname: string) {
   return NextResponse.redirect(url);
 }
 
+function redirectToUnauthorized(req: NextRequest) {
+  const url = req.nextUrl.clone();
+  url.pathname = "/staff/unauthorized";
+  return NextResponse.redirect(url);
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-
-  // Легаси-страница PIN-входа всегда публична, независимо от области.
-  if (pathname.startsWith("/manager/login")) {
-    return NextResponse.next();
-  }
 
   const area = STAFF_AREAS.find((a) => pathname.startsWith(a.prefix));
   if (!area) return NextResponse.next();
 
-  // Легаси PIN-доступ — только для /manager, временный резервный вход.
-  if (area.prefix === "/manager") {
-    if (!isManagerAuthEnabled()) return NextResponse.next();
-    const pin = req.cookies.get(getManagerCookieName())?.value;
-    if (isValidManagerSession(pin)) return NextResponse.next();
-  }
-
-  // Supabase Auth — основной путь для всех трёх разделов.
+  // Fail closed: если Supabase Auth не настроен, доступ в защищённые
+  // разделы персонала не предоставляется никому, независимо от области.
   const { supabase, response } = createSupabaseMiddlewareClient(req);
   if (!supabase) {
     return redirectToLogin(req, pathname);
@@ -55,18 +46,29 @@ export async function middleware(req: NextRequest) {
     return redirectToLogin(req, pathname);
   }
 
-  const { data: roleRows } = await supabase
-    .from("user_roles")
-    .select("roles ( name )")
-    .eq("user_id", user.id)
-    .is("deleted_at", null);
+  const [{ data: profile }, { data: roleRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("is_active, deleted_at")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("user_roles")
+      .select("roles ( name )")
+      .eq("user_id", user.id)
+      .is("deleted_at", null),
+  ]);
+
+  // Деактивированный или удалённый профиль не получает доступ ни к одной
+  // защищённой странице, даже если Supabase-сессия ещё валидна.
+  if (!profile || profile.is_active !== true || profile.deleted_at !== null) {
+    return redirectToUnauthorized(req);
+  }
 
   const roles = extractRoleNames(roleRows);
   const allowed = roles.some((r) => area.roles.includes(r));
   if (!allowed) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/staff/unauthorized";
-    return NextResponse.redirect(url);
+    return redirectToUnauthorized(req);
   }
 
   return response;

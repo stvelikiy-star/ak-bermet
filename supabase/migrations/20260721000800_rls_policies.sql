@@ -58,6 +58,17 @@ create policy profiles_self_select on public.profiles for select
 create policy profiles_self_update on public.profiles for update
   using (id = auth.uid()) with check (id = auth.uid());
 
+-- Row-level RLS above only scopes *which row* a user may update (their
+-- own); it does not stop them setting every column on that row, including
+-- is_active/deleted_at. Column-level privileges close that gap: a
+-- self-service update may only ever touch full_name/phone. Reactivating
+-- a deactivated account, or clearing deleted_at, requires an
+-- administrative path outside this self-update grant (service_role or a
+-- future dedicated admin RPC), never the user's own authenticated
+-- session.
+revoke update on public.profiles from authenticated;
+grant update (full_name, phone) on public.profiles to authenticated;
+
 alter table public.roles enable row level security;
 create policy roles_staff_select on public.roles for select
   using (public.is_staff());
@@ -198,12 +209,11 @@ comment on policy leads_public_insert on public.leads is
 alter table public.lead_status_history enable row level security;
 create policy lead_status_history_staff_select on public.lead_status_history for select
   using (public.has_role('owner') or public.has_role('administrator') or public.has_role('manager'));
--- No write policy: rows are inserted only by trg_leads_status_history
--- (0004), which runs as the invoking staff role already permitted to
--- update leads.status — no separate grant needed since the trigger issues
--- a plain INSERT under the same transaction/role, and that role already
--- passes leads_staff_write above. If this trigger is ever made SECURITY
--- DEFINER, revisit this note.
+-- No write policy for any application role: rows are inserted only by
+-- trg_leads_status_history (0004)'s log_lead_status_change(), a SECURITY
+-- DEFINER trigger function (fixed search_path, EXECUTE revoked from
+-- PUBLIC) that bypasses this table's RLS to write, exactly like
+-- audit_log/fn_audit_row_change() below.
 
 -- ---------------------------------------------------------------------
 -- Booking core and integrity

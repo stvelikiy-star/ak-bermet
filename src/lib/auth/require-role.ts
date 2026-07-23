@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import type { CurrentStaff, RoleName } from "@/types/auth";
 
-// Переиспользуемый серверный guard для protected layouts. Используется
-// напрямую только в разделах без легаси-входа (/housekeeping,
-// /technician) — /manager дополнительно допускает легаси PIN, эта
-// логика живёт в middleware.ts и src/lib/manager-session.ts, а не здесь.
+// Переиспользуемый серверный guard для protected layouts (/housekeeping,
+// /technician). /manager использует src/lib/manager-session.ts вместо
+// этой функции для route handlers, но оба пути идут через один и тот же
+// Supabase Auth — соответствующая проверка живёт в middleware.ts, а не
+// здесь.
 export async function requireStaffRole(
   allowed: RoleName[]
 ): Promise<CurrentStaff> {

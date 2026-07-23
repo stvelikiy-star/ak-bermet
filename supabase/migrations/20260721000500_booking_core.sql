@@ -104,8 +104,17 @@ create table public.booking_status_history (
 );
 create index idx_booking_status_history_booking on public.booking_status_history(booking_id, created_at);
 
+-- SECURITY DEFINER with a fixed search_path: booking_status_history has
+-- RLS enabled with a select-only policy (0008) and no insert policy for
+-- any role. See the identical rationale on log_lead_status_change()
+-- (0004) — an invoker-rights trigger here would fail every booking
+-- insert/status-change with an RLS violation.
 create or replace function public.log_booking_status_change()
-returns trigger language plpgsql as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
   if (tg_op = 'INSERT') or (old.status is distinct from new.status) then
     insert into public.booking_status_history (booking_id, status, changed_by)
@@ -114,6 +123,7 @@ begin
   return new;
 end;
 $$;
+revoke all on function public.log_booking_status_change() from public;
 create trigger trg_bookings_status_history
   after insert or update of status on public.bookings
   for each row execute function public.log_booking_status_change();

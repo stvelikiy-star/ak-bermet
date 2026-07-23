@@ -1,27 +1,15 @@
-import { cookies } from "next/headers";
-import {
-  isManagerAuthEnabled,
-  getManagerCookieName,
-  isValidManagerSession,
-} from "./manager-auth";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 
 const MANAGER_AREA_ROLES = ["owner", "administrator", "manager"] as const;
 
-// Серверная проверка сессии менеджера (для route handlers).
-// Два независимых пути входа:
-//   1. Supabase Auth с ролью owner/administrator/manager — основной
-//      способ (см. /staff/login, src/lib/auth/current-staff.ts).
-//   2. Легаси PIN-cookie — временный резервный вход, см. .env.example
-//      и src/lib/manager-auth.ts. Сохранён без изменений для обратной
-//      совместимости c уже работающими сценариями (например,
-//      /manager/operations).
+// Серверная проверка сессии менеджера (для route handlers). Supabase
+// Auth с ролью owner/administrator/manager — единственный способ входа.
+// Легаси PIN-cookie (FNV-1a, offline-подбираемый — см.
+// AK_BERMET_CODEX_AUDIT_001.md, H-03) удалён и не может использоваться
+// в production. Fail closed: без валидной Supabase-сессии с нужной
+// ролью и активным профилем (getCurrentStaff() уже проверяет
+// is_active) доступ не предоставляется.
 export async function isManagerAuthenticated(): Promise<boolean> {
-  if (!isManagerAuthEnabled()) return true;
-  const store = await cookies();
-  const value = store.get(getManagerCookieName())?.value;
-  if (isValidManagerSession(value)) return true;
-
   const staff = await getCurrentStaff();
   return hasAnyRole(staff, [...MANAGER_AREA_ROLES]);
 }

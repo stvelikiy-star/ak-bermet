@@ -103,8 +103,21 @@ create table public.lead_status_history (
 );
 create index idx_lead_status_history_lead on public.lead_status_history(lead_id, created_at);
 
+-- SECURITY DEFINER with a fixed search_path: lead_status_history has RLS
+-- enabled with a select-only policy (0008) and no insert policy for any
+-- role, so an ordinary invoker-rights trigger would fail every lead
+-- insert/status-change with an RLS violation. Running as the defining
+-- role's privileges (bypassing RLS on the history table) is what lets the
+-- append-only history actually get written, while the table itself
+-- remains impossible to insert into directly by any application role.
+-- EXECUTE is revoked from PUBLIC — direct invocation is never needed,
+-- only trigger firing, which is not subject to EXECUTE privilege checks.
 create or replace function public.log_lead_status_change()
-returns trigger language plpgsql as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
   if (tg_op = 'INSERT') or (old.status is distinct from new.status) then
     insert into public.lead_status_history (lead_id, status, changed_by, comment)
@@ -113,6 +126,7 @@ begin
   return new;
 end;
 $$;
+revoke all on function public.log_lead_status_change() from public;
 create trigger trg_leads_status_history
   after insert or update of status on public.leads
   for each row execute function public.log_lead_status_change();

@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import ManagerSidebar from "@/components/manager/ManagerSidebar";
 
-// Роль-защита (Supabase Auth: owner/administrator/manager, либо легаси
-// PIN) выполняется в middleware.ts, а не здесь — это единственное
-// место, которое надёжно исключает вложенный /manager/login из
-// проверки без риска зациклить редирект. См. src/middleware.ts.
+// Роль-защита (Supabase Auth: owner/administrator/manager) выполняется в
+// middleware.ts, а не здесь. См. src/middleware.ts.
 
 export const metadata: Metadata = {
   title: "Кабинет менеджера",

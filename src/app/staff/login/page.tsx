@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { IconShield } from "@/components/ui/icons";
 import {
   createSupabaseBrowserClient,
@@ -132,16 +131,6 @@ function StaffLoginForm() {
             </button>
           </form>
         )}
-
-        <p className="mt-5 text-center text-xs text-muted">
-          Резервный вход по PIN (устаревший способ):{" "}
-          <Link
-            href="/manager/login"
-            className="font-semibold text-emerald-deep underline underline-offset-2"
-          >
-            /manager/login
-          </Link>
-        </p>
       </div>
     </div>
   );

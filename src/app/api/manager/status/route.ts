@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { isManagerAuthenticated } from "@/lib/manager-session";
-import { isManagerAuthEnabled } from "@/lib/manager-auth";
 import { isGoogleSheetsEnabled } from "@/lib/google-sheets";
 import { getAIProviderName, isRealAIEnabled } from "@/lib/ai/providers";
 
@@ -14,7 +13,6 @@ export async function GET() {
   }
   return NextResponse.json({
     ok: true,
-    managerAuth: isManagerAuthEnabled(),
     googleSheets: isGoogleSheetsEnabled(),
     aiProvider: getAIProviderName(),
     realAI: isRealAIEnabled(),

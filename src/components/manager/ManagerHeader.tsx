@@ -11,12 +11,7 @@ export default function ManagerHeader({ title }: { title: string }) {
 
   const logout = async () => {
     try {
-      // Очищаем обе возможные сессии — легаси PIN и Supabase Auth,
-      // независимо от того, каким способом вошёл текущий пользователь.
-      await Promise.allSettled([
-        fetch("/api/manager/logout", { method: "POST" }),
-        fetch("/api/staff/logout", { method: "POST" }),
-      ]);
+      await fetch("/api/staff/logout", { method: "POST" });
     } finally {
       router.push("/staff/login");
       router.refresh();
