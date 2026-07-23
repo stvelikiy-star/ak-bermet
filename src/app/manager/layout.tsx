@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import ManagerSidebar from "@/components/manager/ManagerSidebar";
 
-// TODO Stage 09: protect manager routes with authentication and role-based access.
+// Роль-защита (Supabase Auth: owner/administrator/manager) выполняется в
+// middleware.ts, а не здесь. См. src/middleware.ts.
 
 export const metadata: Metadata = {
   title: "Кабинет менеджера",

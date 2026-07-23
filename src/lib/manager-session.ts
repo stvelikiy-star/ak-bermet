@@ -1,14 +1,16 @@
-import { cookies } from "next/headers";
-import {
-  isManagerAuthEnabled,
-  getManagerCookieName,
-  isValidManagerSession,
-} from "./manager-auth";
+import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 
-// Серверная проверка сессии менеджера (для route handlers).
+const MANAGER_AREA_ROLES = ["owner", "administrator", "manager"] as const;
+
+// Серверная проверка сессии менеджера (для route handlers). Supabase
+// Auth с ролью owner/administrator/manager — единственный способ входа.
+// Легаси PIN-cookie (FNV-1a, offline-подбираемый — см.
+// AK_BERMET_CODEX_AUDIT_001.md, H-03) удалён и не может использоваться
+// в production. Fail closed: без валидной Supabase-сессии с нужной
+// ролью и активным, не удалённым профилем (getCurrentStaff() уже
+// проверяет is_active === true и deleted_at === null) доступ не
+// предоставляется.
 export async function isManagerAuthenticated(): Promise<boolean> {
-  if (!isManagerAuthEnabled()) return true;
-  const store = await cookies();
-  const value = store.get(getManagerCookieName())?.value;
-  return isValidManagerSession(value);
+  const staff = await getCurrentStaff();
+  return hasAnyRole(staff, [...MANAGER_AREA_ROLES]);
 }
