@@ -62,7 +62,7 @@ npm run start    # локальный предпросмотр продакше�
 
 Демо менеджера (MVP, помечен как демо):
 
-- `/manager/login` — вход по PIN
+- `/staff/login` — вход персонала через Supabase Auth (email/пароль)
 - `/manager`, `/manager/leads`, `/manager/availability`,
   `/manager/rooms`, `/manager/payments`, `/manager/reports`, `/manager/settings`
 

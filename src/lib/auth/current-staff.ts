@@ -21,10 +21,13 @@ export async function getCurrentStaff(): Promise<CurrentStaff | null> {
   } = await supabase.auth.getUser();
   if (userError || !user) return null;
 
-  const [{ data: profile }, { data: roleRows }] = await Promise.all([
+  const [
+    { data: profile, error: profileError },
+    { data: roleRows, error: roleError },
+  ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, is_active")
+      .select("full_name, is_active, deleted_at")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -34,9 +37,17 @@ export async function getCurrentStaff(): Promise<CurrentStaff | null> {
       .is("deleted_at", null),
   ]);
 
-  // Деактивированный сотрудник (is_active=false) не считается текущим
+  // Fail closed: ошибка при чтении profile/user_roles не должна
+  // трактоваться как «профиль не найден, но доступ разрешён» — без
+  // подтверждённых данных о сотруднике доступ не предоставляется.
+  if (profileError || roleError) return null;
+
+  // Профиль обязателен: деактивированный (is_active=false) или
+  // мягко удалённый (deleted_at не null) сотрудник не считается текущим
   // персоналом, даже если Supabase-сессия у него всё ещё валидна.
-  if (profile && profile.is_active === false) return null;
+  if (!profile) return null;
+  if (profile.is_active !== true) return null;
+  if (profile.deleted_at !== null) return null;
 
   const roles = extractRoleNames(roleRows as RoleRow[] | null);
 

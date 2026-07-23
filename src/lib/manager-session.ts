@@ -7,8 +7,9 @@ const MANAGER_AREA_ROLES = ["owner", "administrator", "manager"] as const;
 // Легаси PIN-cookie (FNV-1a, offline-подбираемый — см.
 // AK_BERMET_CODEX_AUDIT_001.md, H-03) удалён и не может использоваться
 // в production. Fail closed: без валидной Supabase-сессии с нужной
-// ролью и активным профилем (getCurrentStaff() уже проверяет
-// is_active) доступ не предоставляется.
+// ролью и активным, не удалённым профилем (getCurrentStaff() уже
+// проверяет is_active === true и deleted_at === null) доступ не
+// предоставляется.
 export async function isManagerAuthenticated(): Promise<boolean> {
   const staff = await getCurrentStaff();
   return hasAnyRole(staff, [...MANAGER_AREA_ROLES]);
