@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { IconShield } from "@/components/ui/icons";
 
 export default function ManagerLoginPage() {
@@ -42,10 +43,18 @@ export default function ManagerLoginPage() {
             <IconShield className="h-7 w-7" />
           </span>
           <h1 className="font-display text-2xl font-semibold text-emerald-deep">
-            Кабинет менеджера
+            Резервный вход (PIN)
           </h1>
           <p className="mt-1 text-sm text-muted">AK BERMET — SPA & WELLNESS</p>
         </div>
+
+        <p className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
+          Устаревший способ входа. Основной вход для персонала —{" "}
+          <Link href="/staff/login" className="font-semibold underline underline-offset-2">
+            /staff/login
+          </Link>{" "}
+          (Supabase Auth). PIN оставлен как аварийный резерв.
+        </p>
 
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -83,7 +92,7 @@ export default function ManagerLoginPage() {
         </form>
 
         <p className="mt-5 text-center text-xs text-muted">
-          Демо-доступ. В production требуется полноценная авторизация.
+          Демо-доступ. Используйте только если Supabase Auth недоступен.
         </p>
       </div>
     </div>
