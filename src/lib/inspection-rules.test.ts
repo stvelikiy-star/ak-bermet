@@ -87,15 +87,45 @@ test("only matching completed sources can be inspected", () => {
   );
 });
 
-test("unsupported blocking mutation is rejected deterministically", () => {
+test("blocking action supports only inspectable completed source tasks", () => {
+  assert.equal(
+    validateInspectionAction({
+      source: "cleaning",
+      action: "mark_blocking_problem",
+      roomStatus: "inspection_required",
+      cleaningStatus: "done",
+      hasActiveBlockingMaintenance: false,
+    }),
+    null
+  );
+  assert.equal(
+    validateInspectionAction({
+      source: "maintenance",
+      action: "mark_blocking_problem",
+      roomStatus: "inspection_required",
+      maintenanceStatus: "completed",
+      hasActiveBlockingMaintenance: false,
+    }),
+    null
+  );
   assert.match(
     validateInspectionAction({
       source: "maintenance",
       action: "mark_blocking_problem",
       roomStatus: "inspection_required",
-      maintenanceStatus: "closed",
+      maintenanceStatus: "in_progress",
       hasActiveBlockingMaintenance: false,
     }) ?? "",
-    /нет RPC/
+    /завершённого ремонта/
+  );
+  assert.match(
+    validateInspectionAction({
+      source: "cleaning",
+      action: "mark_blocking_problem",
+      roomStatus: "ready",
+      cleaningStatus: "done",
+      hasActiveBlockingMaintenance: false,
+    }) ?? "",
+    /не ожидает проверки/
   );
 });

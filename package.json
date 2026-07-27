@@ -10,7 +10,7 @@
     "lint": "next lint",
     "test:housekeeping": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-housekeeping-tests src/lib/housekeeping-rules.ts src/lib/housekeeping-rules.test.ts && node --test /tmp/ak-bermet-housekeeping-tests/lib/housekeeping-rules.test.js",
     "test:technician": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-technician-tests src/lib/technician-rules.ts src/lib/technician-rules.test.ts src/types/auth.ts src/types/operations.ts src/types/technician.ts && node --test /tmp/ak-bermet-technician-tests/lib/technician-rules.test.js",
-    "test:inspection": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-inspection-tests src/lib/inspection-rules.ts src/lib/inspection-rules.test.ts src/types/operations.ts src/types/inspection.ts && node --test /tmp/ak-bermet-inspection-tests/lib/inspection-rules.test.js"
+    "test:inspection": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-inspection-tests src/lib/inspection-rules.ts src/lib/inspection-rules.test.ts src/types/operations.ts src/types/inspection.ts && node --test /tmp/ak-bermet-inspection-tests/lib/inspection-rules.test.js supabase/migrations/manager-inspection-blocking.contract.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
