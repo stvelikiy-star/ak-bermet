@@ -311,7 +311,7 @@ export async function POST(request: Request) {
       source === "cleaning" ? "cleaning_tasks" : "maintenance_requests";
     const { data: sourceTask, error: sourceTaskError } = await auth.supabase
       .from(taskTable)
-      .select("id, room_unit_id")
+      .select("id, room_unit_id, status, room_units!inner ( operational_status )")
       .eq("id", taskId)
       .maybeSingle();
     if (sourceTaskError) {
@@ -325,6 +325,25 @@ export async function POST(request: Request) {
         { error: "Задача не найдена или недоступна." },
         { status: 404 }
       );
+    }
+    const sourceRoom = one(
+      sourceTask.room_units as Relation<{ operational_status: RoomOperationalStatus }>
+    );
+    if (!sourceRoom) {
+      return NextResponse.json({ error: "Номер задачи не найден." }, { status: 409 });
+    }
+    const blockingValidationError = validateInspectionAction({
+      source,
+      action,
+      roomStatus: sourceRoom.operational_status,
+      cleaningStatus:
+        source === "cleaning" ? (sourceTask.status as CleaningTaskStatus) : undefined,
+      maintenanceStatus:
+        source === "maintenance" ? (sourceTask.status as MaintenanceStatus) : undefined,
+      hasActiveBlockingMaintenance: false,
+    });
+    if (blockingValidationError) {
+      return NextResponse.json({ error: blockingValidationError }, { status: 409 });
     }
 
     const rpcResult = await auth.supabase.rpc(
