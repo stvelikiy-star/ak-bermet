@@ -307,13 +307,57 @@ export async function POST(request: Request) {
     );
   }
   if (action === "mark_blocking_problem") {
-    return NextResponse.json(
+    const taskTable =
+      source === "cleaning" ? "cleaning_tasks" : "maintenance_requests";
+    const { data: sourceTask, error: sourceTaskError } = await auth.supabase
+      .from(taskTable)
+      .select("id, room_unit_id")
+      .eq("id", taskId)
+      .maybeSingle();
+    if (sourceTaskError) {
+      return NextResponse.json(
+        { error: "Не удалось проверить задачу перед блокировкой номера." },
+        { status: 503 }
+      );
+    }
+    if (!sourceTask) {
+      return NextResponse.json(
+        { error: "Задача не найдена или недоступна." },
+        { status: 404 }
+      );
+    }
+
+    const rpcResult = await auth.supabase.rpc(
+      "fn_mark_inspection_blocking_problem",
       {
-        error:
-          "Операция недоступна: в текущей схеме нет manager-authorized RPC для создания блокирующей технической заявки.",
-      },
-      { status: 503 }
+        p_room_unit_id: sourceTask.room_unit_id,
+        p_note: note,
+        p_cleaning_task_id: source === "cleaning" ? taskId : null,
+        p_maintenance_request_id: source === "maintenance" ? taskId : null,
+      }
     );
+    if (rpcResult.error) {
+      const unavailable =
+        rpcResult.error.code === "42883" || rpcResult.error.code === "PGRST202";
+      return NextResponse.json(
+        {
+          error: unavailable
+            ? "Операция блокировки номера не установлена в Supabase."
+            : "Не удалось создать блокирующую техническую заявку. Обновите очередь и повторите.",
+        },
+        { status: unavailable ? 503 : 409 }
+      );
+    }
+    const result = Array.isArray(rpcResult.data)
+      ? rpcResult.data[0]
+      : rpcResult.data;
+    return NextResponse.json({
+      ok: true,
+      maintenanceRequestId: result?.maintenance_request_id ?? null,
+      inspectionId: result?.room_inspection_id ?? null,
+      created: result?.created ?? false,
+      roomStatus: result?.room_status ?? "blocked",
+    });
   }
 
   const table = source === "cleaning" ? "cleaning_tasks" : "maintenance_requests";

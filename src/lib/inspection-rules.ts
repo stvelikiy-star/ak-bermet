@@ -44,7 +44,18 @@ export function validateInspectionAction(input: {
   hasActiveBlockingMaintenance: boolean;
 }): string | null {
   if (input.action === "mark_blocking_problem") {
-    return "В текущей схеме нет RPC для блокирующей технической заявки от менеджера.";
+    if (input.roomStatus !== "inspection_required") {
+      return "Номер больше не ожидает проверки.";
+    }
+    if (input.source === "cleaning") {
+      return input.cleaningStatus === "done"
+        ? null
+        : "Блокирующую проблему можно отметить только для завершённой уборки.";
+    }
+    return input.maintenanceStatus === "completed" ||
+      input.maintenanceStatus === "closed"
+      ? null
+      : "Блокирующую проблему можно отметить только при проверке завершённого ремонта.";
   }
   if (input.roomStatus !== "inspection_required") {
     return "Номер больше не ожидает проверки.";

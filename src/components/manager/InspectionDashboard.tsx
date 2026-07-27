@@ -31,6 +31,7 @@ export default function InspectionDashboard() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +64,7 @@ export default function InspectionDashboard() {
     }
     setBusy(item.id);
     setError("");
+    setSuccess("");
     try {
       const response = await fetch("/api/manager/inspections", {
         method: "POST",
@@ -77,6 +79,13 @@ export default function InspectionDashboard() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Операция не выполнена.");
       setNotes((current) => ({ ...current, [item.id]: "" }));
+      setSuccess(
+        action === "mark_blocking_problem"
+          ? payload.created
+            ? "Номер заблокирован, техническая заявка создана."
+            : "Номер заблокирован, использована существующая техническая заявка."
+          : "Результат проверки сохранён."
+      );
       await load();
     } catch (actionError) {
       setError(
@@ -98,6 +107,11 @@ export default function InspectionDashboard() {
       {error && (
         <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
           {error}
+        </div>
+      )}
+      {success && (
+        <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-700">
+          {success}
         </div>
       )}
 
