@@ -1,13 +1,11 @@
-export default function HousekeepingHome() {
+import HousekeepingDashboard from "@/components/housekeeping/HousekeepingDashboard";
+import { requireStaffRole } from "@/lib/auth/require-role";
+
+export default async function HousekeepingHome() {
+  const staff = await requireStaffRole(["housekeeping"]);
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-3 p-6 text-center">
-      <h1 className="font-display text-2xl font-semibold text-emerald-deep">
-        Кабинет горничной
-      </h1>
-      <p className="text-sm text-muted">
-        Доступ подтверждён по роли «Горничная». Экран задач по уборке
-        появится на следующем этапе.
-      </p>
-    </main>
+    <HousekeepingDashboard
+      staffName={staff.fullName ?? staff.email ?? "Сотрудник"}
+    />
   );
 }
