@@ -42,7 +42,15 @@ export function validateInspectionAction(input: {
   cleaningStatus?: CleaningTaskStatus;
   maintenanceStatus?: MaintenanceStatus;
   hasActiveBlockingMaintenance: boolean;
+  alreadyInspected: boolean;
+  isCurrentTask: boolean;
 }): string | null {
+  if (input.alreadyInspected) {
+    return "Задача уже проверена ранее. Обновите очередь и повторите.";
+  }
+  if (!input.isCurrentTask) {
+    return "Задача устарела: по номеру уже есть более новая задача. Обновите очередь и повторите.";
+  }
   if (input.action === "mark_blocking_problem") {
     if (input.roomStatus !== "inspection_required") {
       return "Номер больше не ожидает проверки.";
