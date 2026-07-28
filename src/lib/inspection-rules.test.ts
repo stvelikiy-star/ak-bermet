@@ -62,6 +62,8 @@ test("only matching completed sources can be inspected", () => {
       roomStatus: "inspection_required",
       cleaningStatus: "done",
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }),
     null
   );
@@ -72,6 +74,8 @@ test("only matching completed sources can be inspected", () => {
       roomStatus: "inspection_required",
       cleaningStatus: "in_progress",
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }) ?? "",
     /не завершена/
   );
@@ -82,6 +86,8 @@ test("only matching completed sources can be inspected", () => {
       roomStatus: "inspection_required",
       maintenanceStatus: "closed",
       hasActiveBlockingMaintenance: true,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }) ?? "",
     /блокирующая/
   );
@@ -95,6 +101,8 @@ test("blocking action supports only inspectable completed source tasks", () => {
       roomStatus: "inspection_required",
       cleaningStatus: "done",
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }),
     null
   );
@@ -105,6 +113,8 @@ test("blocking action supports only inspectable completed source tasks", () => {
       roomStatus: "inspection_required",
       maintenanceStatus: "completed",
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }),
     null
   );
@@ -115,6 +125,8 @@ test("blocking action supports only inspectable completed source tasks", () => {
       roomStatus: "inspection_required",
       maintenanceStatus: "in_progress",
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }) ?? "",
     /завершённого ремонта/
   );
@@ -125,7 +137,48 @@ test("blocking action supports only inspectable completed source tasks", () => {
       roomStatus: "ready",
       cleaningStatus: "done",
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: true,
     }) ?? "",
     /не ожидает проверки/
+  );
+});
+
+test("stale or already-resolved tasks are rejected before any action-specific rule", () => {
+  assert.match(
+    validateInspectionAction({
+      source: "cleaning",
+      action: "approve",
+      roomStatus: "inspection_required",
+      cleaningStatus: "done",
+      hasActiveBlockingMaintenance: false,
+      alreadyInspected: true,
+      isCurrentTask: true,
+    }) ?? "",
+    /уже проверена/
+  );
+  assert.match(
+    validateInspectionAction({
+      source: "cleaning",
+      action: "approve",
+      roomStatus: "inspection_required",
+      cleaningStatus: "done",
+      hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: false,
+    }) ?? "",
+    /устарела/
+  );
+  assert.match(
+    validateInspectionAction({
+      source: "maintenance",
+      action: "mark_blocking_problem",
+      roomStatus: "inspection_required",
+      maintenanceStatus: "completed",
+      hasActiveBlockingMaintenance: false,
+      alreadyInspected: false,
+      isCurrentTask: false,
+    }) ?? "",
+    /устарела/
   );
 });

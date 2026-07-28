@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import {
   canRoomBecomeReady,
@@ -125,6 +126,51 @@ async function authorizeManager() {
   return { supabase, staff };
 }
 
+type TaskFreshness = { alreadyInspected: boolean; isCurrentTask: boolean };
+
+async function loadTaskFreshness(
+  supabase: SupabaseClient,
+  source: "cleaning" | "maintenance",
+  roomUnitId: string,
+  taskId: string
+): Promise<TaskFreshness | { error: true }> {
+  const inspectionField =
+    source === "cleaning" ? "cleaning_task_id" : "maintenance_request_id";
+  const { data: existingInspection, error: inspectionError } = await supabase
+    .from("room_inspections")
+    .select("id")
+    .eq(inspectionField, taskId)
+    .limit(1)
+    .maybeSingle();
+  if (inspectionError) return { error: true };
+
+  const latestResult =
+    source === "cleaning"
+      ? await supabase
+          .from("cleaning_tasks")
+          .select("id")
+          .eq("room_unit_id", roomUnitId)
+          .eq("status", "done")
+          .eq("requires_inspection", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : await supabase
+          .from("maintenance_requests")
+          .select("id")
+          .eq("room_unit_id", roomUnitId)
+          .in("status", ["completed", "closed"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+  if (latestResult.error) return { error: true };
+
+  return {
+    alreadyInspected: Boolean(existingInspection),
+    isCurrentTask: latestResult.data?.id === taskId,
+  };
+}
+
 function one<T>(value: Relation<T>): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
@@ -229,6 +275,8 @@ export async function GET() {
   for (const task of (cleaningResult.data ?? []) as unknown as RawCleaning[]) {
     const room = one(task.room_units);
     if (!room) continue;
+    const taskInspections = historyFor(inspections, "cleaning_task_id", task.id);
+    if (taskInspections.length > 0) continue;
     items.push({
       id: task.id,
       source: "cleaning",
@@ -243,13 +291,15 @@ export async function GET() {
       requiresInspection: task.requires_inspection,
       activeBlockingMaintenance: (blockingByRoom.get(room.id)?.size ?? 0) > 0,
       attachments: (task.task_attachments ?? []).map(mapAttachment),
-      inspections: historyFor(inspections, "cleaning_task_id", task.id),
+      inspections: taskInspections,
       createdAt: task.created_at,
     });
   }
   for (const task of (maintenanceResult.data ?? []) as unknown as RawMaintenance[]) {
     const room = one(task.room_units);
     if (!room) continue;
+    const taskInspections = historyFor(inspections, "maintenance_request_id", task.id);
+    if (taskInspections.length > 0) continue;
     const blockers = blockingByRoom.get(room.id);
     const hasOtherBlocker = [...(blockers ?? [])].some((id) => id !== task.id);
     items.push({
@@ -266,7 +316,7 @@ export async function GET() {
       requiresInspection: true,
       activeBlockingMaintenance: hasOtherBlocker,
       attachments: (task.task_attachments ?? []).map(mapAttachment),
-      inspections: historyFor(inspections, "maintenance_request_id", task.id),
+      inspections: taskInspections,
       createdAt: task.created_at,
     });
   }
@@ -332,6 +382,18 @@ export async function POST(request: Request) {
     if (!sourceRoom) {
       return NextResponse.json({ error: "Номер задачи не найден." }, { status: 409 });
     }
+    const blockingFreshness = await loadTaskFreshness(
+      auth.supabase,
+      source,
+      sourceTask.room_unit_id,
+      taskId
+    );
+    if ("error" in blockingFreshness) {
+      return NextResponse.json(
+        { error: "Не удалось проверить актуальность задачи." },
+        { status: 503 }
+      );
+    }
     const blockingValidationError = validateInspectionAction({
       source,
       action,
@@ -341,6 +403,8 @@ export async function POST(request: Request) {
       maintenanceStatus:
         source === "maintenance" ? (sourceTask.status as MaintenanceStatus) : undefined,
       hasActiveBlockingMaintenance: false,
+      alreadyInspected: blockingFreshness.alreadyInspected,
+      isCurrentTask: blockingFreshness.isCurrentTask,
     });
     if (blockingValidationError) {
       return NextResponse.json({ error: blockingValidationError }, { status: 409 });
@@ -455,6 +519,29 @@ export async function POST(request: Request) {
     );
   }
 
+  const freshness = await loadTaskFreshness(
+    auth.supabase,
+    source,
+    task.room_unit_id,
+    taskId
+  );
+  if ("error" in freshness) {
+    return NextResponse.json(
+      { error: "Не удалось проверить актуальность задачи." },
+      { status: 503 }
+    );
+  }
+  if (freshness.alreadyInspected || !freshness.isCurrentTask) {
+    return NextResponse.json(
+      {
+        error: freshness.alreadyInspected
+          ? "Задача уже проверена ранее. Обновите очередь и повторите."
+          : "Задача устарела: по номеру уже есть более новая задача. Обновите очередь и повторите.",
+      },
+      { status: 409 }
+    );
+  }
+
   let roomStatus = room.operational_status;
   if ((blockers ?? []).length === 0 &&
       source === "maintenance" &&
@@ -483,6 +570,8 @@ export async function POST(request: Request) {
     maintenanceStatus:
       source === "maintenance" ? (task.status as MaintenanceStatus) : undefined,
     hasActiveBlockingMaintenance: (blockers ?? []).length > 0,
+    alreadyInspected: freshness.alreadyInspected,
+    isCurrentTask: freshness.isCurrentTask,
   });
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 409 });
