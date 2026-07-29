@@ -3,6 +3,12 @@ import type {
   OccupancyRecord,
   AvailabilityQuery,
   AvailabilityItem,
+  CreateHoldRequest,
+  AvailabilityErrorCode,
+} from "@/types/availability";
+import {
+  HOLD_DURATION_MINUTES,
+  BLOCKING_BOOKING_STATUSES,
 } from "@/types/availability";
 
 // TODO Stage 05: replace mock availability with Google Sheets API integration.
@@ -111,18 +117,155 @@ export const mockOccupancy: OccupancyRecord[] = [];
 export const AVAILABILITY_MESSAGE =
   "Предварительно могут быть варианты. Финальное наличие и бронь подтверждает администратор после проверки системы.";
 
+export class AvailabilityError extends Error {
+  code: AvailabilityErrorCode;
+  constructor(code: AvailabilityErrorCode, message: string) {
+    super(message);
+    this.name = "AvailabilityError";
+    this.code = code;
+  }
+}
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Строгий разбор даты в формате YYYY-MM-DD. Отклоняет невалидные даты,
+// в т.ч. "переливающиеся" (напр. 2026-02-30 -> Invalid Date проверкой ниже).
+export function parseDateStrict(value: string): Date | null {
+  if (!DATE_ONLY_RE.test(value)) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== m - 1 ||
+    date.getUTCDate() !== d
+  ) {
+    return null;
+  }
+  return date;
+}
+
+// Проверяет и разбирает пару дат заезда/выезда. Бросает AvailabilityError
+// с явным кодом при некорректном формате или диапазоне.
+export function parseDateRange(
+  checkIn?: string,
+  checkOut?: string
+): { checkIn: Date; checkOut: Date } | null {
+  if (!checkIn && !checkOut) return null;
+  if (!checkIn || !checkOut) {
+    throw new AvailabilityError(
+      "invalid_date_range",
+      "Нужно указать обе даты: заезд и выезд."
+    );
+  }
+  const inDate = parseDateStrict(checkIn);
+  const outDate = parseDateStrict(checkOut);
+  if (!inDate) {
+    throw new AvailabilityError(
+      "invalid_date",
+      `Некорректная дата заезда: ${checkIn}`
+    );
+  }
+  if (!outDate) {
+    throw new AvailabilityError(
+      "invalid_date",
+      `Некорректная дата выезда: ${checkOut}`
+    );
+  }
+  if (outDate.getTime() <= inDate.getTime()) {
+    throw new AvailabilityError(
+      "invalid_date_range",
+      "Дата выезда должна быть позже даты заезда."
+    );
+  }
+  return { checkIn: inDate, checkOut: outDate };
+}
+
+// Проверяет количество гостей: положительное целое число.
+export function parseGuests(guestsRaw: string | null): number | undefined {
+  if (guestsRaw === null || guestsRaw === "") return undefined;
+  const n = Number(guestsRaw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    throw new AvailabilityError(
+      "invalid_guests",
+      `Некорректное число гостей: ${guestsRaw}`
+    );
+  }
+  return n;
+}
+
+// Пересечение двух полуоткрытых интервалов [checkIn, checkOut).
+function rangesOverlap(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date
+): boolean {
+  return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
+}
+
+// Удержание/бронь считается активной (блокирующей), если её статус не
+// финализирован как отменённый и — для pre_hold — она ещё не истекла.
+export function isOccupancyBlocking(
+  record: OccupancyRecord,
+  now: Date = new Date()
+): boolean {
+  if (!BLOCKING_BOOKING_STATUSES.includes(record.status)) return false;
+  if (record.status === "pre_hold" && record.expiresAt) {
+    const expiresAt = new Date(record.expiresAt);
+    if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= now.getTime()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function roomHasConflict(
+  roomId: string,
+  checkIn: Date,
+  checkOut: Date,
+  occupancy: OccupancyRecord[],
+  now: Date
+): boolean {
+  return occupancy.some((rec) => {
+    if (rec.roomId !== roomId) return false;
+    if (!isOccupancyBlocking(rec, now)) return false;
+    const recIn = parseDateStrict(rec.checkIn) ?? new Date(rec.checkIn);
+    const recOut = parseDateStrict(rec.checkOut) ?? new Date(rec.checkOut);
+    if (Number.isNaN(recIn.getTime()) || Number.isNaN(recOut.getTime())) {
+      // Повреждённые даты занятости не доказывают отсутствие пересечения —
+      // считаем номер занятым (fail closed), а не свободным. Иначе битая
+      // запись могла бы маскировать реально занятый номер под доступный.
+      console.error(
+        `[AVAILABILITY] Malformed occupancy dates for room ${roomId}, record ${rec.id}: checkIn=${rec.checkIn} checkOut=${rec.checkOut}. Treating as conflict.`
+      );
+      return true;
+    }
+    return rangesOverlap(checkIn, checkOut, recIn, recOut);
+  });
+}
+
 // Фильтрация набора номеров по запросу (без статусов «свободно/занято»).
+// Если переданы даты заезда/выезда, номера с пересекающейся активной
+// занятостью (включая неистёкшие удержания) исключаются из выдачи.
 export function filterRooms(
   rooms: RoomUnit[],
-  q: AvailabilityQuery
+  q: AvailabilityQuery,
+  occupancy: OccupancyRecord[] = [],
+  now: Date = new Date()
 ): AvailabilityItem[] {
   const guests = q.guests ?? 1;
+  const range = parseDateRange(q.checkIn, q.checkOut);
   return rooms
     .filter((r) => r.status === "active")
     .filter((r) => r.capacity >= guests)
     .filter((r) =>
       q.category
         ? r.category.toLowerCase().includes(q.category.toLowerCase())
+        : true
+    )
+    .filter((r) =>
+      range
+        ? !roomHasConflict(r.id, range.checkIn, range.checkOut, occupancy, now)
         : true
     )
     .map((r) => ({
@@ -138,5 +281,128 @@ export function filterRooms(
 
 // Предварительный подбор по mock-данным.
 export function queryAvailability(q: AvailabilityQuery): AvailabilityItem[] {
-  return filterRooms(mockRooms, q);
+  return filterRooms(mockRooms, q, mockOccupancy);
+}
+
+// ── Удержания номеров (60 минут, см. DECISIONS.md) ──────────────
+//
+// In-memory хранилище живёт в пределах одного процесса Node.js. Этого
+// достаточно для demo/mock-режима (без Google Sheets/Supabase): доступ к
+// нему всегда синхронный, поэтому проверка конфликта и запись удержания
+// выполняются атомарно относительно параллельных запросов в этом процессе.
+const holdStore = new Map<string, OccupancyRecord>();
+
+let holdSequence = 0;
+function nextHoldId(): string {
+  holdSequence += 1;
+  return `hold_${Date.now().toString(36)}_${holdSequence}`;
+}
+
+export function listActiveHolds(now: Date = new Date()): OccupancyRecord[] {
+  return Array.from(holdStore.values()).filter((rec) =>
+    isOccupancyBlocking(rec, now)
+  );
+}
+
+// Убирает истёкшие удержания из хранилища (housekeeping для памяти).
+export function sweepExpiredHolds(now: Date = new Date()): void {
+  for (const [id, rec] of holdStore) {
+    if (!isOccupancyBlocking(rec, now)) {
+      holdStore.delete(id);
+    }
+  }
+}
+
+export function resetHoldStoreForTests(): void {
+  holdStore.clear();
+  holdSequence = 0;
+}
+
+// Находит уже созданное удержание по ключу идемпотентности, если такое
+// есть — независимо от того, истекло ли оно с тех пор.
+function findHoldByIdempotencyKey(key: string): OccupancyRecord | undefined {
+  for (const rec of holdStore.values()) {
+    if (rec.idempotencyKey === key) return rec;
+  }
+  return undefined;
+}
+
+// Атомарно создаёт 60-минутное удержание номера, если нет конфликта по
+// датам с уже действующей занятостью (внешней и текущими удержаниями).
+// Повторный вызов с тем же idempotencyKey (напр. повтор запроса после
+// таймаута) возвращает исходное удержание вместо создания дубликата или
+// ложного конфликта с самим собой.
+export function createHold(
+  input: CreateHoldRequest,
+  rooms: RoomUnit[],
+  externalOccupancy: OccupancyRecord[] = [],
+  now: Date = new Date()
+): OccupancyRecord {
+  if (input.idempotencyKey) {
+    const existing = findHoldByIdempotencyKey(input.idempotencyKey);
+    if (existing) {
+      if (
+        existing.roomId !== input.roomId ||
+        existing.checkIn !== input.checkIn ||
+        existing.checkOut !== input.checkOut
+      ) {
+        throw new AvailabilityError(
+          "idempotency_conflict",
+          `Ключ идемпотентности уже использован для другого запроса: ${input.idempotencyKey}`
+        );
+      }
+      return existing;
+    }
+  }
+
+  const range = parseDateRange(input.checkIn, input.checkOut);
+  if (!range) {
+    throw new AvailabilityError(
+      "invalid_date_range",
+      "Нужно указать даты заезда и выезда."
+    );
+  }
+
+  const room = rooms.find((r) => r.id === input.roomId);
+  if (!room || room.status !== "active") {
+    throw new AvailabilityError(
+      "invalid_room",
+      `Номер не найден или недоступен: ${input.roomId}`
+    );
+  }
+
+  sweepExpiredHolds(now);
+
+  const allOccupancy = [...externalOccupancy, ...holdStore.values()];
+  if (roomHasConflict(room.id, range.checkIn, range.checkOut, allOccupancy, now)) {
+    throw new AvailabilityError(
+      "hold_conflict",
+      `Номер уже удержан или забронирован на выбранные даты: ${input.roomId}`
+    );
+  }
+
+  const createdAt = now.toISOString();
+  const expiresAt = new Date(
+    now.getTime() + HOLD_DURATION_MINUTES * 60_000
+  ).toISOString();
+
+  const hold: OccupancyRecord = {
+    id: nextHoldId(),
+    roomId: room.id,
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    status: "pre_hold",
+    guestName: input.guestName,
+    guestPhone: input.guestPhone,
+    manager: input.manager,
+    createdAt,
+    expiresAt,
+    idempotencyKey: input.idempotencyKey,
+  };
+
+  // Проверка конфликта и запись ниже не разделены await — весь метод
+  // выполняется синхронно в одном tick event loop, поэтому параллельные
+  // вызовы createHold не могут создать двойное бронирование одного номера.
+  holdStore.set(hold.id, hold);
+  return hold;
 }

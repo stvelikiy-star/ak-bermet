@@ -135,7 +135,12 @@ const OCCUPANCY_COLS = [
 const toBool = (v: string) => v?.trim().toLowerCase() === "да" || v === "true";
 const toNum = (v: string) => (v ? Number(v) : undefined);
 
-// Читает «Номерной фонд». Если лист не подключён/пуст — возвращает [].
+// Читает «Номерной фонд». Если лист не подключён — возвращает [].
+//
+// Ошибка чтения НЕ проглатывается (см. getOccupancyFromSheet): пустой
+// список неотличим от «в листе реально нет номеров», поэтому при сбое
+// чтения бросаем исключение — вызывающий код обязан считать номерной
+// фонд неизвестным, а не тихо переключаться на mock-данные (fail-open).
 export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
   if (!isGoogleSheetsEnabled()) return [];
   // TODO Stage 06: финализировать структуру листа «Номерной фонд».
@@ -175,11 +180,16 @@ export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
       });
   } catch (e) {
     console.error("[SHEETS] getRoomsFromSheet failed:", e);
-    return [];
+    throw e;
   }
 }
 
-// Читает «Занятость». Если лист не подключён/пуст — возвращает [].
+// Читает «Занятость». Если лист не подключён — возвращает [].
+//
+// В отличие от getRoomsFromSheet ошибка чтения НЕ проглатывается: пустой
+// список занятости неотличим от «реальной занятости нет», поэтому при сбое
+// чтения нужно явно сообщить вызывающему коду, а не тихо отдать [] — иначе
+// доступность и удержания будут считаться по неполным данным (fail-open).
 export async function getOccupancyFromSheet(): Promise<OccupancyRecord[]> {
   if (!isGoogleSheetsEnabled()) return [];
   // TODO Stage 06: финализировать структуру листа «Занятость».
@@ -210,7 +220,7 @@ export async function getOccupancyFromSheet(): Promise<OccupancyRecord[]> {
       });
   } catch (e) {
     console.error("[SHEETS] getOccupancyFromSheet failed:", e);
-    return [];
+    throw e;
   }
 }
 
