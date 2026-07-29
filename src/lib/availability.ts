@@ -229,12 +229,16 @@ function roomHasConflict(
   return occupancy.some((rec) => {
     if (rec.roomId !== roomId) return false;
     if (!isOccupancyBlocking(rec, now)) return false;
-    const recIn = parseDateStrict(rec.checkIn) ?? new Date(rec.checkIn);
-    const recOut = parseDateStrict(rec.checkOut) ?? new Date(rec.checkOut);
-    if (Number.isNaN(recIn.getTime()) || Number.isNaN(recOut.getTime())) {
-      // Повреждённые даты занятости не доказывают отсутствие пересечения —
-      // считаем номер занятым (fail closed), а не свободным. Иначе битая
-      // запись могла бы маскировать реально занятый номер под доступный.
+    // Только строгий разбор YYYY-MM-DD: permissive-парсинг через `new
+    // Date(string)` принимает форматы вроде "01/13/2026", которые не
+    // являются YYYY-MM-DD и могут дать неверную дату вместо явного отказа.
+    const recIn = parseDateStrict(rec.checkIn);
+    const recOut = parseDateStrict(rec.checkOut);
+    if (!recIn || !recOut || recOut.getTime() <= recIn.getTime()) {
+      // Повреждённые или инвертированные даты занятости не доказывают
+      // отсутствие пересечения — считаем номер занятым (fail closed), а не
+      // свободным. Иначе битая запись могла бы маскировать реально занятый
+      // номер под доступный.
       console.error(
         `[AVAILABILITY] Malformed occupancy dates for room ${roomId}, record ${rec.id}: checkIn=${rec.checkIn} checkOut=${rec.checkOut}. Treating as conflict.`
       );

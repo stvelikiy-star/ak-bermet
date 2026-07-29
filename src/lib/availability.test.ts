@@ -234,6 +234,48 @@ test("filterRooms treats malformed occupancy dates as blocking (fail closed)", (
   );
 });
 
+test("filterRooms treats inverted occupancy date ranges as blocking (fail closed)", () => {
+  const roomId = mockRooms[0].id;
+  const inverted: OccupancyRecord = {
+    id: "occ_inverted",
+    roomId,
+    checkIn: "2026-08-05",
+    checkOut: "2026-08-01",
+    status: "confirmed",
+  };
+
+  const items = filterRooms(
+    mockRooms,
+    { checkIn: "2026-08-01", checkOut: "2026-08-03" },
+    [inverted]
+  );
+  assert.equal(
+    items.length,
+    mockRooms.filter((r) => r.status === "active").length - 1
+  );
+});
+
+test("filterRooms rejects occupancy dates JS Date would parse permissively", () => {
+  const roomId = mockRooms[0].id;
+  const permissive: OccupancyRecord = {
+    id: "occ_permissive",
+    roomId,
+    checkIn: "08/01/2026",
+    checkOut: "2026-08-05",
+    status: "confirmed",
+  };
+
+  const items = filterRooms(
+    mockRooms,
+    { checkIn: "2026-08-01", checkOut: "2026-08-03" },
+    [permissive]
+  );
+  assert.equal(
+    items.length,
+    mockRooms.filter((r) => r.status === "active").length - 1
+  );
+});
+
 test("createHold is idempotent for repeated requests with the same key", () => {
   resetHoldStoreForTests();
   const roomId = mockRooms[0].id;

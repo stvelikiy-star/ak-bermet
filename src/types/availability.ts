@@ -88,6 +88,7 @@ export type AvailabilityErrorCode =
   | "invalid_date_range"
   | "invalid_guests"
   | "invalid_room"
+  | "invalid_idempotency_key"
   | "room_unavailable"
   | "hold_conflict"
   | "idempotency_conflict"

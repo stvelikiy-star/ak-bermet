@@ -28,6 +28,7 @@ function errorStatus(code: AvailabilityErrorCode): number {
     case "invalid_date_range":
     case "invalid_guests":
     case "invalid_room":
+    case "invalid_idempotency_key":
       return 400;
     case "hold_conflict":
     case "room_unavailable":
@@ -64,20 +65,24 @@ async function loadRoomsAndOccupancy(): Promise<{
         "Не удалось прочитать номерной фонд. Повторите запрос позже."
       );
     }
-    const sheetRooms = roomsResult.value;
-    if (sheetRooms.length > 0) {
-      if (occupancyResult.status === "rejected") {
-        console.error(
-          "[AVAILABILITY] Occupancy read failed while real rooms are in use:",
-          occupancyResult.reason
-        );
-        throw new AvailabilityError(
-          "availability_unknown",
-          "Не удалось проверить занятость номеров. Повторите запрос позже."
-        );
-      }
-      return { rooms: sheetRooms, occupancy: occupancyResult.value, source: "sheets" };
+    if (occupancyResult.status === "rejected") {
+      console.error(
+        "[AVAILABILITY] Occupancy read failed:",
+        occupancyResult.reason
+      );
+      throw new AvailabilityError(
+        "availability_unknown",
+        "Не удалось проверить занятость номеров. Повторите запрос позже."
+      );
     }
+    // Реальный номерной фонд настроен — используем его как есть, даже если
+    // лист пуст. Подмена fabricated mock-номерами здесь была бы fail-open:
+    // клиент получил бы выдуманные варианты вместо честного пустого списка.
+    return {
+      rooms: roomsResult.value,
+      occupancy: occupancyResult.value,
+      source: "sheets",
+    };
   }
   return { rooms: mockRooms, occupancy: mockOccupancy, source: "mock" };
 }
@@ -172,6 +177,19 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  // Ключ идемпотентности обязателен: без него повторный запрос (retry
+  // после таймаута, двойной клик) создаёт отдельное удержание вместо
+  // возврата уже созданного (см. Codex-аудит).
+  if (!body.idempotencyKey || typeof body.idempotencyKey !== "string") {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "invalid_idempotency_key",
+        message: "Не указан ключ идемпотентности (idempotencyKey).",
+      },
+      { status: 400 }
+    );
+  }
 
   let rooms, occupancy;
   try {
@@ -195,10 +213,7 @@ export async function POST(request: Request) {
         guestName: body.guestName,
         guestPhone: body.guestPhone,
         manager: body.manager,
-        idempotencyKey:
-          typeof body.idempotencyKey === "string"
-            ? body.idempotencyKey
-            : undefined,
+        idempotencyKey: body.idempotencyKey,
       },
       rooms,
       occupancy

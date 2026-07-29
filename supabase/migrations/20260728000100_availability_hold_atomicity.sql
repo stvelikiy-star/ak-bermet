@@ -136,6 +136,28 @@ begin
 
   return v_hold;
 exception
+  when unique_violation then
+    -- availability_holds_idempotency_key_key: a concurrent caller with the
+    -- same idempotency_key committed its insert between this call's
+    -- lookup (no row found) and its own insert. That is not a conflict —
+    -- it is the same logical request racing itself — so re-fetch and
+    -- return the winning row exactly as the early lookup above would have
+    -- if it had run a moment later. A key collision against a different
+    -- room/date range is still rejected explicitly (AKB02), never
+    -- silently returned.
+    if p_idempotency_key is not null then
+      select * into v_existing
+        from public.availability_holds
+        where idempotency_key = p_idempotency_key;
+      if found then
+        if v_existing.room_unit_id <> p_room_unit_id or v_existing.date_range <> v_range then
+          raise exception 'idempotency_key_conflict: key already used for a different hold'
+            using errcode = 'AKB02';
+        end if;
+        return v_existing;
+      end if;
+    end if;
+    raise;
   when exclusion_violation then
     -- occupancy_periods EXCLUDE (0006): another active booking, hold, or
     -- block already covers an overlapping period for this room. This is
