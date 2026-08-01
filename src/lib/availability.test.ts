@@ -52,6 +52,41 @@ test("parseGuests rejects zero, negative and non-integer values", () => {
   }
 });
 
+test("availability reads keep mock inventory usable without roomNumber", () => {
+  assert.ok(mockRooms.length > 0);
+  assert.ok(mockRooms.every((room) => room.roomNumber === undefined));
+
+  const items = filterRooms(mockRooms, {
+    checkIn: "2026-09-01",
+    checkOut: "2026-09-03",
+  });
+  assert.equal(
+    items.length,
+    mockRooms.filter((room) => room.status === "active").length
+  );
+});
+
+test("hold creation uses source inventory when persisted room_units is unseeded", () => {
+  resetHoldStoreForTests();
+  // The mock path deliberately has no room_units mapping. Hold validation
+  // must use the loaded source inventory instead of treating an absent DB
+  // mapping as an unknown room.
+  assert.ok(mockRooms.every((room) => room.roomNumber === undefined));
+  const hold = createHold(
+    {
+      roomId: mockRooms[0].id,
+      checkIn: "2026-09-01",
+      checkOut: "2026-09-03",
+      idempotencyKey: "mock-room-without-number",
+    },
+    mockRooms,
+    [],
+    new Date("2026-08-01T10:00:00.000Z")
+  );
+  assert.equal(hold.roomId, mockRooms[0].id);
+  resetHoldStoreForTests();
+});
+
 test("filterRooms excludes rooms with overlapping active occupancy", () => {
   const roomId = mockRooms[0].id;
   const occupancy: OccupancyRecord[] = [
