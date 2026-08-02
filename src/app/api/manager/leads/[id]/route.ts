@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { isManagerAuthenticated } from "@/lib/manager-session";
+import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import {
   isGoogleSheetsEnabled,
+  StaleLeadError,
   updateLeadStatusInSheet,
 } from "@/lib/google-sheets";
 import { STATUS_ORDER } from "@/lib/manager-utils";
@@ -9,19 +10,18 @@ import type { LeadStatus } from "@/types/lead";
 
 export const runtime = "nodejs";
 
+const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isManagerAuthenticated())) {
+  const staff = await getCurrentStaff();
+  if (!staff || !hasAnyRole(staff, [...MANAGER_ROLES])) {
     return NextResponse.json({ ok: false, message: "Нет доступа" }, { status: 403 });
   }
 
-  let body: {
-    status?: LeadStatus;
-    managerComment?: string;
-    managerName?: string;
-  };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -31,7 +31,20 @@ export async function PATCH(
     );
   }
 
-  const status = body?.status;
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json(
+      { ok: false, message: "Некорректный запрос" },
+      { status: 422 }
+    );
+  }
+
+  const payload = body as {
+    status?: LeadStatus;
+    managerComment?: string;
+    expectedUpdatedAt?: string | null;
+  };
+
+  const status = payload.status;
   if (!status || !STATUS_ORDER.includes(status)) {
     return NextResponse.json(
       { ok: false, message: "Некорректный статус" },
@@ -39,27 +52,65 @@ export async function PATCH(
     );
   }
 
-  if (isGoogleSheetsEnabled()) {
-    try {
-      const { id } = await params;
-      await updateLeadStatusInSheet({
-        leadId: id,
-        status,
-        managerComment: body.managerComment,
-        managerName: body.managerName || "Администратор",
-      });
-    } catch (error) {
-      console.error("[MANAGER] updateLeadStatusInSheet failed:", error);
+  if (
+    payload.managerComment !== undefined &&
+    (typeof payload.managerComment !== "string" ||
+      payload.managerComment.length > 5000)
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "Некорректный комментарий менеджера" },
+      { status: 422 }
+    );
+  }
+
+  if (
+    payload.expectedUpdatedAt !== null &&
+    typeof payload.expectedUpdatedAt !== "string"
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "Некорректная версия заявки" },
+      { status: 422 }
+    );
+  }
+
+  if (!isGoogleSheetsEnabled()) {
+    return NextResponse.json(
+      { ok: false, message: "Источник заявок не настроен." },
+      { status: 503 }
+    );
+  }
+
+  try {
+    const { id } = await params;
+    const updatedAt = await updateLeadStatusInSheet({
+      leadId: id,
+      status,
+      managerComment: payload.managerComment ?? "",
+      managerName: staff.fullName ?? staff.email ?? "",
+      expectedUpdatedAt: payload.expectedUpdatedAt,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      updatedAt,
+    });
+  } catch (error) {
+    if (error instanceof StaleLeadError) {
       return NextResponse.json(
         {
           ok: false,
-          message: "Не удалось сохранить изменения. Попробуйте ещё раз.",
+          message: "Заявка уже изменена другим сотрудником. Обновите список.",
         },
-        { status: 500 }
+        { status: 409 }
       );
     }
+    console.error("[MANAGER] updateLead failed:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Не удалось сохранить изменения. Попробуйте ещё раз.",
+      },
+      { status: 500 }
+    );
   }
-  // В mock-режиме просто возвращаем ok.
-
-  return NextResponse.json({ ok: true });
 }
