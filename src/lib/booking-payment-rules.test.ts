@@ -29,6 +29,83 @@ test("repeated successful callback is idempotent", () => {
   assert.strictEqual(replay.state, first.state);
 });
 
+test("callback IDs are normalized and conflicting replays are rejected", () => {
+  const initial: PaymentState = {
+    total: 1000,
+    paid: 0,
+    status: "waiting",
+    processedCallbackIds: [],
+  };
+  const first = applyPaymentCallback(initial, {
+    id: " provider-event-2 ",
+    outcome: "succeeded",
+    amount: 200,
+  });
+  const replay = applyPaymentCallback(first.state, {
+    id: "provider-event-2",
+    outcome: "succeeded",
+    amount: 200,
+  });
+  assert.equal(replay.applied, false);
+  assert.throws(
+    () =>
+      applyPaymentCallback(first.state, {
+        id: "provider-event-2",
+        outcome: "succeeded",
+        amount: 300,
+      }),
+    /different payload/
+  );
+});
+
+test("legacy callback replay without a fingerprint fails closed", () => {
+  const legacyState: PaymentState = {
+    total: 1000,
+    paid: 200,
+    status: "paid",
+    processedCallbackIds: ["legacy-event"],
+  };
+
+  assert.throws(
+    () =>
+      applyPaymentCallback(legacyState, {
+        id: "legacy-event",
+        outcome: "succeeded",
+        amount: 300,
+      }),
+    /payload metadata is unavailable/
+  );
+});
+
+test("legacy callback IDs with whitespace are normalized before replay lookup", () => {
+  const legacyState: PaymentState = {
+    total: 1000,
+    paid: 200,
+    status: "paid",
+    processedCallbackIds: [" legacy-event-with-spaces "],
+    processedCallbacks: {
+      " legacy-event-with-spaces ": "succeeded:200",
+    },
+  };
+
+  const replay = applyPaymentCallback(legacyState, {
+    id: "legacy-event-with-spaces",
+    outcome: "succeeded",
+    amount: 200,
+  });
+  assert.equal(replay.applied, false);
+  assert.strictEqual(replay.state, legacyState);
+  assert.throws(
+    () =>
+      applyPaymentCallback(legacyState, {
+        id: "legacy-event-with-spaces",
+        outcome: "succeeded",
+        amount: 300,
+      }),
+    /different payload/
+  );
+});
+
 test("payment callbacks cannot overpay or revive a refund", () => {
   const state: PaymentState = {
     total: 1000,

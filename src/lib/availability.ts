@@ -295,6 +295,19 @@ export function queryAvailability(q: AvailabilityQuery): AvailabilityItem[] {
 // нему всегда синхронный, поэтому проверка конфликта и запись удержания
 // выполняются атомарно относительно параллельных запросов в этом процессе.
 const holdStore = new Map<string, OccupancyRecord>();
+interface HoldIdempotencyEntry {
+  hold: OccupancyRecord;
+  retainUntil: number;
+}
+
+// История ключей отделена от набора активных удержаний. Она ограничена как
+// сроком, так и количеством записей, чтобы клиентские ключи не позволяли
+// бесконечно накапливать память. После истечения hold персональные поля из
+// истории удаляются, но повтор запроса в пределах retry-window остаётся
+// идемпотентным.
+const HOLD_IDEMPOTENCY_RETENTION_MS = 24 * 60 * 60 * 1000;
+const MAX_HOLD_IDEMPOTENCY_ENTRIES = 10_000;
+const holdIdempotencyStore = new Map<string, HoldIdempotencyEntry>();
 
 let holdSequence = 0;
 function nextHoldId(): string {
@@ -313,22 +326,49 @@ export function sweepExpiredHolds(now: Date = new Date()): void {
   for (const [id, rec] of holdStore) {
     if (!isOccupancyBlocking(rec, now)) {
       holdStore.delete(id);
+      if (rec.idempotencyKey) {
+        const entry = holdIdempotencyStore.get(rec.idempotencyKey);
+        if (entry?.hold.id === rec.id) {
+          entry.hold = {
+            id: rec.id,
+            roomId: rec.roomId,
+            checkIn: rec.checkIn,
+            checkOut: rec.checkOut,
+            status: rec.status,
+            createdAt: rec.createdAt,
+            expiresAt: rec.expiresAt,
+            idempotencyKey: rec.idempotencyKey,
+          };
+        }
+      }
     }
+  }
+  for (const [key, entry] of holdIdempotencyStore) {
+    if (entry.retainUntil <= now.getTime()) holdIdempotencyStore.delete(key);
   }
 }
 
 export function resetHoldStoreForTests(): void {
   holdStore.clear();
+  holdIdempotencyStore.clear();
   holdSequence = 0;
 }
 
-// Находит уже созданное удержание по ключу идемпотентности, если такое
-// есть — независимо от того, истекло ли оно с тех пор.
+// Находит уже созданное удержание по ключу идемпотентности в пределах
+// ограниченного окна повторов — независимо от того, истекло ли само hold.
 function findHoldByIdempotencyKey(key: string): OccupancyRecord | undefined {
-  for (const rec of holdStore.values()) {
-    if (rec.idempotencyKey === key) return rec;
-  }
-  return undefined;
+  return holdIdempotencyStore.get(key)?.hold;
+}
+
+function rememberIdempotentHold(
+  key: string,
+  hold: OccupancyRecord,
+  expiresAt: number
+): void {
+  holdIdempotencyStore.set(key, {
+    hold,
+    retainUntil: expiresAt + HOLD_IDEMPOTENCY_RETENTION_MS,
+  });
 }
 
 // Атомарно создаёт 60-минутное удержание номера, если нет конфликта по
@@ -342,8 +382,10 @@ export function createHold(
   externalOccupancy: OccupancyRecord[] = [],
   now: Date = new Date()
 ): OccupancyRecord {
-  if (input.idempotencyKey) {
-    const existing = findHoldByIdempotencyKey(input.idempotencyKey);
+  const idempotencyKey = input.idempotencyKey?.trim();
+  sweepExpiredHolds(now);
+  if (idempotencyKey) {
+    const existing = findHoldByIdempotencyKey(idempotencyKey);
     if (existing) {
       if (
         existing.roomId !== input.roomId ||
@@ -352,10 +394,16 @@ export function createHold(
       ) {
         throw new AvailabilityError(
           "idempotency_conflict",
-          `Ключ идемпотентности уже использован для другого запроса: ${input.idempotencyKey}`
+          "Ключ идемпотентности уже использован для другого запроса."
         );
       }
       return existing;
+    }
+    if (holdIdempotencyStore.size >= MAX_HOLD_IDEMPOTENCY_ENTRIES) {
+      throw new AvailabilityError(
+        "availability_unknown",
+        "Невозможно безопасно создать удержание. Повторите запрос позже."
+      );
     }
   }
 
@@ -371,17 +419,15 @@ export function createHold(
   if (!room || room.status !== "active") {
     throw new AvailabilityError(
       "invalid_room",
-      `Номер не найден или недоступен: ${input.roomId}`
+      "Номер не найден или недоступен."
     );
   }
-
-  sweepExpiredHolds(now);
 
   const allOccupancy = [...externalOccupancy, ...holdStore.values()];
   if (roomHasConflict(room.id, range.checkIn, range.checkOut, allOccupancy, now)) {
     throw new AvailabilityError(
       "hold_conflict",
-      `Номер уже удержан или забронирован на выбранные даты: ${input.roomId}`
+      "Номер уже удержан или забронирован на выбранные даты."
     );
   }
 
@@ -401,12 +447,15 @@ export function createHold(
     manager: input.manager,
     createdAt,
     expiresAt,
-    idempotencyKey: input.idempotencyKey,
+    idempotencyKey,
   };
 
   // Проверка конфликта и запись ниже не разделены await — весь метод
   // выполняется синхронно в одном tick event loop, поэтому параллельные
   // вызовы createHold не могут создать двойное бронирование одного номера.
   holdStore.set(hold.id, hold);
+  if (idempotencyKey) {
+    rememberIdempotentHold(idempotencyKey, hold, new Date(expiresAt).getTime());
+  }
   return hold;
 }

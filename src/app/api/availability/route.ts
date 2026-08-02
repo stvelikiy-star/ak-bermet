@@ -180,12 +180,16 @@ export async function POST(request: Request) {
   // Ключ идемпотентности обязателен: без него повторный запрос (retry
   // после таймаута, двойной клик) создаёт отдельное удержание вместо
   // возврата уже созданного (см. Codex-аудит).
-  if (!body.idempotencyKey || typeof body.idempotencyKey !== "string") {
+  if (
+    typeof body.idempotencyKey !== "string" ||
+    body.idempotencyKey.trim().length === 0 ||
+    body.idempotencyKey.trim().length > 200
+  ) {
     return NextResponse.json(
       {
         ok: false,
         code: "invalid_idempotency_key",
-        message: "Не указан ключ идемпотентности (idempotencyKey).",
+        message: "Укажите корректный ключ идемпотентности (до 200 символов).",
       },
       { status: 400 }
     );
@@ -213,12 +217,14 @@ export async function POST(request: Request) {
         guestName: body.guestName,
         guestPhone: body.guestPhone,
         manager: body.manager,
-        idempotencyKey: body.idempotencyKey,
+        idempotencyKey: body.idempotencyKey.trim(),
       },
       rooms,
       occupancy
     );
-    return NextResponse.json({ ok: true, hold }, { status: 201 });
+    const { idempotencyKey, ...publicHold } = hold;
+    void idempotencyKey;
+    return NextResponse.json({ ok: true, hold: publicHold }, { status: 201 });
   } catch (error) {
     if (error instanceof AvailabilityError) {
       return NextResponse.json(
