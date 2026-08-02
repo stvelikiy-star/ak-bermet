@@ -25,7 +25,9 @@ import type {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
+// Readiness after a reported problem or repair is an administrative decision.
+// A regular manager may use the manager area, but must not inspect/approve rooms.
+const INSPECTION_ROLES = ["owner", "administrator"] as const;
 const ACTIONS = new Set<InspectionAction>([
   "approve",
   "return_cleaning",
@@ -96,7 +98,7 @@ interface RawMaintenance {
   task_attachments: RawAttachment[] | null;
 }
 
-async function authorizeManager() {
+async function authorizeInspector() {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return {
@@ -115,7 +117,7 @@ async function authorizeManager() {
       ),
     };
   }
-  if (!hasAnyRole(staff, [...MANAGER_ROLES])) {
+  if (!hasAnyRole(staff, [...INSPECTION_ROLES])) {
     return {
       response: NextResponse.json(
         { error: "Нет доступа к проверкам номеров." },
@@ -204,7 +206,7 @@ function historyFor(
 }
 
 export async function GET() {
-  const auth = await authorizeManager();
+  const auth = await authorizeInspector();
   if ("response" in auth) return auth.response;
 
   const [cleaningResult, maintenanceResult, inspectionResult, blockingResult] =
@@ -325,7 +327,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await authorizeManager();
+  const auth = await authorizeInspector();
   if ("response" in auth) return auth.response;
 
   let body: Record<string, unknown>;
