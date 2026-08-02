@@ -210,6 +210,43 @@ test("createHold releases the room again once the hold expires", () => {
   resetHoldStoreForTests();
 });
 
+test("delayed idempotent retry returns the original expired hold", () => {
+  resetHoldStoreForTests();
+  const roomId = mockRooms[1].id;
+  const now = new Date("2026-08-01T10:00:00.000Z");
+  const request = {
+    roomId,
+    checkIn: "2026-08-10",
+    checkOut: "2026-08-12",
+    guestName: "Test Guest",
+    guestPhone: "+996000000000",
+    idempotencyKey: "delayed-hold-retry",
+  };
+  const first = createHold(request, mockRooms, [], now);
+
+  // A different request performs housekeeping after the first hold expired.
+  const later = new Date(now.getTime() + 61 * 60_000);
+  createHold(
+    {
+      roomId: mockRooms[2].id,
+      checkIn: "2026-08-20",
+      checkOut: "2026-08-22",
+      idempotencyKey: "sweep-trigger",
+    },
+    mockRooms,
+    [],
+    later
+  );
+
+  const replay = createHold(request, mockRooms, [], later);
+  assert.equal(replay.id, first.id);
+  assert.equal(replay.expiresAt, first.expiresAt);
+  assert.equal(replay.guestName, undefined);
+  assert.equal(replay.guestPhone, undefined);
+  assert.equal(listActiveHolds(later).length, 1);
+  resetHoldStoreForTests();
+});
+
 test("createHold rejects unknown or inactive rooms explicitly", () => {
   resetHoldStoreForTests();
   assert.throws(
@@ -358,6 +395,49 @@ test("createHold is idempotent for repeated requests with the same key", () => {
     (e: unknown) => {
       assert.ok(e instanceof AvailabilityError);
       assert.equal(e.code, "idempotency_conflict");
+      return true;
+    }
+  );
+  resetHoldStoreForTests();
+});
+
+test("createHold normalizes idempotency keys and does not expose identifiers in errors", () => {
+  resetHoldStoreForTests();
+  const roomId = mockRooms[0].id;
+  const first = createHold(
+    {
+      roomId,
+      checkIn: "2026-08-10",
+      checkOut: "2026-08-12",
+      idempotencyKey: " retry-key-private ",
+    },
+    mockRooms
+  );
+  assert.equal(first.idempotencyKey, "retry-key-private");
+  const replay = createHold(
+    {
+      roomId,
+      checkIn: "2026-08-10",
+      checkOut: "2026-08-12",
+      idempotencyKey: "retry-key-private",
+    },
+    mockRooms
+  );
+  assert.equal(replay.id, first.id);
+  assert.throws(
+    () =>
+      createHold(
+        {
+          roomId,
+          checkIn: "2026-08-20",
+          checkOut: "2026-08-22",
+          idempotencyKey: "retry-key-private",
+        },
+        mockRooms
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AvailabilityError);
+      assert.doesNotMatch(error.message, /retry-key-private/);
       return true;
     }
   );

@@ -11,6 +11,8 @@ export interface PaymentState {
   paid: number;
   status: PaymentStatus;
   processedCallbackIds: readonly string[];
+  /** Payloads retained so a reused provider event ID cannot hide a different payment. */
+  processedCallbacks?: Readonly<Record<string, string>>;
 }
 
 export interface PaymentCallback {
@@ -62,9 +64,33 @@ export function applyPaymentCallback(
   assertMoney(state.total, "total");
   assertMoney(state.paid, "paid");
   assertMoney(callback.amount, "callback.amount");
-  if (!callback.id.trim()) throw new TypeError("callback.id is required");
+  const callbackId = callback.id.trim();
+  if (!callbackId) throw new TypeError("callback.id is required");
+  const callbackFingerprint = `${callback.outcome}:${roundMoney(callback.amount)}`;
 
-  if (state.processedCallbackIds.includes(callback.id)) {
+  const matchingStoredIds = state.processedCallbackIds.filter(
+    (storedId) => storedId.trim() === callbackId
+  );
+  if (matchingStoredIds.length > 0) {
+    const fingerprints = matchingStoredIds
+      .map(
+        (storedId) =>
+          state.processedCallbacks?.[storedId] ??
+          state.processedCallbacks?.[callbackId]
+      )
+      .filter((value): value is string => value !== undefined);
+    const originalFingerprint = fingerprints[0];
+    if (!originalFingerprint) {
+      throw new Error(
+        "Payment callback replay cannot be verified because its payload metadata is unavailable"
+      );
+    }
+    if (
+      originalFingerprint !== callbackFingerprint ||
+      fingerprints.some((fingerprint) => fingerprint !== originalFingerprint)
+    ) {
+      throw new Error("A payment callback ID was reused with a different payload");
+    }
     return { state, applied: false };
   }
 
@@ -72,13 +98,18 @@ export function applyPaymentCallback(
     throw new Error("A refunded payment cannot accept payment callbacks");
   }
 
-  const processedCallbackIds = [...state.processedCallbackIds, callback.id];
+  const processedCallbackIds = [...state.processedCallbackIds, callbackId];
+  const processedCallbacks = {
+    ...state.processedCallbacks,
+    [callbackId]: callbackFingerprint,
+  };
   if (callback.outcome === "failed") {
     return {
       state: {
         ...state,
         status: state.paid > 0 ? state.status : "failed",
         processedCallbackIds,
+        processedCallbacks,
       },
       applied: true,
     };
@@ -100,6 +131,7 @@ export function applyPaymentCallback(
       paid,
       status: paid >= calculatePrepayment(state.total) ? "paid" : "partial",
       processedCallbackIds,
+      processedCallbacks,
     },
     applied: true,
   };
