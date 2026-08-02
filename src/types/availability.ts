@@ -9,6 +9,7 @@ export type BookingStatus =
   | "confirmed"
   | "checked_in"
   | "checking_out"
+  | "no_show"
   | "cancelled";
 
 export interface RoomUnit {
