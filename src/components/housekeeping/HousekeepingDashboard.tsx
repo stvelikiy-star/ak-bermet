@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  CLEANING_PHOTO_MIME_TYPES,
+  MAX_CLEANING_PHOTO_BYTES,
   canPerformHousekeepingAction,
   getHousekeepingPriority,
   isValidProblemNote,
   type HousekeepingAction,
 } from "@/lib/housekeeping-rules";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import type { HousekeepingTask } from "@/types/housekeeping";
 import type { CleaningTaskStatus } from "@/types/operations";
 
@@ -68,6 +71,9 @@ export default function HousekeepingDashboard({
   const [problemTask, setProblemTask] = useState<HousekeepingTask | null>(null);
   const [problemNote, setProblemNote] = useState("");
   const [blocksRoom, setBlocksRoom] = useState(false);
+  const [photoTask, setPhotoTask] = useState<HousekeepingTask | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPhase, setPhotoPhase] = useState<"before" | "after">("before");
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -168,6 +174,51 @@ export default function HousekeepingDashboard({
     }
   }
 
+  async function recordPhoto() {
+    if (!photoTask || !photoFile) return;
+    setBusyTask(photoTask.id);
+    setError("");
+    try {
+      const supabase = createSupabaseBrowserClient();
+      if (!supabase) {
+        setUnavailable(true);
+        setError("Хранилище фотографий не настроено.");
+        return;
+      }
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        router.replace("/staff/login?from=/housekeeping");
+        return;
+      }
+      const extension = photoFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const storagePath = `${userData.user.id}/${photoTask.id}/${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from("task-attachments")
+        .upload(storagePath, photoFile, { contentType: photoFile.type, upsert: false });
+      if (uploadError) {
+        setError("Не удалось загрузить фотографию. Повторите попытку.");
+        return;
+      }
+      const response = await fetch("/api/housekeeping/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: photoTask.id, action: "record_attachment", storagePath, phase: photoPhase }),
+      });
+      if (!response.ok) {
+        await supabase.storage.from("task-attachments").remove([storagePath]);
+        setError(await responseMessage(response, "Не удалось сохранить фотографию."));
+        return;
+      }
+      setPhotoTask(null);
+      setPhotoFile(null);
+      await loadTasks();
+    } catch {
+      setError("Нет связи с сервисом задач. Фотография не подтверждена.");
+    } finally {
+      setBusyTask(null);
+    }
+  }
+
   return (
     <main className="min-h-screen pb-10">
       <header className="sticky top-0 z-20 border-b border-gold/20 bg-emerald-deep text-white shadow-soft">
@@ -261,6 +312,11 @@ export default function HousekeepingDashboard({
                   setProblemNote("");
                   setBlocksRoom(false);
                 }}
+                onPhoto={(phase) => {
+                  setPhotoTask(task);
+                  setPhotoPhase(phase);
+                  setPhotoFile(null);
+                }}
               />
             ))}
           </div>
@@ -284,6 +340,11 @@ export default function HousekeepingDashboard({
           }
         />
       )}
+      {photoTask && (
+        <PhotoDialog task={photoTask} phase={photoPhase} file={photoFile}
+          busy={busyTask === photoTask.id} onFile={setPhotoFile}
+          onClose={() => setPhotoTask(null)} onSubmit={() => void recordPhoto()} />
+      )}
     </main>
   );
 }
@@ -293,11 +354,13 @@ function TaskCard({
   busy,
   onAction,
   onReport,
+  onPhoto,
 }: {
   task: HousekeepingTask;
   busy: boolean;
   onAction: (action: HousekeepingAction) => void;
   onReport: () => void;
+  onPhoto: (phase: "before" | "after") => void;
 }) {
   const priority = PRIORITY[getHousekeepingPriority(task.dueBy)];
   const primaryAction =
@@ -352,10 +415,16 @@ function TaskCard({
             {task.reportedProblem}
           </div>
         )}
+        {task.attachments.map((photo) => (
+          <p key={photo.id} className="break-all rounded-lg bg-beige p-2 text-xs text-muted">
+            <span className="font-semibold text-ink">Фото {photo.phase === "before" ? "до" : "после"}: </span>{photo.storagePath}
+          </p>
+        ))}
       </div>
 
       {(primaryAction ||
-        canPerformHousekeepingAction(task.status, "report_problem")) && (
+        canPerformHousekeepingAction(task.status, "report_problem") ||
+        task.status === "problem_reported") && (
         <div className="grid gap-2 border-t border-gold/10 p-4 sm:grid-cols-2">
           {primaryAction && (
             <button
@@ -377,9 +446,46 @@ function TaskCard({
               Сообщить о проблеме
             </button>
           )}
+          {(["pending", "accepted", "in_progress"] as CleaningTaskStatus[]).includes(task.status) && (
+            <button type="button" disabled={busy}
+              onClick={() => onPhoto("before")}
+              className="min-h-12 rounded-xl border border-gold/40 bg-white px-4 py-3 text-sm font-semibold text-emerald-deep disabled:opacity-50">
+              Добавить фото до
+            </button>
+          )}
+          {(task.status === "in_progress" || task.status === "problem_reported") && (
+            <button type="button" disabled={busy} onClick={() => onPhoto("after")}
+              className="min-h-12 rounded-xl border border-gold/40 bg-white px-4 py-3 text-sm font-semibold text-emerald-deep disabled:opacity-50">
+              Добавить фото после
+            </button>
+          )}
         </div>
       )}
     </article>
+  );
+}
+
+function PhotoDialog({ task, phase, file, busy, onFile, onClose, onSubmit }: {
+  task: HousekeepingTask; phase: "before" | "after"; file: File | null; busy: boolean;
+  onFile: (value: File | null) => void; onClose: () => void; onSubmit: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/45 sm:items-center sm:justify-center sm:p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="photo-title" className="w-full rounded-t-3xl bg-milk p-5 shadow-float sm:max-w-lg sm:rounded-3xl">
+        <h2 id="photo-title" className="font-display text-2xl font-semibold text-emerald-deep">Фото {phase === "before" ? "до" : "после"} · комната {task.roomNumber}</h2>
+        <label className="mt-5 block text-sm font-semibold text-ink">Сделать или выбрать фотографию
+          <input autoFocus type="file" accept={CLEANING_PHOTO_MIME_TYPES.join(",")}
+            onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+            className="mt-2 block w-full rounded-xl border border-gold/30 bg-white px-4 py-3 text-sm" />
+        </label>
+        <p className="mt-2 text-xs text-muted">JPEG, PNG, WebP, HEIC или HEIF, не более 10 МБ.</p>
+        {file && <p className="mt-2 break-all text-xs text-ink">{file.name}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" disabled={busy} onClick={onClose} className="min-h-12 rounded-xl border border-gold/30 font-semibold text-emerald-deep">Отмена</button>
+          <button type="button" disabled={busy || !file || !(CLEANING_PHOTO_MIME_TYPES as readonly string[]).includes(file.type.toLowerCase()) || file.size <= 0 || file.size > MAX_CLEANING_PHOTO_BYTES} onClick={onSubmit} className="min-h-12 rounded-xl bg-emerald-deep font-semibold text-white disabled:opacity-50">{busy ? "Загружаем…" : "Загрузить"}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

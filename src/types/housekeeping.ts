@@ -14,4 +14,12 @@ export interface HousekeepingTask {
   requiresInspection: boolean;
   reportedProblem: string | null;
   createdAt: string;
+  attachments: HousekeepingAttachment[];
+}
+
+export interface HousekeepingAttachment {
+  id: string;
+  phase: "before" | "after";
+  storagePath: string;
+  createdAt: string;
 }
