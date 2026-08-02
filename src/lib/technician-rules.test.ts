@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   technicianAuthorization,
+  validateMaintenanceCompletionEvidence,
   validateStoragePath,
   validateTechnicianAction,
   validateText,
@@ -14,6 +15,31 @@ test("authorization fails closed for configuration, session, activity and role",
   assert.equal(technicianAuthorization(true, true, false, ["technician"]), 403);
   assert.equal(technicianAuthorization(true, true, true, ["housekeeping"]), 403);
   assert.equal(technicianAuthorization(true, true, true, ["technician"]), 200);
+});
+
+test("completion requires diagnosis, performed work, and before/after evidence", () => {
+  const complete = {
+    diagnosis: "Неисправен клапан",
+    logTypes: ["diagnosis", "work_performed"] as const,
+    attachmentPhases: ["diagnostic", "result"],
+  };
+  assert.equal(validateMaintenanceCompletionEvidence(complete), null);
+  assert.match(
+    validateMaintenanceCompletionEvidence({ ...complete, diagnosis: null }) ?? "",
+    /диагностики/
+  );
+  assert.match(
+    validateMaintenanceCompletionEvidence({ ...complete, logTypes: ["diagnosis"] }) ?? "",
+    /выполненную работу/
+  );
+  assert.match(
+    validateMaintenanceCompletionEvidence({ ...complete, attachmentPhases: ["result"] }) ?? "",
+    /до ремонта/
+  );
+  assert.match(
+    validateMaintenanceCompletionEvidence({ ...complete, attachmentPhases: ["diagnostic"] }) ?? "",
+    /результата ремонта/
+  );
 });
 
 test("maintenance action graph follows repository RPC preconditions", () => {

@@ -6,6 +6,11 @@ import {
   validateTechnicianAction,
   type TechnicianAction,
 } from "@/lib/technician-rules";
+import {
+  CLEANING_PHOTO_MIME_TYPES,
+  MAX_CLEANING_PHOTO_BYTES,
+} from "@/lib/housekeeping-rules";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import type { TechnicianTask } from "@/types/technician";
 
 const STATUS = {
@@ -110,22 +115,69 @@ export default function TechnicianDashboard({ staffName }: { staffName: string }
     setBusy(task.id);
     setError("");
     setUnavailable(false);
+    let uploadedPath: string | null = null;
     try {
+      let requestDetails = details;
+      if (action === "record_attachment") {
+        const photo = (details as { photo?: unknown }).photo;
+        const phase = (details as { phase?: unknown }).phase;
+        if (!(photo instanceof File)) {
+          setError("Выберите фотографию.");
+          return;
+        }
+        if (!(CLEANING_PHOTO_MIME_TYPES as readonly string[]).includes(photo.type) || photo.size <= 0 || photo.size > MAX_CLEANING_PHOTO_BYTES) {
+          setError("Допустимы фотографии JPEG, PNG, WebP, HEIC или HEIF размером до 10 МБ.");
+          return;
+        }
+        const supabase = createSupabaseBrowserClient();
+        if (!supabase) {
+          setUnavailable(true);
+          setError("Сервис загрузки фотографий не настроен.");
+          return;
+        }
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData.user) {
+          router.replace("/staff/login?from=/technician");
+          return;
+        }
+        const extension = photo.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+        uploadedPath = `${userData.user.id}/${task.id}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("task-attachments")
+          .upload(uploadedPath, photo, { contentType: photo.type, upsert: false });
+        if (uploadError) {
+          setError("Не удалось загрузить фотографию. Повторите попытку.");
+          return;
+        }
+        requestDetails = { storagePath: uploadedPath, phase };
+      }
       const response = await fetch("/api/technician/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: task.id, action, ...details }),
+        body: JSON.stringify({ taskId: task.id, action, ...requestDetails }),
       });
       if (response.status === 401) {
+        if (uploadedPath) {
+          const supabase = createSupabaseBrowserClient();
+          await supabase?.storage.from("task-attachments").remove([uploadedPath]);
+        }
         router.replace("/staff/login?from=/technician");
         return;
       }
       if (response.status === 403) {
+        if (uploadedPath) {
+          const supabase = createSupabaseBrowserClient();
+          await supabase?.storage.from("task-attachments").remove([uploadedPath]);
+        }
         setError(await responseError(response, "Заявка больше не назначена вам."));
         await load();
         return;
       }
       if (!response.ok) {
+        if (uploadedPath) {
+          const supabase = createSupabaseBrowserClient();
+          await supabase?.storage.from("task-attachments").remove([uploadedPath]);
+        }
         setUnavailable(response.status === 503);
         setError(await responseError(response, "Изменение не подтверждено."));
         return;
@@ -133,6 +185,10 @@ export default function TechnicianDashboard({ staffName }: { staffName: string }
       setForm(null);
       await load();
     } catch {
+      if (uploadedPath) {
+        const supabase = createSupabaseBrowserClient();
+        await supabase?.storage.from("task-attachments").remove([uploadedPath]);
+      }
       setUnavailable(true);
       setError("Нет связи с сервисом. Изменение не подтверждено.");
     } finally {
@@ -321,13 +377,13 @@ function ActionForm({ task, action, busy, onClose, onSubmit }: { task: Technicia
   const [materialName, setMaterialName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("");
-  const [storagePath, setStoragePath] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [phase, setPhase] = useState<"diagnostic" | "result">("diagnostic");
   const title = action === "record_diagnosis" ? "Результат диагностики" : action === "record_work" ? "Выполненная работа" : action === "record_material" ? "Использованный материал" : "Фотография";
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (action === "record_material") onSubmit({ materialName, quantity: Number(quantity), unit, description });
-    else if (action === "record_attachment") onSubmit({ storagePath, phase });
+    else if (action === "record_attachment") onSubmit({ photo, phase });
     else onSubmit({ description });
   }
   return (
@@ -350,8 +406,16 @@ function ActionForm({ task, action, busy, onClose, onSubmit }: { task: Technicia
                 <option value="result">Результат ремонта</option>
               </select>
             </label>
-            <Field label="Путь объекта в Supabase Storage" value={storagePath} onChange={setStoragePath} placeholder="maintenance/…/photo.jpg" />
-            <p className="text-xs text-muted">Репозиторий не определяет bucket или upload API; здесь сохраняется существующий storage_path по контракту task_attachments.</p>
+            <label className="block text-sm font-medium">Фотография
+              <input
+                type="file"
+                accept={CLEANING_PHOTO_MIME_TYPES.join(",")}
+                required
+                onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+                className="mt-1 block w-full rounded-xl border border-gold/30 bg-white px-3 py-3 text-sm"
+              />
+            </label>
+            <p className="text-xs text-muted">JPEG, PNG, WebP, HEIC или HEIF, не более 10 МБ.</p>
           </> : (
             <label className="block text-sm font-medium">{action === "record_material" ? "Примечание (необязательно)" : "Описание"}
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="mt-1 w-full rounded-xl border border-gold/30 bg-white px-3 py-3" />

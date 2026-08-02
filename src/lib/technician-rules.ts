@@ -115,3 +115,23 @@ export function validateStoragePath(value: unknown): string | null {
   }
   return path;
 }
+
+export function validateMaintenanceCompletionEvidence(input: {
+  diagnosis: string | null;
+  logTypes: readonly MaintenanceLogType[];
+  attachmentPhases: readonly string[];
+}): string | null {
+  if (!validateText(input.diagnosis)) {
+    return "Перед завершением запишите результат диагностики.";
+  }
+  if (!input.logTypes.includes("work_performed")) {
+    return "Перед завершением запишите выполненную работу.";
+  }
+  if (!input.attachmentPhases.includes("diagnostic")) {
+    return "Перед завершением добавьте фотографию до ремонта (диагностика).";
+  }
+  if (!input.attachmentPhases.includes("result")) {
+    return "Перед завершением добавьте фотографию результата ремонта.";
+  }
+  return null;
+}

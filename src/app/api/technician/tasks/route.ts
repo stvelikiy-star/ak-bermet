@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { validateCleaningPhotoFile } from "@/lib/housekeeping-rules";
+import { validateUploadedCleaningPhotoBytes } from "@/lib/housekeeping-photo-validation.server";
 import {
   validateStoragePath,
+  validateMaintenanceCompletionEvidence,
   validateTechnicianAction,
   validateWorkLogInput,
   type TechnicianAction,
@@ -61,6 +64,16 @@ const ACTIONS = new Set<TechnicianAction>([
   "complete",
   "record_attachment",
 ]);
+
+const TASK_ATTACHMENTS_BUCKET = "task-attachments";
+
+function splitStoragePath(storagePath: string): { folder: string; fileName: string } {
+  const separator = storagePath.lastIndexOf("/");
+  return {
+    folder: separator === -1 ? "" : storagePath.slice(0, separator),
+    fileName: storagePath.slice(separator + 1),
+  };
+}
 
 async function authorizeTechnician() {
   const supabase = await createSupabaseServerClient();
@@ -223,6 +236,36 @@ export async function POST(request: Request) {
     );
   }
 
+  if (action === "complete") {
+    const [logsResult, attachmentsResult] = await Promise.all([
+      auth.supabase
+        .from("maintenance_work_logs")
+        .select("log_type")
+        .eq("maintenance_request_id", taskId),
+      auth.supabase
+        .from("task_attachments")
+        .select("phase")
+        .eq("entity_type", "maintenance_request")
+        .eq("maintenance_request_id", taskId),
+    ]);
+    if (logsResult.error || attachmentsResult.error) {
+      return NextResponse.json(
+        { error: "Не удалось проверить материалы завершения ремонта." },
+        { status: 503 }
+      );
+    }
+    const evidenceError = validateMaintenanceCompletionEvidence({
+      diagnosis: task.diagnosis as string | null,
+      logTypes: (logsResult.data ?? []).map(
+        (row) => row.log_type as MaintenanceLogType
+      ),
+      attachmentPhases: (attachmentsResult.data ?? []).map((row) => row.phase as string),
+    });
+    if (evidenceError) {
+      return NextResponse.json({ error: evidenceError }, { status: 409 });
+    }
+  }
+
   let operationError: { code?: string } | null = null;
   if (action === "accept" || action === "start_diagnostics" || action === "complete") {
     const rpc =
@@ -244,6 +287,63 @@ export async function POST(request: Request) {
         { error: "Укажите корректный путь и тип фотографии." },
         { status: 400 }
       );
+    }
+    const { folder, fileName } = splitStoragePath(storagePath);
+    const expectedFolder = `${auth.staff.userId}/${taskId}`;
+    if (folder !== expectedFolder || !fileName || fileName.includes("/")) {
+      return NextResponse.json(
+        { error: "Путь фотографии не соответствует сотруднику и заявке." },
+        { status: 409 }
+      );
+    }
+    const { data: objects, error: storageError } = await auth.supabase.storage
+      .from(TASK_ATTACHMENTS_BUCKET)
+      .list(folder, { search: fileName, limit: 100 });
+    if (storageError) {
+      return NextResponse.json(
+        { error: "Не удалось проверить фотографию в хранилище." },
+        { status: 503 }
+      );
+    }
+    const uploadedObject = objects.find((object) => object.name === fileName);
+    if (!uploadedObject) {
+      return NextResponse.json(
+        { error: "Фотография не найдена или загружена другим сотрудником." },
+        { status: 409 }
+      );
+    }
+    const metadata = uploadedObject.metadata as Record<string, unknown> | null;
+    const uploadedMimeType = metadata?.mimetype ?? metadata?.contentType;
+    const metadataError = validateCleaningPhotoFile({
+      mimeType: uploadedMimeType,
+      size: metadata?.size,
+    });
+    if (metadataError) {
+      return NextResponse.json({ error: metadataError }, { status: 409 });
+    }
+    const { data: uploadedFile, error: downloadError } = await auth.supabase.storage
+      .from(TASK_ATTACHMENTS_BUCKET)
+      .download(storagePath);
+    if (downloadError || !uploadedFile) {
+      return NextResponse.json(
+        { error: "Не удалось проверить содержимое фотографии." },
+        { status: 503 }
+      );
+    }
+    const uploadedBytes = new Uint8Array(await uploadedFile.arrayBuffer());
+    const downloadedFileError = validateCleaningPhotoFile({
+      mimeType: uploadedMimeType,
+      size: uploadedBytes.byteLength,
+    });
+    if (downloadedFileError) {
+      return NextResponse.json({ error: downloadedFileError }, { status: 409 });
+    }
+    const bytesError = validateUploadedCleaningPhotoBytes({
+      bytes: uploadedBytes,
+      mimeType: uploadedMimeType,
+    });
+    if (bytesError) {
+      return NextResponse.json({ error: bytesError }, { status: 409 });
     }
     const result = await auth.supabase.from("task_attachments").insert({
       entity_type: "maintenance_request",
