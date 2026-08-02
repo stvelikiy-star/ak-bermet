@@ -29,12 +29,13 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 
 export default function ManagerLeadsPage() {
   const [leads, setLeads] = useState<ManagerLead[]>([]);
-  const [source, setSource] = useState<"sheets" | "mock">("mock");
+  const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [filters, setFilters] = useState<LeadFilterState>(EMPTY);
   const [selected, setSelected] = useState<ManagerLead | null>(null);
   const [save, setSave] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -42,13 +43,19 @@ export default function ManagerLeadsPage() {
       try {
         const res = await fetch("/api/manager/leads");
         const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.message || "error");
+        if (!res.ok || !data.ok) {
+          if (data.configured === false) setConfigured(false);
+          throw new Error(data.message || "Не удалось загрузить заявки.");
+        }
         if (active) {
           setLeads(data.items ?? []);
-          setSource(data.source === "sheets" ? "sheets" : "mock");
         }
-      } catch {
-        if (active) setLoadError("Не удалось загрузить заявки.");
+      } catch (error) {
+        if (active) {
+          setLoadError(
+            error instanceof Error ? error.message : "Не удалось загрузить заявки."
+          );
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -72,6 +79,7 @@ export default function ManagerLeadsPage() {
   const open = (lead: ManagerLead) => {
     setSelected(lead);
     setSave("idle");
+    setSaveError("");
   };
 
   const patchDraft = (patch: Partial<ManagerLead>) =>
@@ -80,6 +88,7 @@ export default function ManagerLeadsPage() {
   const onSave = async () => {
     if (!selected) return;
     setSave("saving");
+    setSaveError("");
     try {
       const res = await fetch(`/api/manager/leads/${selected.id}`, {
         method: "PATCH",
@@ -87,16 +96,23 @@ export default function ManagerLeadsPage() {
         body: JSON.stringify({
           status: selected.status,
           managerComment: selected.managerComment ?? "",
-          managerName: "Администратор",
+          expectedUpdatedAt: selected.updatedAt ?? null,
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || "Не удалось сохранить изменения.");
+      }
+      const saved = { ...selected, updatedAt: data.updatedAt as string };
       setLeads((prev) =>
-        prev.map((l) => (l.id === selected.id ? { ...l, ...selected } : l))
+        prev.map((l) => (l.id === selected.id ? saved : l))
       );
+      setSelected(saved);
       setSave("saved");
-    } catch {
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Не удалось сохранить изменения."
+      );
       setSave("error");
     }
   };
@@ -107,12 +123,12 @@ export default function ManagerLeadsPage() {
       <main className="space-y-5 p-4 lg:p-8">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Это демо-кабинет менеджера. Настоящая авторизация будет подключена на
-            следующем этапе.
+            Изменения сохраняются в подключённом источнике заявок. Если запись
+            уже изменил другой сотрудник, сохранение будет отклонено.
           </div>
-          {source === "mock" && (
-            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200">
-              Mock mode
+          {!configured && (
+            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+              Источник не настроен
             </span>
           )}
         </div>
@@ -233,12 +249,7 @@ export default function ManagerLeadsPage() {
               )}
               {save === "error" && (
                 <p className="text-sm text-red-600">
-                  Не удалось сохранить изменения. Попробуйте ещё раз.
-                </p>
-              )}
-              {source === "mock" && (
-                <p className="text-xs text-muted">
-                  Mock-режим: изменения не пишутся в Google Sheets.
+                  {saveError || "Не удалось сохранить изменения. Попробуйте ещё раз."}
                 </p>
               )}
             </div>
