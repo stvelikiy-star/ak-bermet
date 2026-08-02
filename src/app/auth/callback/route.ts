@@ -11,7 +11,16 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/manager";
+  const requestedNext = searchParams.get("next");
+  // Redirect only to an absolute path on this origin. In particular, reject
+  // protocol-relative paths and backslashes, which URL parsers may interpret
+  // as an external host after a successful authentication callback.
+  const next =
+    requestedNext?.startsWith("/") &&
+    !requestedNext.startsWith("//") &&
+    !requestedNext.includes("\\")
+      ? requestedNext
+      : "/manager";
 
   if (code) {
     const supabase = await createSupabaseServerClient();
