@@ -17,7 +17,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const staff = await getCurrentStaff();
-  if (!hasAnyRole(staff, [...MANAGER_ROLES])) {
+  if (!staff || !hasAnyRole(staff, [...MANAGER_ROLES])) {
     return NextResponse.json({ ok: false, message: "Нет доступа" }, { status: 403 });
   }
 
@@ -85,11 +85,15 @@ export async function PATCH(
     const updatedAt = await updateLeadStatusInSheet({
       leadId: id,
       status,
-      managerComment: payload.managerComment,
-      managerName: staff?.fullName || staff?.email || "Сотрудник",
-      expectedUpdatedAt: payload.expectedUpdatedAt ?? null,
+      managerComment: payload.managerComment ?? "",
+      managerName: staff.fullName ?? staff.email ?? "",
+      expectedUpdatedAt: payload.expectedUpdatedAt,
     });
-    return NextResponse.json({ ok: true, updatedAt });
+
+    return NextResponse.json({
+      ok: true,
+      updatedAt,
+    });
   } catch (error) {
     if (error instanceof StaleLeadError) {
       return NextResponse.json(
@@ -100,7 +104,7 @@ export async function PATCH(
         { status: 409 }
       );
     }
-    console.error("[MANAGER] updateLeadStatusInSheet failed:", error);
+    console.error("[MANAGER] updateLead failed:", error);
     return NextResponse.json(
       {
         ok: false,
