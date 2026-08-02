@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CLEANING_PHOTO_MIME_TYPES,
@@ -74,6 +74,7 @@ export default function HousekeepingDashboard({
   const [photoTask, setPhotoTask] = useState<HousekeepingTask | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPhase, setPhotoPhase] = useState<"before" | "after">("before");
+  const pendingTasks = useRef(new Set<string>());
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -94,16 +95,16 @@ export default function HousekeepingDashboard({
       }
       if (!response.ok) {
         setUnavailable(response.status === 503);
-        setTasks([]);
         setError(await responseMessage(response, "Сервис задач временно недоступен."));
-        return;
+        return false;
       }
       const payload = (await response.json()) as { tasks: HousekeepingTask[] };
       setTasks(payload.tasks);
+      return true;
     } catch {
       setUnavailable(true);
-      setTasks([]);
       setError("Нет связи с сервисом задач. Проверьте интернет и повторите.");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -126,10 +127,12 @@ export default function HousekeepingDashboard({
     action: HousekeepingAction,
     details?: { note: string; blocksRoom: boolean }
   ) {
+    if (pendingTasks.current.has(task.id)) return;
     if (!canPerformHousekeepingAction(task.status, action)) {
       setError("Статус задачи изменился. Обновите список.");
       return;
     }
+    pendingTasks.current.add(task.id);
     setBusyTask(task.id);
     setError("");
     setUnavailable(false);
@@ -161,6 +164,7 @@ export default function HousekeepingDashboard({
       setUnavailable(true);
       setError("Нет связи с сервисом задач. Изменение не подтверждено.");
     } finally {
+      pendingTasks.current.delete(task.id);
       setBusyTask(null);
     }
   }
@@ -176,7 +180,10 @@ export default function HousekeepingDashboard({
 
   async function recordPhoto() {
     if (!photoTask || !photoFile) return;
-    setBusyTask(photoTask.id);
+    const taskId = photoTask.id;
+    if (pendingTasks.current.has(taskId)) return;
+    pendingTasks.current.add(taskId);
+    setBusyTask(taskId);
     setError("");
     try {
       const supabase = createSupabaseBrowserClient();
@@ -213,8 +220,17 @@ export default function HousekeepingDashboard({
       setPhotoFile(null);
       await loadTasks();
     } catch {
-      setError("Нет связи с сервисом задач. Фотография не подтверждена.");
+      // The upload or API request may have completed before the connection
+      // failed. Do not delete an object that the server may already reference.
+      const refreshed = await loadTasks();
+      setUnavailable(!refreshed);
+      setError(
+        refreshed
+          ? "Нет связи с сервисом задач. Фотография не подтверждена. Список обновлён; проверьте наличие фото перед повтором."
+          : "Нет связи с сервисом задач. Фотография не подтверждена. Не удалось обновить список; сохранены ранее загруженные задачи. Проверьте связь перед повтором."
+      );
     } finally {
+      pendingTasks.current.delete(taskId);
       setBusyTask(null);
     }
   }

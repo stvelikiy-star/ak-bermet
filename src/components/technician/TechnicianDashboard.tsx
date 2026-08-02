@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   validateTechnicianAction,
@@ -64,6 +64,7 @@ export default function TechnicianDashboard({ staffName }: { staffName: string }
   const [form, setForm] = useState<{ task: TechnicianTask; action: FormAction } | null>(
     null
   );
+  const pendingTasks = useRef(new Set<string>());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,17 +84,17 @@ export default function TechnicianDashboard({ staffName }: { staffName: string }
         return;
       }
       if (!response.ok) {
-        setTasks([]);
         setUnavailable(response.status === 503);
         setError(await responseError(response, "Не удалось загрузить заявки."));
-        return;
+        return false;
       }
       const payload = (await response.json()) as { tasks: TechnicianTask[] };
       setTasks(payload.tasks);
+      return true;
     } catch {
-      setTasks([]);
       setUnavailable(true);
       setError("Нет связи с сервисом. Проверьте интернет и повторите.");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -107,11 +108,13 @@ export default function TechnicianDashboard({ staffName }: { staffName: string }
   );
 
   async function run(task: TechnicianTask, action: TechnicianAction, details = {}) {
+    if (pendingTasks.current.has(task.id)) return;
     const invalid = validateTechnicianAction(task.status, action);
     if (invalid) {
       setError(invalid);
       return;
     }
+    pendingTasks.current.add(task.id);
     setBusy(task.id);
     setError("");
     setUnavailable(false);
@@ -185,13 +188,17 @@ export default function TechnicianDashboard({ staffName }: { staffName: string }
       setForm(null);
       await load();
     } catch {
-      if (uploadedPath) {
-        const supabase = createSupabaseBrowserClient();
-        await supabase?.storage.from("task-attachments").remove([uploadedPath]);
-      }
-      setUnavailable(true);
-      setError("Нет связи с сервисом. Изменение не подтверждено.");
+      // A lost response is ambiguous: the API may already have stored the
+      // attachment. Removing it here could leave a persisted broken reference.
+      const refreshed = await load();
+      setUnavailable(!refreshed);
+      setError(
+        refreshed
+          ? "Нет связи с сервисом. Изменение не подтверждено. Список обновлён; проверьте результат перед повтором."
+          : "Нет связи с сервисом. Изменение не подтверждено. Не удалось обновить список; сохранены ранее загруженные заявки. Проверьте связь перед повтором."
+      );
     } finally {
+      pendingTasks.current.delete(task.id);
       setBusy(null);
     }
   }
