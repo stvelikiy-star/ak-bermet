@@ -18,9 +18,11 @@ import {
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import {
   AvailabilityHoldRpcError,
+  OwnerActionRequiredError,
   availabilityHoldRpcHttpStatus,
-  createAvailabilityHoldRpc,
+  createAvailabilityHoldForMappedRoom,
   listActiveAvailabilityHolds,
+  mapOccupancyToInventoryRoomIds,
 } from "@/lib/supabase-admin";
 import type {
   AvailabilityQuery,
@@ -31,6 +33,18 @@ import type {
 export const runtime = "nodejs";
 
 const HOLD_CREATOR_ROLES = ["owner", "administrator", "manager"] as const;
+
+function ownerActionRequiredResponse() {
+  return NextResponse.json(
+    {
+      ok: false,
+      code: "OWNER_ACTION_REQUIRED",
+      message:
+        "Для номера отсутствует однозначное сопоставление с room_units.id. Обратитесь к владельцу.",
+    },
+    { status: 503 }
+  );
+}
 
 function availabilityHoldRpcErrorResponse(code: string | undefined): {
   status: number;
@@ -114,20 +128,21 @@ async function loadRoomsAndOccupancy(): Promise<{
     // Реальный номерной фонд настроен — используем его как есть, даже если
     // лист пуст. Подмена fabricated mock-номерами здесь была бы fail-open:
     // клиент получил бы выдуманные варианты вместо честного пустого списка.
+    const occupancy = [
+      ...occupancyResult.value,
+      ...holdsResult.value.map((hold) => ({
+        id: hold.id,
+        roomId: hold.room_unit_id,
+        checkIn: hold.check_in,
+        checkOut: hold.check_out,
+        status: "pre_hold" as const,
+        expiresAt: hold.expires_at,
+        source: "supabase",
+      })),
+    ];
     return {
       rooms: roomsResult.value,
-      occupancy: [
-        ...occupancyResult.value,
-        ...holdsResult.value.map((hold) => ({
-          id: hold.id,
-          roomId: hold.room_unit_id,
-          checkIn: hold.check_in,
-          checkOut: hold.check_out,
-          status: "pre_hold" as const,
-          expiresAt: hold.hold_expires_at ?? hold.expires_at,
-          source: "supabase",
-        })),
-      ],
+      occupancy: mapOccupancyToInventoryRoomIds(occupancy, roomsResult.value),
       source: "sheets",
     };
   }
@@ -169,6 +184,9 @@ export async function GET(request: Request) {
   try {
     ({ rooms, occupancy, source } = await loadRoomsAndOccupancy());
   } catch (error) {
+    if (error instanceof OwnerActionRequiredError) {
+      return ownerActionRequiredResponse();
+    }
     if (error instanceof AvailabilityError) {
       return NextResponse.json(
         { ok: false, code: error.code, message: error.message },
@@ -255,6 +273,9 @@ export async function POST(request: Request) {
   try {
     ({ rooms, occupancy, source } = await loadRoomsAndOccupancy());
   } catch (error) {
+    if (error instanceof OwnerActionRequiredError) {
+      return ownerActionRequiredResponse();
+    }
     if (error instanceof AvailabilityError) {
       return NextResponse.json(
         { ok: false, code: error.code, message: error.message },
@@ -280,8 +301,9 @@ export async function POST(request: Request) {
     }
 
     try {
-      const hold = await createAvailabilityHoldRpc({
-        roomUnitId: body.roomId,
+      const hold = await createAvailabilityHoldForMappedRoom({
+        externalRoomId: body.roomId,
+        rooms,
         checkIn: body.checkIn,
         checkOut: body.checkOut,
         heldBy: staff.userId,
@@ -292,6 +314,9 @@ export async function POST(request: Request) {
       void idempotency_key;
       return NextResponse.json({ ok: true, hold: publicHold }, { status: 201 });
     } catch (error) {
+      if (error instanceof OwnerActionRequiredError) {
+        return ownerActionRequiredResponse();
+      }
       if (error instanceof AvailabilityHoldRpcError) {
         const mapped = availabilityHoldRpcErrorResponse(error.code);
         return NextResponse.json(

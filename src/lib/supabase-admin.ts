@@ -54,7 +54,6 @@ export interface AvailabilityHoldRpcRow {
   status: string;
   created_at?: string;
   expires_at?: string;
-  hold_expires_at?: string;
   idempotency_key?: string;
   [key: string]: unknown;
 }
@@ -74,13 +73,141 @@ export async function listActiveAvailabilityHolds(
   client: SupabaseClient = getSupabaseAdminClient()
 ): Promise<AvailabilityHoldRpcRow[]> {
   const { data, error } = await client
-    .from("bookings")
-    .select("id, room_unit_id, check_in, check_out, status, hold_expires_at")
-    .eq("status", "pre_hold")
-    .gt("hold_expires_at", now.toISOString());
+    .schema("public")
+    .from("availability_holds")
+    .select("id, room_unit_id, check_in, check_out, status, created_at, expires_at")
+    .eq("status", "active")
+    .gt("expires_at", now.toISOString());
 
   if (error || !data) throw new AvailabilityHoldReadError();
   return data as AvailabilityHoldRpcRow[];
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * A Sheets room id is an external identifier and must never be treated as a
+ * room_units UUID merely because it arrived in the roomId field.  The only
+ * accepted evidence is an explicit UUID mapping attached to that inventory
+ * row by the configured inventory adapter.
+ */
+export interface RoomIdentityMappingEvidence {
+  id: string;
+  roomUnitId?: unknown;
+  room_unit_id?: unknown;
+}
+
+export type RoomUnitMappingResult =
+  | {
+      status: "mapped";
+      externalRoomId: string;
+      roomUnitId: string;
+    }
+  | { status: "missing" | "ambiguous" };
+
+function normalizeUuid(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return UUID_PATTERN.test(normalized) ? normalized : null;
+}
+
+function explicitRoomUnitIds(room: RoomIdentityMappingEvidence): string[] {
+  return [
+    ...new Set(
+      [room.roomUnitId, room.room_unit_id]
+        .map(normalizeUuid)
+        .filter((value): value is string => value !== null)
+    ),
+  ];
+}
+
+function matchingInventoryRooms(
+  identifier: string,
+  rooms: readonly RoomIdentityMappingEvidence[]
+): RoomIdentityMappingEvidence[] {
+  const externalId = identifier.trim();
+  const uuid = normalizeUuid(identifier);
+  return rooms.filter(
+    (room) =>
+      room.id.trim() === externalId ||
+      (uuid !== null && explicitRoomUnitIds(room).includes(uuid))
+  );
+}
+
+export function resolveRoomUnitMapping(
+  identifier: string,
+  rooms: readonly RoomIdentityMappingEvidence[]
+): RoomUnitMappingResult {
+  const matches = matchingInventoryRooms(identifier, rooms);
+  const roomUnitIds = [
+    ...new Set(matches.flatMap((room) => explicitRoomUnitIds(room))),
+  ];
+
+  if (roomUnitIds.length === 0) return { status: "missing" };
+  if (roomUnitIds.length !== 1) return { status: "ambiguous" };
+
+  const externalRoomIds = [
+    ...new Set(matches.map((room) => room.id.trim()).filter(Boolean)),
+  ];
+  if (externalRoomIds.length !== 1) return { status: "ambiguous" };
+
+  return {
+    status: "mapped",
+    externalRoomId: externalRoomIds[0],
+    roomUnitId: roomUnitIds[0],
+  };
+}
+
+export class OwnerActionRequiredError extends Error {
+  readonly code = "OWNER_ACTION_REQUIRED" as const;
+  readonly reason: "missing" | "ambiguous";
+
+  constructor(reason: "missing" | "ambiguous") {
+    super("A unique room_units.id mapping is required");
+    this.name = "OwnerActionRequiredError";
+    this.reason = reason;
+  }
+}
+
+export interface OccupancyRoomIdentity {
+  roomId: string;
+  source?: string;
+}
+
+/**
+ * Converts both UUID-backed durable holds and external Sheets occupancy to the
+ * external id used by filterRooms.  A durable row which cannot be mapped is a
+ * fail-closed condition: silently retaining its UUID could make the held room
+ * appear available.
+ */
+export function mapOccupancyToInventoryRoomIds<
+  T extends OccupancyRoomIdentity,
+>(
+  occupancy: readonly T[],
+  rooms: readonly RoomIdentityMappingEvidence[]
+): T[] {
+  return occupancy.map((entry) => {
+    const mapping = resolveRoomUnitMapping(entry.roomId, rooms);
+    if (mapping.status === "mapped") {
+      return { ...entry, roomId: mapping.externalRoomId };
+    }
+
+    const exactExternalMatches = rooms.filter(
+      (room) => room.id.trim() === entry.roomId.trim()
+    );
+    if (
+      exactExternalMatches.length === 1 &&
+      (entry.source !== "supabase" || normalizeUuid(entry.roomId) === null)
+    ) {
+      return { ...entry, roomId: exactExternalMatches[0].id.trim() };
+    }
+
+    if (entry.source === "supabase") {
+      throw new OwnerActionRequiredError(mapping.status);
+    }
+    return { ...entry };
+  });
 }
 
 export interface AvailabilityHoldRpcClient {
@@ -101,9 +228,12 @@ export interface AvailabilityHoldRpcClient {
 }
 
 export class AvailabilityHoldRpcError extends Error {
-  constructor(public readonly code: string | undefined) {
+  readonly code: string | undefined;
+
+  constructor(code: string | undefined) {
     super("Availability hold RPC failed");
     this.name = "AvailabilityHoldRpcError";
+    this.code = code;
   }
 }
 
@@ -145,4 +275,29 @@ export async function createAvailabilityHoldRpc(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new AvailabilityHoldRpcError(undefined);
   return row;
+}
+
+export async function createAvailabilityHoldForMappedRoom(
+  input: Omit<CreateAvailabilityHoldRpcInput, "roomUnitId"> & {
+    externalRoomId: string;
+    rooms: readonly RoomIdentityMappingEvidence[];
+  },
+  client?: AvailabilityHoldRpcClient
+): Promise<AvailabilityHoldRpcRow> {
+  const mapping = resolveRoomUnitMapping(input.externalRoomId, input.rooms);
+  if (mapping.status !== "mapped") {
+    throw new OwnerActionRequiredError(mapping.status);
+  }
+
+  return createAvailabilityHoldRpc(
+    {
+      roomUnitId: mapping.roomUnitId,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      heldBy: input.heldBy,
+      leadId: input.leadId,
+      idempotencyKey: input.idempotencyKey,
+    },
+    client
+  );
 }
