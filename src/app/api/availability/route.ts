@@ -148,8 +148,11 @@ export async function GET(request: Request) {
   });
 }
 
-// Создаёт 60-минутное удержание номера на выбранные даты. Атомарно
-// защищает от двойного бронирования в пределах текущего процесса.
+// Создаёт 60-минутное удержание номера только в явно локальном mock-режиме.
+// Production-источник нельзя подтверждать через process-local Map: несколько
+// инстансов или рестарт потеряют удержание и допустят двойное бронирование.
+// До появления durable atomic операции в общем хранилище запрос обязан
+// завершаться fail-closed, а не возвращать ложный 201.
 export async function POST(request: Request) {
   let body: Partial<CreateHoldRequest>;
   try {
@@ -195,9 +198,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let rooms, occupancy;
+  let rooms, occupancy, source;
   try {
-    ({ rooms, occupancy } = await loadRoomsAndOccupancy());
+    ({ rooms, occupancy, source } = await loadRoomsAndOccupancy());
   } catch (error) {
     if (error instanceof AvailabilityError) {
       return NextResponse.json(
@@ -206,6 +209,18 @@ export async function POST(request: Request) {
       );
     }
     throw error;
+  }
+
+  if (source !== "mock") {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "availability_unknown",
+        message:
+          "Безопасное удержание номера временно недоступно. Обратитесь к администратору.",
+      },
+      { status: 503 }
+    );
   }
 
   try {
