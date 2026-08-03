@@ -11,6 +11,7 @@ import {
 } from "@/lib/availability";
 import {
   isGoogleSheetsEnabled,
+  isLocalMockAvailabilityAllowed,
   getRoomsFromSheet,
   getOccupancyFromSheet,
 } from "@/lib/google-sheets";
@@ -83,6 +84,12 @@ async function loadRoomsAndOccupancy(): Promise<{
       occupancy: occupancyResult.value,
       source: "sheets",
     };
+  }
+  if (!isLocalMockAvailabilityAllowed()) {
+    throw new AvailabilityError(
+      "availability_unknown",
+      "Источник доступности не настроен. Обратитесь к администратору."
+    );
   }
   return { rooms: mockRooms, occupancy: mockOccupancy, source: "mock" };
 }

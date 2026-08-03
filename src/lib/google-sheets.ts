@@ -24,6 +24,16 @@ export function isGoogleSheetsEnabled(): boolean {
   return process.env.GOOGLE_SHEETS_ENABLED === "true" && getCreds() !== null;
 }
 
+// Fabricated inventory and process-local holds are development aids only.
+// A production deployment with missing/incomplete Sheets configuration must
+// fail closed: treating it as mock would make holds instance-local and allow
+// conflicting bookings after a restart or on another server instance.
+export function isLocalMockAvailabilityAllowed(): boolean {
+  return (
+    process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test"
+  );
+}
+
 // Названия листов (можно переопределить через env).
 const SHEET = {
   leads: process.env.GOOGLE_SHEETS_LEADS_SHEET_NAME || "Заявки",
