@@ -20,9 +20,9 @@ import {
   AvailabilityHoldRpcError,
   OwnerActionRequiredError,
   availabilityHoldRpcHttpStatus,
-  createAvailabilityHoldForMappedRoom,
   listActiveAvailabilityHolds,
   mapOccupancyToInventoryRoomIds,
+  syncSheetsBookingsAndCreateAvailabilityHold,
 } from "@/lib/supabase-admin";
 import type {
   AvailabilityQuery,
@@ -40,7 +40,7 @@ function ownerActionRequiredResponse() {
       ok: false,
       code: "OWNER_ACTION_REQUIRED",
       message:
-        "Для номера отсутствует однозначное сопоставление с room_units.id. Обратитесь к владельцу.",
+        "Для синхронизации занятости не хватает однозначных идентификаторов или версии данных. Обратитесь к владельцу.",
     },
     { status: 503 }
   );
@@ -90,6 +90,7 @@ function errorStatus(code: AvailabilityErrorCode): number {
 async function loadRoomsAndOccupancy(): Promise<{
   rooms: typeof mockRooms;
   occupancy: typeof mockOccupancy;
+  sheetsOccupancy: typeof mockOccupancy;
   source: "sheets" | "mock";
 }> {
   if (isGoogleSheetsEnabled()) {
@@ -143,6 +144,7 @@ async function loadRoomsAndOccupancy(): Promise<{
     return {
       rooms: roomsResult.value,
       occupancy: mapOccupancyToInventoryRoomIds(occupancy, roomsResult.value),
+      sheetsOccupancy: occupancyResult.value,
       source: "sheets",
     };
   }
@@ -152,7 +154,12 @@ async function loadRoomsAndOccupancy(): Promise<{
       "Источник доступности не настроен. Обратитесь к администратору."
     );
   }
-  return { rooms: mockRooms, occupancy: mockOccupancy, source: "mock" };
+  return {
+    rooms: mockRooms,
+    occupancy: mockOccupancy,
+    sheetsOccupancy: [],
+    source: "mock",
+  };
 }
 
 // Предварительная проверка наличия. Финальное наличие всегда подтверждает
@@ -269,9 +276,10 @@ export async function POST(request: Request) {
     );
   }
 
-  let rooms, occupancy, source;
+  let rooms, occupancy, sheetsOccupancy, source;
   try {
-    ({ rooms, occupancy, source } = await loadRoomsAndOccupancy());
+    ({ rooms, occupancy, sheetsOccupancy, source } =
+      await loadRoomsAndOccupancy());
   } catch (error) {
     if (error instanceof OwnerActionRequiredError) {
       return ownerActionRequiredResponse();
@@ -301,9 +309,10 @@ export async function POST(request: Request) {
     }
 
     try {
-      const hold = await createAvailabilityHoldForMappedRoom({
+      const hold = await syncSheetsBookingsAndCreateAvailabilityHold({
         externalRoomId: body.roomId,
         rooms,
+        occupancy: sheetsOccupancy,
         checkIn: body.checkIn,
         checkOut: body.checkOut,
         heldBy: staff.userId,

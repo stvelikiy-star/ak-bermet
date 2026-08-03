@@ -14,6 +14,10 @@ export type BookingStatus =
 
 export interface RoomUnit {
   id: string;
+  // Authoritative mapping supplied by the inventory owner. The external
+  // Sheets id above is never converted to a Supabase id by room name,
+  // number, ordering, or any other heuristic.
+  roomUnitId?: string;
   building: string;
   floor?: number;
   roomNumber?: string;
@@ -42,6 +46,9 @@ export interface OccupancyRecord {
   source?: string;
   manager?: string;
   notes?: string;
+  // Monotonic source version for the stable Sheets booking id. Required
+  // before a Sheets event can be synchronized into durable occupancy.
+  sourceUpdatedAt?: string;
   // Заполняются для удержаний, создаваемых через API (Stage 05).
   createdAt?: string;
   expiresAt?: string;
