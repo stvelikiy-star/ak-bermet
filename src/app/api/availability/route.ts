@@ -15,6 +15,13 @@ import {
   getRoomsFromSheet,
   getOccupancyFromSheet,
 } from "@/lib/google-sheets";
+import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
+import {
+  AvailabilityHoldRpcError,
+  availabilityHoldRpcHttpStatus,
+  createAvailabilityHoldRpc,
+  listActiveAvailabilityHolds,
+} from "@/lib/supabase-admin";
 import type {
   AvailabilityQuery,
   AvailabilityErrorCode,
@@ -22,6 +29,26 @@ import type {
 } from "@/types/availability";
 
 export const runtime = "nodejs";
+
+const HOLD_CREATOR_ROLES = ["owner", "administrator", "manager"] as const;
+
+function availabilityHoldRpcErrorResponse(code: string | undefined): {
+  status: number;
+  code: AvailabilityErrorCode;
+  message: string;
+} {
+  switch (code) {
+    case "AKB01":
+      return { status: availabilityHoldRpcHttpStatus(code), code: "invalid_date_range", message: "Некорректный диапазон дат." };
+    case "AKB02":
+    case "23P01":
+      return { status: availabilityHoldRpcHttpStatus(code), code: "hold_conflict", message: "Номер уже занят или удерживается на эти даты." };
+    case "AKB03":
+      return { status: availabilityHoldRpcHttpStatus(code), code: "invalid_room", message: "Номер не найден или недоступен." };
+    default:
+      return { status: availabilityHoldRpcHttpStatus(code), code: "availability_unknown", message: "Не удалось безопасно создать удержание. Повторите запрос позже." };
+  }
+}
 
 function errorStatus(code: AvailabilityErrorCode): number {
   switch (code) {
@@ -52,9 +79,10 @@ async function loadRoomsAndOccupancy(): Promise<{
   source: "sheets" | "mock";
 }> {
   if (isGoogleSheetsEnabled()) {
-    const [roomsResult, occupancyResult] = await Promise.allSettled([
+    const [roomsResult, occupancyResult, holdsResult] = await Promise.allSettled([
       getRoomsFromSheet(),
       getOccupancyFromSheet(),
+      listActiveAvailabilityHolds(),
     ]);
     if (roomsResult.status === "rejected") {
       console.error(
@@ -76,12 +104,30 @@ async function loadRoomsAndOccupancy(): Promise<{
         "Не удалось проверить занятость номеров. Повторите запрос позже."
       );
     }
+    if (holdsResult.status === "rejected") {
+      console.error("[AVAILABILITY] Durable holds read failed");
+      throw new AvailabilityError(
+        "availability_unknown",
+        "Не удалось проверить удержания номеров. Повторите запрос позже."
+      );
+    }
     // Реальный номерной фонд настроен — используем его как есть, даже если
     // лист пуст. Подмена fabricated mock-номерами здесь была бы fail-open:
     // клиент получил бы выдуманные варианты вместо честного пустого списка.
     return {
       rooms: roomsResult.value,
-      occupancy: occupancyResult.value,
+      occupancy: [
+        ...occupancyResult.value,
+        ...holdsResult.value.map((hold) => ({
+          id: hold.id,
+          roomId: hold.room_unit_id,
+          checkIn: hold.check_in,
+          checkOut: hold.check_out,
+          status: "pre_hold" as const,
+          expiresAt: hold.hold_expires_at ?? hold.expires_at,
+          source: "supabase",
+        })),
+      ],
       source: "sheets",
     };
   }
@@ -131,7 +177,10 @@ export async function GET(request: Request) {
     }
     throw error;
   }
-  const allOccupancy = [...occupancy, ...listActiveHolds()];
+  // Process-local holds belong exclusively to the explicit mock source.
+  // Production occupancy already includes active durable Supabase holds.
+  const allOccupancy =
+    source === "mock" ? [...occupancy, ...listActiveHolds()] : occupancy;
 
   let items;
   try {
@@ -155,11 +204,8 @@ export async function GET(request: Request) {
   });
 }
 
-// Создаёт 60-минутное удержание номера только в явно локальном mock-режиме.
-// Production-источник нельзя подтверждать через process-local Map: несколько
-// инстансов или рестарт потеряют удержание и допустят двойное бронирование.
-// До появления durable atomic операции в общем хранилище запрос обязан
-// завершаться fail-closed, а не возвращать ложный 201.
+// Production создаёт hold атомарно в БД; process-local store остаётся
+// только для явного mock/test source.
 export async function POST(request: Request) {
   let body: Partial<CreateHoldRequest>;
   try {
@@ -218,16 +264,43 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  if (source !== "mock") {
-    return NextResponse.json(
-      {
-        ok: false,
-        code: "availability_unknown",
-        message:
-          "Безопасное удержание номера временно недоступно. Обратитесь к администратору.",
-      },
-      { status: 503 }
-    );
+  if (source === "sheets") {
+    const staff = await getCurrentStaff();
+    if (!staff) {
+      return NextResponse.json(
+        { ok: false, code: "unauthorized", message: "Требуется вход в систему." },
+        { status: 401 }
+      );
+    }
+    if (!hasAnyRole(staff, [...HOLD_CREATOR_ROLES])) {
+      return NextResponse.json(
+        { ok: false, code: "forbidden", message: "Нет доступа к удержанию номеров." },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const hold = await createAvailabilityHoldRpc({
+        roomUnitId: body.roomId,
+        checkIn: body.checkIn,
+        checkOut: body.checkOut,
+        heldBy: staff.userId,
+        leadId: null,
+        idempotencyKey: body.idempotencyKey.trim(),
+      });
+      const { idempotency_key, ...publicHold } = hold;
+      void idempotency_key;
+      return NextResponse.json({ ok: true, hold: publicHold }, { status: 201 });
+    } catch (error) {
+      if (error instanceof AvailabilityHoldRpcError) {
+        const mapped = availabilityHoldRpcErrorResponse(error.code);
+        return NextResponse.json(
+          { ok: false, code: mapped.code, message: mapped.message },
+          { status: mapped.status }
+        );
+      }
+      throw error;
+    }
   }
 
   try {
@@ -238,7 +311,6 @@ export async function POST(request: Request) {
         checkOut: body.checkOut,
         guestName: body.guestName,
         guestPhone: body.guestPhone,
-        manager: body.manager,
         idempotencyKey: body.idempotencyKey.trim(),
       },
       rooms,
