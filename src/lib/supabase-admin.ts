@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { BookingStatus, OccupancyRecord } from "@/types/availability";
 
 // Серверный клиент Supabase (Operational CRM).
 // ВАЖНО: использует Service Role ключ — импортировать этот модуль
@@ -104,7 +106,7 @@ export type RoomUnitMappingResult =
       externalRoomId: string;
       roomUnitId: string;
     }
-  | { status: "missing" | "ambiguous" };
+  | { status: "missing" | "duplicated" | "ambiguous" };
 
 function normalizeUuid(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -120,6 +122,11 @@ function explicitRoomUnitIds(room: RoomIdentityMappingEvidence): string[] {
         .filter((value): value is string => value !== null)
     ),
   ];
+}
+
+function explicitRoomUnitId(room: RoomIdentityMappingEvidence): string | null {
+  const ids = explicitRoomUnitIds(room);
+  return ids.length === 1 ? ids[0] : null;
 }
 
 function matchingInventoryRooms(
@@ -140,34 +147,183 @@ export function resolveRoomUnitMapping(
   rooms: readonly RoomIdentityMappingEvidence[]
 ): RoomUnitMappingResult {
   const matches = matchingInventoryRooms(identifier, rooms);
-  const roomUnitIds = [
-    ...new Set(matches.flatMap((room) => explicitRoomUnitIds(room))),
-  ];
+  if (matches.length === 0) return { status: "missing" };
+  if (matches.length !== 1) {
+    const matchedIds = new Set(
+      matches.flatMap((room) => explicitRoomUnitIds(room))
+    );
+    return { status: matchedIds.size > 1 ? "ambiguous" : "duplicated" };
+  }
 
+  const matchedRoom = matches[0];
+  const roomUnitIds = explicitRoomUnitIds(matchedRoom);
   if (roomUnitIds.length === 0) return { status: "missing" };
   if (roomUnitIds.length !== 1) return { status: "ambiguous" };
 
-  const externalRoomIds = [
-    ...new Set(matches.map((room) => room.id.trim()).filter(Boolean)),
-  ];
-  if (externalRoomIds.length !== 1) return { status: "ambiguous" };
+  const externalRoomId = matchedRoom.id.trim();
+  if (!externalRoomId) return { status: "missing" };
+
+  // The reverse side must also be one-to-one. Two external inventory rows
+  // claiming the same UUID are duplicated mappings even when the requested
+  // external id itself occurs only once.
+  const uuidOwners = rooms.filter(
+    (room) => explicitRoomUnitId(room) === roomUnitIds[0]
+  );
+  if (uuidOwners.length !== 1) return { status: "duplicated" };
 
   return {
     status: "mapped",
-    externalRoomId: externalRoomIds[0],
+    externalRoomId,
     roomUnitId: roomUnitIds[0],
   };
 }
 
 export class OwnerActionRequiredError extends Error {
   readonly code = "OWNER_ACTION_REQUIRED" as const;
-  readonly reason: "missing" | "ambiguous";
+  readonly reason: "missing" | "duplicated" | "ambiguous" | "invalid";
 
-  constructor(reason: "missing" | "ambiguous") {
-    super("A unique room_units.id mapping is required");
+  constructor(reason: "missing" | "duplicated" | "ambiguous" | "invalid") {
+    super("Authoritative Sheets synchronization evidence is incomplete");
     this.name = "OwnerActionRequiredError";
     this.reason = reason;
   }
+}
+
+export interface SheetsBookingSyncEvent {
+  external_booking_id: string;
+  room_unit_id: string;
+  check_in: string;
+  check_out: string;
+  source_status: BookingStatus;
+  blocks_availability: boolean;
+  source_updated_at: string;
+  event_fingerprint: string;
+}
+
+const BOOKING_STATUS_VALUES = new Set<BookingStatus>([
+  "pre_hold",
+  "waiting_prepayment",
+  "paid",
+  "confirmed",
+  "checked_in",
+  "checking_out",
+  "no_show",
+  "cancelled",
+]);
+const BLOCKING_SHEETS_BOOKING_STATUSES = new Set<BookingStatus>([
+  "pre_hold",
+  "waiting_prepayment",
+  "paid",
+  "confirmed",
+  "checked_in",
+  "checking_out",
+]);
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isStrictDate(value: string): boolean {
+  if (!DATE_ONLY_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
+function normalizedSourceTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parsed = new Date(value.trim());
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+function eventFingerprint(
+  event: Omit<SheetsBookingSyncEvent, "event_fingerprint">
+): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        event.external_booking_id,
+        event.room_unit_id,
+        event.check_in,
+        event.check_out,
+        event.source_status,
+        event.blocks_availability,
+        event.source_updated_at,
+      ])
+    )
+    .digest("hex");
+}
+
+/**
+ * Turns Sheets rows into the complete, authoritative event contract accepted
+ * by the database. No row is mapped by a display field. Missing stable ids,
+ * versions, dates, statuses, and room mappings all stop synchronization (and
+ * therefore stop the hold RPC) with OWNER_ACTION_REQUIRED.
+ */
+export function prepareSheetsBookingSyncEvents(
+  occupancy: readonly OccupancyRecord[],
+  rooms: readonly RoomIdentityMappingEvidence[]
+): SheetsBookingSyncEvent[] {
+  const events = new Map<string, SheetsBookingSyncEvent>();
+
+  for (const record of occupancy) {
+    const externalBookingId = record.id?.trim();
+    const sourceUpdatedAt = normalizedSourceTimestamp(record.sourceUpdatedAt);
+    const status = record.status as BookingStatus;
+    if (
+      !externalBookingId ||
+      !record.roomId?.trim() ||
+      !sourceUpdatedAt ||
+      !isStrictDate(record.checkIn) ||
+      !isStrictDate(record.checkOut) ||
+      record.checkOut <= record.checkIn ||
+      !BOOKING_STATUS_VALUES.has(status)
+    ) {
+      throw new OwnerActionRequiredError("invalid");
+    }
+
+    const mapping = resolveRoomUnitMapping(record.roomId, rooms);
+    if (mapping.status !== "mapped") {
+      throw new OwnerActionRequiredError(mapping.status);
+    }
+
+    const eventWithoutFingerprint = {
+      external_booking_id: externalBookingId,
+      room_unit_id: mapping.roomUnitId,
+      check_in: record.checkIn,
+      check_out: record.checkOut,
+      source_status: status,
+      blocks_availability: BLOCKING_SHEETS_BOOKING_STATUSES.has(status),
+      source_updated_at: sourceUpdatedAt,
+    };
+    const event: SheetsBookingSyncEvent = {
+      ...eventWithoutFingerprint,
+      event_fingerprint: eventFingerprint(eventWithoutFingerprint),
+    };
+    const previous = events.get(externalBookingId);
+    if (previous) {
+      if (previous.source_updated_at === event.source_updated_at) {
+        if (previous.event_fingerprint !== event.event_fingerprint) {
+          throw new OwnerActionRequiredError("ambiguous");
+        }
+        continue;
+      }
+
+      if (
+        Date.parse(previous.source_updated_at) >
+        Date.parse(event.source_updated_at)
+      ) {
+        continue;
+      }
+    }
+    events.set(externalBookingId, event);
+  }
+
+  return [...events.values()].sort((a, b) =>
+    a.external_booking_id.localeCompare(b.external_booking_id)
+  );
 }
 
 export interface OccupancyRoomIdentity {
@@ -214,6 +370,24 @@ export interface AvailabilityHoldRpcClient {
   rpc(
     name: "fn_create_availability_hold",
     params: {
+      p_room_unit_id: string;
+      p_check_in: string;
+      p_check_out: string;
+      p_held_by: string;
+      p_lead_id: string | null;
+      p_idempotency_key: string | null;
+    }
+  ): Promise<{
+    data: AvailabilityHoldRpcRow | AvailabilityHoldRpcRow[] | null;
+    error: { code?: string; message?: string } | null;
+  }>;
+}
+
+export interface SheetsBookingHoldRpcClient {
+  rpc(
+    name: "fn_sync_sheets_bookings_and_create_availability_hold",
+    params: {
+      p_events: SheetsBookingSyncEvent[];
       p_room_unit_id: string;
       p_check_in: string;
       p_check_out: string;
@@ -300,4 +474,48 @@ export async function createAvailabilityHoldForMappedRoom(
     },
     client
   );
+}
+
+/**
+ * Synchronizes the complete Sheets booking snapshot and creates the hold in
+ * one database transaction. Preparing every event happens before `rpc`, so a
+ * missing/duplicate/ambiguous identity or source version cannot accidentally
+ * fall through to the hold path.
+ */
+export async function syncSheetsBookingsAndCreateAvailabilityHold(
+  input: Omit<CreateAvailabilityHoldRpcInput, "roomUnitId"> & {
+    externalRoomId: string;
+    rooms: readonly RoomIdentityMappingEvidence[];
+    occupancy: readonly OccupancyRecord[];
+  },
+  client?: SheetsBookingHoldRpcClient
+): Promise<AvailabilityHoldRpcRow> {
+  const mapping = resolveRoomUnitMapping(input.externalRoomId, input.rooms);
+  if (mapping.status !== "mapped") {
+    throw new OwnerActionRequiredError(mapping.status);
+  }
+  const events = prepareSheetsBookingSyncEvents(input.occupancy, input.rooms);
+  const rpcClient =
+    client ??
+    (getSupabaseAdminClient() as unknown as SheetsBookingHoldRpcClient);
+  const { data, error } = await rpcClient.rpc(
+    "fn_sync_sheets_bookings_and_create_availability_hold",
+    {
+      p_events: events,
+      p_room_unit_id: mapping.roomUnitId,
+      p_check_in: input.checkIn,
+      p_check_out: input.checkOut,
+      p_held_by: input.heldBy,
+      p_lead_id: input.leadId ?? null,
+      p_idempotency_key: input.idempotencyKey ?? null,
+    }
+  );
+
+  if (error?.code === "AKB04") {
+    throw new OwnerActionRequiredError("ambiguous");
+  }
+  if (error) throw new AvailabilityHoldRpcError(error.code);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new AvailabilityHoldRpcError(undefined);
+  return row;
 }

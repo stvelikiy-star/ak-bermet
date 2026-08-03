@@ -129,6 +129,7 @@ const ROOMS_COLS = [
   "distanceToBeachMeters",
   "status",
   "notes",
+  "roomUnitId",
 ] as const;
 
 const OCCUPANCY_COLS = [
@@ -142,6 +143,7 @@ const OCCUPANCY_COLS = [
   "source",
   "manager",
   "notes",
+  "sourceUpdatedAt",
 ] as const;
 
 const toBool = (v: string) => v?.trim().toLowerCase() === "да" || v === "true";
@@ -160,7 +162,7 @@ export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
     const { sheets, spreadsheetId } = await getClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${SHEET.rooms}!A2:P`,
+      range: `${SHEET.rooms}!A2:Q`,
     });
     const rows = res.data.values ?? [];
     return rows
@@ -170,6 +172,7 @@ export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
           (r[ROOMS_COLS.indexOf(k)] ?? "") as string;
         return {
           id: g("id"),
+          roomUnitId: g("roomUnitId") || undefined,
           building: g("building"),
           floor: toNum(g("floor")),
           roomNumber: g("roomNumber") || undefined,
@@ -209,31 +212,41 @@ export async function getOccupancyFromSheet(): Promise<OccupancyRecord[]> {
     const { sheets, spreadsheetId } = await getClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${SHEET.occupancy}!A2:J`,
+      range: `${SHEET.occupancy}!A2:K`,
     });
     const rows = res.data.values ?? [];
     return rows
-      .filter((r) => r[0])
-      .map((r) => {
-        const g = (k: (typeof OCCUPANCY_COLS)[number]) =>
-          (r[OCCUPANCY_COLS.indexOf(k)] ?? "") as string;
-        return {
-          id: g("id"),
-          roomId: g("roomId"),
-          checkIn: g("checkIn"),
-          checkOut: g("checkOut"),
-          status: (g("status") || "pre_hold") as OccupancyRecord["status"],
-          guestName: g("guestName") || undefined,
-          guestPhone: g("guestPhone") || undefined,
-          source: g("source") || undefined,
-          manager: g("manager") || undefined,
-          notes: g("notes") || undefined,
-        } satisfies OccupancyRecord;
-      });
+      // Preserve every non-empty source row. In particular, a booking row
+      // with a missing stable id must reach contract validation and fail
+      // closed; filtering on column A would silently erase that evidence.
+      .filter((r) => r.some((value) => String(value ?? "").trim().length > 0))
+      .map(occupancyRowToRecord);
   } catch (e) {
     console.error("[SHEETS] getOccupancyFromSheet failed:", e);
     throw e;
   }
+}
+
+// Preserve incomplete authoritative values at the adapter boundary. In
+// particular, an empty status must not be converted into a valid blocking
+// state: prepareSheetsBookingSyncEvents validates the complete row and stops
+// the transactional hold RPC with OWNER_ACTION_REQUIRED.
+export function occupancyRowToRecord(row: readonly unknown[]): OccupancyRecord {
+  const g = (key: (typeof OCCUPANCY_COLS)[number]) =>
+    String(row[OCCUPANCY_COLS.indexOf(key)] ?? "");
+  return {
+    id: g("id"),
+    roomId: g("roomId"),
+    checkIn: g("checkIn"),
+    checkOut: g("checkOut"),
+    status: g("status") as OccupancyRecord["status"],
+    guestName: g("guestName") || undefined,
+    guestPhone: g("guestPhone") || undefined,
+    source: g("source") || undefined,
+    manager: g("manager") || undefined,
+    notes: g("notes") || undefined,
+    sourceUpdatedAt: g("sourceUpdatedAt") || undefined,
+  };
 }
 
 // ── Менеджер: чтение и обновление заявок (Stage 09) ────────────
