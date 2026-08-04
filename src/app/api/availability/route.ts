@@ -5,6 +5,7 @@ import {
   filterRooms,
   createHold,
   listActiveHolds,
+  parseDateRange,
   parseGuests,
   AvailabilityError,
   AVAILABILITY_MESSAGE,
@@ -23,6 +24,7 @@ import {
   listActiveAvailabilityHolds,
   mapOccupancyToInventoryRoomIds,
   syncSheetsBookingsAndCreateAvailabilityHold,
+  validateRoomInventoryForAvailability,
 } from "@/lib/supabase-admin";
 import type {
   AvailabilityQuery,
@@ -40,7 +42,18 @@ function ownerActionRequiredResponse() {
       ok: false,
       code: "OWNER_ACTION_REQUIRED",
       message:
-        "Для синхронизации занятости не хватает однозначных идентификаторов или версии данных. Обратитесь к владельцу.",
+        "Данные номерного фонда или занятости неполны либо неоднозначны. Обратитесь к владельцу.",
+    },
+    { status: 503 }
+  );
+}
+
+function availabilityUnknownResponse() {
+  return NextResponse.json(
+    {
+      ok: false,
+      code: "availability_unknown",
+      message: "Не удалось безопасно проверить доступность. Повторите запрос позже.",
     },
     { status: 503 }
   );
@@ -59,6 +72,10 @@ function availabilityHoldRpcErrorResponse(code: string | undefined): {
       return { status: availabilityHoldRpcHttpStatus(code), code: "hold_conflict", message: "Номер уже занят или удерживается на эти даты." };
     case "AKB03":
       return { status: availabilityHoldRpcHttpStatus(code), code: "invalid_room", message: "Номер не найден или недоступен." };
+    case "AKB05":
+      return { status: availabilityHoldRpcHttpStatus(code), code: "invalid_idempotency_key", message: "Некорректный ключ идемпотентности." };
+    case "AKB06":
+      return { status: availabilityHoldRpcHttpStatus(code), code: "idempotency_conflict", message: "Ключ идемпотентности уже использован для другого запроса." };
     default:
       return { status: availabilityHoldRpcHttpStatus(code), code: "availability_unknown", message: "Не удалось безопасно создать удержание. Повторите запрос позже." };
   }
@@ -91,8 +108,13 @@ async function loadRoomsAndOccupancy(): Promise<{
   rooms: typeof mockRooms;
   occupancy: typeof mockOccupancy;
   sheetsOccupancy: typeof mockOccupancy;
+  sheetsSnapshotStartedAt: string;
   source: "sheets" | "mock";
 }> {
+  // This fence is captured before the Sheets read starts. A slower, older
+  // snapshot therefore cannot arrive after a newer read and reconcile away
+  // bookings which the newer snapshot has already made durable.
+  const sheetsSnapshotStartedAt = new Date().toISOString();
   if (isGoogleSheetsEnabled()) {
     const [roomsResult, occupancyResult, holdsResult] = await Promise.allSettled([
       getRoomsFromSheet(),
@@ -129,6 +151,7 @@ async function loadRoomsAndOccupancy(): Promise<{
     // Реальный номерной фонд настроен — используем его как есть, даже если
     // лист пуст. Подмена fabricated mock-номерами здесь была бы fail-open:
     // клиент получил бы выдуманные варианты вместо честного пустого списка.
+    validateRoomInventoryForAvailability(roomsResult.value);
     const occupancy = [
       ...occupancyResult.value,
       ...holdsResult.value.map((hold) => ({
@@ -145,6 +168,7 @@ async function loadRoomsAndOccupancy(): Promise<{
       rooms: roomsResult.value,
       occupancy: mapOccupancyToInventoryRoomIds(occupancy, roomsResult.value),
       sheetsOccupancy: occupancyResult.value,
+      sheetsSnapshotStartedAt,
       source: "sheets",
     };
   }
@@ -158,6 +182,7 @@ async function loadRoomsAndOccupancy(): Promise<{
     rooms: mockRooms,
     occupancy: mockOccupancy,
     sheetsOccupancy: [],
+    sheetsSnapshotStartedAt,
     source: "mock",
   };
 }
@@ -177,7 +202,8 @@ export async function GET(request: Request) {
         { status: errorStatus(error.code) }
       );
     }
-    throw error;
+    console.error("[AVAILABILITY] Unexpected query validation failure");
+    return availabilityUnknownResponse();
   }
 
   const query: AvailabilityQuery = {
@@ -200,7 +226,8 @@ export async function GET(request: Request) {
         { status: errorStatus(error.code) }
       );
     }
-    throw error;
+    console.error("[AVAILABILITY] Unexpected inventory load failure");
+    return availabilityUnknownResponse();
   }
   // Process-local holds belong exclusively to the explicit mock source.
   // Production occupancy already includes active durable Supabase holds.
@@ -217,7 +244,8 @@ export async function GET(request: Request) {
         { status: errorStatus(error.code) }
       );
     }
-    throw error;
+    console.error("[AVAILABILITY] Unexpected filtering failure");
+    return availabilityUnknownResponse();
   }
 
   return NextResponse.json({
@@ -232,9 +260,9 @@ export async function GET(request: Request) {
 // Production создаёт hold атомарно в БД; process-local store остаётся
 // только для явного mock/test source.
 export async function POST(request: Request) {
-  let body: Partial<CreateHoldRequest>;
+  let parsedBody: unknown;
   try {
-    body = await request.json();
+    parsedBody = await request.json();
   } catch {
     return NextResponse.json(
       { ok: false, code: "invalid_date", message: "Некорректное тело запроса." },
@@ -242,13 +270,29 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.roomId || typeof body.roomId !== "string") {
+  if (
+    typeof parsedBody !== "object" ||
+    parsedBody === null ||
+    Array.isArray(parsedBody)
+  ) {
+    return NextResponse.json(
+      { ok: false, code: "invalid_date", message: "Некорректное тело запроса." },
+      { status: 400 }
+    );
+  }
+  const body = parsedBody as Partial<CreateHoldRequest>;
+
+  if (
+    typeof body.roomId !== "string" ||
+    body.roomId.trim().length === 0 ||
+    body.roomId.trim().length > 500
+  ) {
     return NextResponse.json(
       { ok: false, code: "invalid_room", message: "Не указан номер (roomId)." },
       { status: 400 }
     );
   }
-  if (!body.checkIn || !body.checkOut) {
+  if (typeof body.checkIn !== "string" || typeof body.checkOut !== "string") {
     return NextResponse.json(
       {
         ok: false,
@@ -257,6 +301,18 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+  }
+  try {
+    parseDateRange(body.checkIn, body.checkOut);
+  } catch (error) {
+    if (error instanceof AvailabilityError) {
+      return NextResponse.json(
+        { ok: false, code: error.code, message: error.message },
+        { status: errorStatus(error.code) }
+      );
+    }
+    console.error("[AVAILABILITY] Unexpected date validation failure");
+    return availabilityUnknownResponse();
   }
   // Ключ идемпотентности обязателен: без него повторный запрос (retry
   // после таймаута, двойной клик) создаёт отдельное удержание вместо
@@ -276,9 +332,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let rooms, occupancy, sheetsOccupancy, source;
+  let rooms, occupancy, sheetsOccupancy, sheetsSnapshotStartedAt, source;
   try {
-    ({ rooms, occupancy, sheetsOccupancy, source } =
+    ({ rooms, occupancy, sheetsOccupancy, sheetsSnapshotStartedAt, source } =
       await loadRoomsAndOccupancy());
   } catch (error) {
     if (error instanceof OwnerActionRequiredError) {
@@ -290,11 +346,18 @@ export async function POST(request: Request) {
         { status: errorStatus(error.code) }
       );
     }
-    throw error;
+    console.error("[AVAILABILITY] Unexpected inventory load failure");
+    return availabilityUnknownResponse();
   }
 
   if (source === "sheets") {
-    const staff = await getCurrentStaff();
+    let staff;
+    try {
+      staff = await getCurrentStaff();
+    } catch {
+      console.error("[AVAILABILITY] Staff authentication read failed");
+      return availabilityUnknownResponse();
+    }
     if (!staff) {
       return NextResponse.json(
         { ok: false, code: "unauthorized", message: "Требуется вход в систему." },
@@ -310,9 +373,10 @@ export async function POST(request: Request) {
 
     try {
       const hold = await syncSheetsBookingsAndCreateAvailabilityHold({
-        externalRoomId: body.roomId,
+        externalRoomId: body.roomId.trim(),
         rooms,
         occupancy: sheetsOccupancy,
+        snapshotStartedAt: sheetsSnapshotStartedAt,
         checkIn: body.checkIn,
         checkOut: body.checkOut,
         heldBy: staff.userId,
@@ -333,14 +397,15 @@ export async function POST(request: Request) {
           { status: mapped.status }
         );
       }
-      throw error;
+      console.error("[AVAILABILITY] Unexpected hold creation failure");
+      return availabilityUnknownResponse();
     }
   }
 
   try {
     const hold = createHold(
       {
-        roomId: body.roomId,
+        roomId: body.roomId.trim(),
         checkIn: body.checkIn,
         checkOut: body.checkOut,
         guestName: body.guestName,
@@ -360,6 +425,7 @@ export async function POST(request: Request) {
         { status: errorStatus(error.code) }
       );
     }
-    throw error;
+    console.error("[AVAILABILITY] Unexpected mock hold creation failure");
+    return availabilityUnknownResponse();
   }
 }

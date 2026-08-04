@@ -73,6 +73,7 @@ for (const code of ["AKB01", "AKB02", "AKB03", "23P01"]) {
           checkIn: "2026-09-01",
           checkOut: "2026-09-03",
           heldBy: "staff-id",
+          idempotencyKey: `error-${code}`,
         },
         client
       ),

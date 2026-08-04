@@ -19,6 +19,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v_range daterange;
+  v_idempotency_key text;
   v_existing public.availability_holds;
   v_hold public.availability_holds;
 begin
@@ -31,6 +32,13 @@ begin
       using errcode = 'AKB01';
   end if;
   v_range := daterange(p_check_in, p_check_out, '[)');
+
+  v_idempotency_key := btrim(p_idempotency_key);
+  if v_idempotency_key is null or length(v_idempotency_key) = 0
+    or length(v_idempotency_key) > 200 then
+    raise exception 'invalid_idempotency_key: key is required and must be at most 200 characters'
+      using errcode = 'AKB05';
+  end if;
 
   -- A row lock is the per-room serialization point. It is deliberately
   -- acquired before idempotency lookup, expiration, and insertion so two
@@ -47,18 +55,18 @@ begin
       using errcode = 'AKB03';
   end if;
 
-  -- Replay always returns the original row, including after that hold was
-  -- expired, released, or converted. Reusing a key for another logical hold
-  -- remains an explicit caller error.
-  if p_idempotency_key is not null then
+  -- For a still-eligible room, replay returns the original row, including
+  -- after that hold was expired, released, or converted. Reusing a key for
+  -- another logical hold remains an explicit caller error.
+  if v_idempotency_key is not null then
     select * into v_existing
       from public.availability_holds
-      where idempotency_key = p_idempotency_key;
+      where idempotency_key = v_idempotency_key;
     if found then
       if v_existing.room_unit_id <> p_room_unit_id
         or v_existing.date_range <> v_range then
         raise exception 'idempotency_key_conflict: key already used for a different hold'
-          using errcode = 'AKB02';
+          using errcode = 'AKB06';
       end if;
       return v_existing;
     end if;
@@ -74,7 +82,7 @@ begin
     (room_unit_id, lead_id, date_range, status, held_by, expires_at, idempotency_key)
   values
     (p_room_unit_id, p_lead_id, v_range, 'active', p_held_by,
-     now() + interval '60 minutes', p_idempotency_key)
+     now() + interval '60 minutes', v_idempotency_key)
   returning * into v_hold;
 
   return v_hold;
@@ -82,16 +90,16 @@ exception
   when unique_violation then
     -- The unique partial index created in 20260728000100 arbitrates a race
     -- between equal idempotency keys used for different rooms. Same-request
-    -- replay returns the winner; different arguments retain AKB02.
-    if p_idempotency_key is not null then
+    -- replay returns the winner; different arguments return AKB06.
+    if v_idempotency_key is not null then
       select * into v_existing
         from public.availability_holds
-        where idempotency_key = p_idempotency_key;
+        where idempotency_key = v_idempotency_key;
       if found then
         if v_existing.room_unit_id <> p_room_unit_id
           or v_existing.date_range <> v_range then
           raise exception 'idempotency_key_conflict: key already used for a different hold'
-            using errcode = 'AKB02';
+            using errcode = 'AKB06';
         end if;
         return v_existing;
       end if;
@@ -114,6 +122,14 @@ revoke all on function public.fn_create_availability_hold(uuid, date, date, uuid
 revoke all on function public.fn_create_availability_hold(uuid, date, date, uuid, uuid, text) from anon;
 revoke all on function public.fn_create_availability_hold(uuid, date, date, uuid, uuid, text) from authenticated;
 grant execute on function public.fn_create_availability_hold(uuid, date, date, uuid, uuid, text) to service_role;
+
+-- RLS policy holds_staff_all was created when staff-side direct writes were
+-- still anticipated. PostgreSQL requires both a table grant and a passing RLS
+-- policy, so remove the DML grants explicitly: an authenticated REST client
+-- must not bypass room readiness, mandatory idempotency, expiration cleanup,
+-- or the authenticated server identity enforced by the service-role route.
+revoke insert, update, delete on table public.availability_holds from anon;
+revoke insert, update, delete on table public.availability_holds from authenticated;
 
 comment on function public.fn_create_availability_hold(uuid, date, date, uuid, uuid, text) is
   'Service-role-only, invoker-rights hold creation. Locks the eligible room, '

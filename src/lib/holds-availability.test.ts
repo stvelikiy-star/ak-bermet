@@ -8,6 +8,7 @@ import type {
 
 const modulePath = "./supabase-admin.ts";
 const {
+  AvailabilityHoldRpcError,
   OwnerActionRequiredError,
   createAvailabilityHoldForMappedRoom,
   listActiveAvailabilityHolds,
@@ -15,13 +16,19 @@ const {
   prepareSheetsBookingSyncEvents,
   resolveRoomUnitMapping,
   syncSheetsBookingsAndCreateAvailabilityHold,
+  validateRoomInventoryForAvailability,
 } = (await import(modulePath)) as typeof import("./supabase-admin");
-const { occupancyRowToRecord } = (await import(
+const { occupancyRowToRecord, roomRowToRoomUnit } = (await import(
   "./google-sheets.ts"
 )) as typeof import("./google-sheets");
 
 const ROOM_UNIT_ID = "123e4567-e89b-42d3-a456-426614174000";
 const OTHER_ROOM_UNIT_ID = "223e4567-e89b-42d3-a456-426614174000";
+const ACTIVE_ROOM = {
+  id: "sheet-room-101",
+  roomUnitId: ROOM_UNIT_ID,
+  status: "active",
+} as const;
 
 test("active holds are read from public.availability_holds and filtered by expires_at", async () => {
   const calls: Array<[string, unknown]> = [];
@@ -103,6 +110,38 @@ test("missing and ambiguous room mappings are rejected", () => {
       { id: "sheet-room-101", room_unit_id: OTHER_ROOM_UNIT_ID },
     ]),
     { status: "ambiguous" }
+  );
+});
+
+test("a malformed alternate UUID is not ignored as valid mapping evidence", () => {
+  assert.deepEqual(
+    resolveRoomUnitMapping("sheet-room-101", [
+      {
+        id: "sheet-room-101",
+        roomUnitId: ROOM_UNIT_ID,
+        room_unit_id: "not-a-uuid",
+      },
+    ]),
+    { status: "invalid" }
+  );
+});
+
+test("inventory validation rejects missing mappings and unknown status", () => {
+  assert.throws(
+    () =>
+      validateRoomInventoryForAvailability([
+        { id: "sheet-room-101", status: "active" },
+      ]),
+    (error: unknown) =>
+      error instanceof OwnerActionRequiredError && error.reason === "missing"
+  );
+  assert.throws(
+    () =>
+      validateRoomInventoryForAvailability([
+        { id: "sheet-room-101", roomUnitId: ROOM_UNIT_ID, status: "" },
+      ]),
+    (error: unknown) =>
+      error instanceof OwnerActionRequiredError && error.reason === "invalid"
   );
 });
 
@@ -205,7 +244,7 @@ test("the mapped room_units UUID, never the external id, is sent to RPC", async 
   await createAvailabilityHoldForMappedRoom(
     {
       externalRoomId: "sheet-room-101",
-      rooms: [{ id: "sheet-room-101", roomUnitId: ROOM_UNIT_ID.toUpperCase() }],
+      rooms: [{ ...ACTIVE_ROOM, roomUnitId: ROOM_UNIT_ID.toUpperCase() }],
       checkIn: "2026-08-10",
       checkOut: "2026-08-11",
       heldBy: "staff-1",
@@ -216,6 +255,62 @@ test("the mapped room_units UUID, never the external id, is sent to RPC", async 
 
   assert.equal(rpcRoomUnitId, ROOM_UNIT_ID);
   assert.notEqual(rpcRoomUnitId, "sheet-room-101");
+});
+
+test("an unavailable operational state prevents the hold RPC", async () => {
+  let rpcCalls = 0;
+  const client: AvailabilityHoldRpcClient = {
+    async rpc() {
+      rpcCalls += 1;
+      return { data: null, error: null };
+    },
+  };
+
+  await assert.rejects(
+    createAvailabilityHoldForMappedRoom(
+      {
+        externalRoomId: "sheet-room-101",
+        rooms: [{ ...ACTIVE_ROOM, status: "maintenance" }],
+        checkIn: "2026-08-10",
+        checkOut: "2026-08-11",
+        heldBy: "staff-1",
+        idempotencyKey: "request-maintenance",
+      },
+      client
+    ),
+    (error: unknown) =>
+      error instanceof OwnerActionRequiredError && error.reason === "invalid"
+  );
+  assert.equal(rpcCalls, 0);
+});
+
+test("invalid hold input fails before the write RPC", async () => {
+  let rpcCalls = 0;
+  const client: AvailabilityHoldRpcClient = {
+    async rpc() {
+      rpcCalls += 1;
+      return { data: null, error: null };
+    },
+  };
+
+  for (const input of [
+    { checkIn: "2026-08-11", checkOut: "2026-08-10", idempotencyKey: "key" },
+    { checkIn: "2026-08-10", checkOut: "2026-08-11", idempotencyKey: " " },
+  ]) {
+    await assert.rejects(
+      createAvailabilityHoldForMappedRoom(
+        {
+          externalRoomId: "sheet-room-101",
+          rooms: [ACTIVE_ROOM],
+          heldBy: "staff-1",
+          ...input,
+        },
+        client
+      ),
+      (error: unknown) => error instanceof AvailabilityHoldRpcError
+    );
+  }
+  assert.equal(rpcCalls, 0);
 });
 
 test("a held UUID is canonicalized to the external inventory id and excluded", () => {
@@ -378,7 +473,7 @@ test("equal-version conflicts prevent the transactional hold RPC", async () => {
     syncSheetsBookingsAndCreateAvailabilityHold(
       {
         externalRoomId: "sheet-room-101",
-        rooms: [{ id: "sheet-room-101", roomUnitId: ROOM_UNIT_ID }],
+        rooms: [ACTIVE_ROOM],
         occupancy: [
           {
             id: "booking-stable-1",
@@ -397,6 +492,7 @@ test("equal-version conflicts prevent the transactional hold RPC", async () => {
             sourceUpdatedAt: "2026-08-04T10:15:00+00:00",
           },
         ],
+        snapshotStartedAt: "2026-08-04T12:00:00Z",
         checkIn: "2026-08-20",
         checkOut: "2026-08-21",
         heldBy: "staff-1",
@@ -423,7 +519,7 @@ test("missing source version prevents the transactional hold RPC", async () => {
     syncSheetsBookingsAndCreateAvailabilityHold(
       {
         externalRoomId: "sheet-room-101",
-        rooms: [{ id: "sheet-room-101", roomUnitId: ROOM_UNIT_ID }],
+        rooms: [ACTIVE_ROOM],
         occupancy: [
           {
             id: "booking-stable-1",
@@ -433,6 +529,7 @@ test("missing source version prevents the transactional hold RPC", async () => {
             status: "confirmed",
           },
         ],
+        snapshotStartedAt: "2026-08-04T12:00:00Z",
         checkIn: "2026-08-20",
         checkOut: "2026-08-21",
         heldBy: "staff-1",
@@ -473,8 +570,9 @@ test("missing Sheets booking status is not invented and prevents the hold RPC", 
     syncSheetsBookingsAndCreateAvailabilityHold(
       {
         externalRoomId: "sheet-room-101",
-        rooms: [{ id: "sheet-room-101", roomUnitId: ROOM_UNIT_ID }],
+        rooms: [ACTIVE_ROOM],
         occupancy: [row],
+        snapshotStartedAt: "2026-08-04T12:00:00Z",
         checkIn: "2026-08-20",
         checkOut: "2026-08-21",
         heldBy: "staff-1",
@@ -486,6 +584,73 @@ test("missing Sheets booking status is not invented and prevents the hold RPC", 
       error instanceof OwnerActionRequiredError &&
       error.code === "OWNER_ACTION_REQUIRED" &&
       error.reason === "invalid"
+  );
+  assert.equal(rpcCalls, 0);
+});
+
+test("missing Sheets room status is not invented as active", () => {
+  const sourceRow = Array<string>(17).fill("");
+  sourceRow[0] = "sheet-room-101";
+  sourceRow[1] = "Garden 1";
+  sourceRow[4] = "Люкс";
+  sourceRow[6] = "2";
+  sourceRow[16] = ROOM_UNIT_ID;
+
+  const room = roomRowToRoomUnit(sourceRow);
+  assert.equal(room.status, "");
+  assert.throws(
+    () => validateRoomInventoryForAvailability([room]),
+    (error: unknown) =>
+      error instanceof OwnerActionRequiredError && error.reason === "invalid"
+  );
+});
+
+test("a source version must be an explicit RFC 3339 instant", () => {
+  assert.throws(
+    () =>
+      prepareSheetsBookingSyncEvents(
+        [
+          {
+            id: "booking-stable-1",
+            roomId: "sheet-room-101",
+            checkIn: "2026-08-10",
+            checkOut: "2026-08-12",
+            status: "confirmed",
+            sourceUpdatedAt: "2026-08-04",
+          },
+        ],
+        [ACTIVE_ROOM]
+      ),
+    (error: unknown) =>
+      error instanceof OwnerActionRequiredError && error.reason === "invalid"
+  );
+});
+
+test("an invalid snapshot fence prevents the transactional hold RPC", async () => {
+  let rpcCalls = 0;
+  const client: SheetsBookingHoldRpcClient = {
+    async rpc() {
+      rpcCalls += 1;
+      return { data: null, error: null };
+    },
+  };
+
+  await assert.rejects(
+    syncSheetsBookingsAndCreateAvailabilityHold(
+      {
+        externalRoomId: "sheet-room-101",
+        rooms: [ACTIVE_ROOM],
+        occupancy: [],
+        snapshotStartedAt: "not-an-instant",
+        checkIn: "2026-08-20",
+        checkOut: "2026-08-21",
+        heldBy: "staff-1",
+        idempotencyKey: "request-invalid-snapshot",
+      },
+      client
+    ),
+    (error: unknown) =>
+      error instanceof OwnerActionRequiredError && error.reason === "invalid"
   );
   assert.equal(rpcCalls, 0);
 });
@@ -513,7 +678,7 @@ test("Sheets events are synchronized in the same RPC before hold creation", asyn
   await syncSheetsBookingsAndCreateAvailabilityHold(
     {
       externalRoomId: "sheet-room-101",
-      rooms: [{ id: "sheet-room-101", roomUnitId: ROOM_UNIT_ID }],
+      rooms: [ACTIVE_ROOM],
       occupancy: [
         {
           id: "booking-stable-1",
@@ -524,6 +689,7 @@ test("Sheets events are synchronized in the same RPC before hold creation", asyn
           sourceUpdatedAt: "2026-08-04T10:15:00Z",
         },
       ],
+      snapshotStartedAt: "2026-08-04T12:00:00Z",
       checkIn: "2026-08-20",
       checkOut: "2026-08-21",
       heldBy: "staff-1",
@@ -537,6 +703,10 @@ test("Sheets events are synchronized in the same RPC before hold creation", asyn
     "fn_sync_sheets_bookings_and_create_availability_hold"
   );
   assert.equal(rpcParams?.p_room_unit_id, ROOM_UNIT_ID);
+  assert.equal(
+    rpcParams?.p_snapshot_started_at,
+    "2026-08-04T12:00:00.000Z"
+  );
   assert.equal(rpcParams?.p_events.length, 1);
   assert.equal(rpcParams?.p_events[0].external_booking_id, "booking-stable-1");
 });
