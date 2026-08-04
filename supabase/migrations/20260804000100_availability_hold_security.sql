@@ -4,6 +4,14 @@
 
 begin;
 
+-- The application and PostgREST contract expose hold dates as scalar fields,
+-- while 0006 stores the authoritative interval as a daterange. Keep one
+-- writable source of truth and derive the two API fields in PostgreSQL so a
+-- restart/read never depends on reconstructing dates in process memory.
+alter table public.availability_holds
+  add column check_in date generated always as (lower(date_range)) stored,
+  add column check_out date generated always as (upper(date_range)) stored;
+
 create or replace function public.fn_create_availability_hold(
   p_room_unit_id uuid,
   p_check_in date,
