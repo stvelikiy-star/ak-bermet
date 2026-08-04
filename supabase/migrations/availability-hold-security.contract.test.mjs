@@ -29,6 +29,17 @@ const executableSheetsSyncSql = sheetsSyncSql.replace(/--.*$/gm, "");
 const signature =
   String.raw`public\.fn_create_availability_hold\(uuid,\s*date,\s*date,\s*uuid,\s*uuid,\s*text\)`;
 
+test("durable holds expose dates derived from the authoritative range", () => {
+  assert.match(
+    executableSql,
+    /alter table public\.availability_holds[\s\S]*?add column check_in date generated always as \(lower\(date_range\)\) stored[\s\S]*?add column check_out date generated always as \(upper\(date_range\)\) stored/i
+  );
+  assert.doesNotMatch(
+    executableSql,
+    /insert into public\.availability_holds\s*\([^)]*\bcheck_(?:in|out)\b/i
+  );
+});
+
 test("hold RPC uses invoker rights and is executable only by service_role", () => {
   assert.match(executableSql, /security invoker/i);
   assert.doesNotMatch(executableSql, /security definer/i);
