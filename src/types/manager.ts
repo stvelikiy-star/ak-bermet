@@ -4,6 +4,7 @@ import type { Lead, LeadStatus } from "./lead";
 export interface ManagerLead extends Lead {
   manager?: string;
   managerComment?: string;
+  updatedAt?: string;
 }
 
 export interface LeadStatusHistoryItem {

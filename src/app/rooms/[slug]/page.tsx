@@ -23,12 +23,13 @@ export function generateStaticParams() {
   return roomDetailSlugs.map((slug) => ({ slug }));
 }
 
-export function generateMetadata({
+export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
-}): Metadata {
-  const room = getRoomDetail(params.slug);
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const room = getRoomDetail(slug);
   if (!room) return { title: "Номер не найден" };
   return {
     title: room.title,
@@ -37,12 +38,13 @@ export function generateMetadata({
   };
 }
 
-export default function RoomDetailPage({
+export default async function RoomDetailPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const room = getRoomDetail(params.slug);
+  const { slug } = await params;
+  const room = getRoomDetail(slug);
   if (!room) notFound();
 
   const waHref = WA[room.whatsappKey];

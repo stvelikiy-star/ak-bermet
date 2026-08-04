@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { isManagerAuthenticated } from "@/lib/manager-session";
-import { isManagerAuthEnabled } from "@/lib/manager-auth";
 import { isGoogleSheetsEnabled } from "@/lib/google-sheets";
 import { getAIProviderName, isRealAIEnabled } from "@/lib/ai/providers";
 
@@ -9,12 +8,11 @@ export const dynamic = "force-dynamic";
 
 // Безопасные статусы интеграций (без секретов).
 export async function GET() {
-  if (!isManagerAuthenticated()) {
+  if (!(await isManagerAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Нет доступа" }, { status: 403 });
   }
   return NextResponse.json({
     ok: true,
-    managerAuth: isManagerAuthEnabled(),
     googleSheets: isGoogleSheetsEnabled(),
     aiProvider: getAIProviderName(),
     realAI: isRealAIEnabled(),

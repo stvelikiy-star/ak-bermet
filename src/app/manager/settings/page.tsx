@@ -2,7 +2,6 @@ import ManagerHeader from "@/components/manager/ManagerHeader";
 import { SITE } from "@/data/site";
 import { isGoogleSheetsEnabled } from "@/lib/google-sheets";
 import { getAIProviderName, isRealAIEnabled } from "@/lib/ai/providers";
-import { isManagerAuthEnabled } from "@/lib/manager-auth";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -66,10 +65,7 @@ export default function ManagerSettingsPage() {
             Интеграции
           </h2>
           <dl>
-            <Row
-              label="Авторизация менеджера"
-              value={isManagerAuthEnabled() ? "Включена" : "Выключена"}
-            />
+            <Row label="Авторизация менеджера" value="Supabase Auth" />
             <Row
               label="Google Sheets"
               value={sheets ? "Подключено" : "Выключено (mock)"}

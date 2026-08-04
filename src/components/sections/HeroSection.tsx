@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { WA } from "@/data/site";
 import { heroFacts } from "@/data/home";
 import { IconCalendar, IconEye } from "@/components/ui/icons";
@@ -46,13 +47,13 @@ export default function HeroSection() {
               <IconCalendar className="h-5 w-5" />
               Забронировать отдых
             </a>
-            <a
+            <Link
               href="/rooms"
               className="inline-flex items-center justify-center gap-2.5 rounded-full border border-white/30 bg-white/5 px-7 py-4 text-sm font-semibold uppercase tracking-wide text-white backdrop-blur transition-colors hover:border-gold/60 hover:text-gold-soft"
             >
               <IconEye className="h-5 w-5" />
               Посмотреть номера
-            </a>
+            </Link>
           </div>
         </div>
 

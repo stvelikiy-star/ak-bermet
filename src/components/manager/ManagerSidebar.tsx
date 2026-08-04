@@ -10,6 +10,8 @@ import {
   IconGift,
   IconWaves,
   IconShield,
+  IconClock,
+  IconEye,
 } from "@/components/ui/icons";
 
 const NAV = [
@@ -17,6 +19,8 @@ const NAV = [
   { href: "/manager/leads", label: "Заявки", icon: IconUsers },
   { href: "/manager/availability", label: "Занятость", icon: IconBed },
   { href: "/manager/rooms", label: "Номерной фонд", icon: IconBed2 },
+  { href: "/manager/operations", label: "Операции", icon: IconClock },
+  { href: "/manager/inspections", label: "Проверки", icon: IconEye },
   { href: "/manager/payments", label: "Оплаты", icon: IconGift },
   { href: "/manager/reports", label: "Отчёты", icon: IconWaves },
   { href: "/manager/settings", label: "Настройки", icon: IconShield },

@@ -1,10 +1,12 @@
+import { createHash, randomUUID } from "node:crypto";
 import type { Lead } from "@/types/lead";
+import type { ManagerLead } from "@/types/manager";
 import type { RoomUnit, OccupancyRecord } from "@/types/availability";
 import type { LeadStatus } from "@/types/lead";
 
 // Клиент Google Sheets для заявок (и архитектура под доступность).
 // Работает только при GOOGLE_SHEETS_ENABLED=true и заданных кредах;
-// иначе вызывающий код использует fallback / mock.
+// рабочие CRM-маршруты явно сообщают об отсутствии источника.
 
 type Creds = { spreadsheetId: string; email: string; key: string };
 
@@ -20,6 +22,16 @@ function getCreds(): Creds | null {
 
 export function isGoogleSheetsEnabled(): boolean {
   return process.env.GOOGLE_SHEETS_ENABLED === "true" && getCreds() !== null;
+}
+
+// Fabricated inventory and process-local holds are development aids only.
+// A production deployment with missing/incomplete Sheets configuration must
+// fail closed: treating it as mock would make holds instance-local and allow
+// conflicting bookings after a restart or on another server instance.
+export function isLocalMockAvailabilityAllowed(): boolean {
+  return (
+    process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test"
+  );
 }
 
 // Названия листов (можно переопределить через env).
@@ -135,7 +147,12 @@ const OCCUPANCY_COLS = [
 const toBool = (v: string) => v?.trim().toLowerCase() === "да" || v === "true";
 const toNum = (v: string) => (v ? Number(v) : undefined);
 
-// Читает «Номерной фонд». Если лист не подключён/пуст — возвращает [].
+// Читает «Номерной фонд». Если лист не подключён — возвращает [].
+//
+// Ошибка чтения НЕ проглатывается (см. getOccupancyFromSheet): пустой
+// список неотличим от «в листе реально нет номеров», поэтому при сбое
+// чтения бросаем исключение — вызывающий код обязан считать номерной
+// фонд неизвестным, а не тихо переключаться на mock-данные (fail-open).
 export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
   if (!isGoogleSheetsEnabled()) return [];
   // TODO Stage 06: финализировать структуру листа «Номерной фонд».
@@ -175,11 +192,16 @@ export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
       });
   } catch (e) {
     console.error("[SHEETS] getRoomsFromSheet failed:", e);
-    return [];
+    throw e;
   }
 }
 
-// Читает «Занятость». Если лист не подключён/пуст — возвращает [].
+// Читает «Занятость». Если лист не подключён — возвращает [].
+//
+// В отличие от getRoomsFromSheet ошибка чтения НЕ проглатывается: пустой
+// список занятости неотличим от «реальной занятости нет», поэтому при сбое
+// чтения нужно явно сообщить вызывающему коду, а не тихо отдать [] — иначе
+// доступность и удержания будут считаться по неполным данным (fail-open).
 export async function getOccupancyFromSheet(): Promise<OccupancyRecord[]> {
   if (!isGoogleSheetsEnabled()) return [];
   // TODO Stage 06: финализировать структуру листа «Занятость».
@@ -210,7 +232,7 @@ export async function getOccupancyFromSheet(): Promise<OccupancyRecord[]> {
       });
   } catch (e) {
     console.error("[SHEETS] getOccupancyFromSheet failed:", e);
-    return [];
+    throw e;
   }
 }
 
@@ -218,18 +240,64 @@ export async function getOccupancyFromSheet(): Promise<OccupancyRecord[]> {
 
 const yesNoToBool = (v: string) => (v ?? "").trim().toLowerCase() === "да";
 const numOrUndef = (v: string) => (v ? Number(v) : undefined);
+const LEAD_UPDATE_CLAIM_MARKER = "lead_update_claim_v2";
+
+function applyCompletedLeadUpdates(
+  leads: ManagerLead[],
+  historyRows: unknown[][]
+): ManagerLead[] {
+  const eventsByLead = new Map<string, unknown[][]>();
+  for (const row of historyRows) {
+    const leadId = String(row[1] ?? "");
+    const token = String(row[8] ?? "");
+    // A completed claim keeps its immutable fence in G:K and records the
+    // business event in A:F. An incomplete claim must never become visible.
+    if (
+      !leadId ||
+      String(row[6] ?? "") !== LEAD_UPDATE_CLAIM_MARKER ||
+      String(row[0] ?? "") !== `h_${token}` ||
+      String(row[2] ?? "") !== String(row[10] ?? "")
+    ) {
+      continue;
+    }
+    const events = eventsByLead.get(leadId) ?? [];
+    events.push(row);
+    eventsByLead.set(leadId, events);
+  }
+
+  return leads.map((lead) => {
+    let current = lead;
+    for (const row of eventsByLead.get(lead.id) ?? []) {
+      if (String(row[7] ?? "") !== (current.updatedAt ?? "")) continue;
+      current = {
+        ...current,
+        status: String(row[3] ?? "") as LeadStatus,
+        manager: String(row[4] ?? "") || undefined,
+        managerComment: String(row[5] ?? "") || undefined,
+        updatedAt: String(row[10] ?? "") || undefined,
+      };
+    }
+    return current;
+  });
+}
 
 // Читает лист «Заявки» в массив Lead (с полями менеджера).
-export async function getLeadsFromSheet(): Promise<Lead[]> {
+export async function getLeadsFromSheet(): Promise<ManagerLead[]> {
   if (!isGoogleSheetsEnabled()) return [];
   try {
     const { sheets, spreadsheetId } = await getClient();
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${SHEET.leads}!A2:Z`,
-    });
+    const [res, history] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${SHEET.leads}!A2:Z`,
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${SHEET.history}!A:K`,
+      }),
+    ]);
     const rows = res.data.values ?? [];
-    return rows
+    const leads = rows
       .filter((r) => r[0])
       .map((r) => {
         const g = (i: number) => (r[i] ?? "") as string;
@@ -259,12 +327,136 @@ export async function getLeadsFromSheet(): Promise<Lead[]> {
           preferredContact: (g(22) || undefined) as Lead["preferredContact"],
           manager: g(23) || undefined,
           managerComment: g(24) || undefined,
-        } as Lead;
+          updatedAt: g(25) || undefined,
+        } satisfies ManagerLead;
       });
+    return applyCompletedLeadUpdates(leads, history.data.values ?? []);
   } catch (e) {
     console.error("[SHEETS] getLeadsFromSheet failed:", e);
-    return [];
+    throw e;
   }
+}
+
+export class StaleLeadError extends Error {
+  constructor() {
+    super("Lead was updated after it was loaded");
+    this.name = "StaleLeadError";
+  }
+}
+
+// values.batchUpdate не поддерживает compare-and-swap: проверка Z и запись
+// отдельными запросами оставляет окно для lost update. append, напротив,
+// атомарно назначает строкам порядок. Храним в дополнительных колонках
+// журнала неизменяемые заявки на обновление и разрешаем запись только первой
+// заявке для конкретной версии лида. Это работает и между разными процессами
+// приложения, в отличие от локального mutex.
+// Claims are permanent version fences. Google Sheets does not provide a
+// compare-and-swap for values, so expiring a claim would let an old worker
+// resume after a recovery write and overwrite newer data. A retry of the same
+// operation can still resume through operationKey. A different operation
+// first completes the immutable winning payload and then must reload the lead
+// before claiming its new version.
+
+type LeadVersionClaim = {
+  historyRow: number;
+  token: string;
+  updatedAt: string;
+  operationKey: string;
+  status: LeadStatus;
+  managerName: string;
+  managerComment: string;
+};
+
+async function claimLeadVersion(input: {
+  sheets: Awaited<ReturnType<typeof getClient>>["sheets"];
+  spreadsheetId: string;
+  leadId: string;
+  expectedUpdatedAt: string | null;
+  operationKey: string;
+  status: LeadStatus;
+  managerName: string;
+  managerComment: string;
+}): Promise<LeadVersionClaim> {
+  const expectedVersion = input.expectedUpdatedAt ?? "";
+
+  const readClaims = async () => {
+    const response = await input.sheets.spreadsheets.values.get({
+      spreadsheetId: input.spreadsheetId,
+      // Читаем и первую строку: старые таблицы могли быть созданы без шапки.
+      range: `${SHEET.history}!A:N`,
+    });
+    return response.data.values ?? [];
+  };
+
+  const findClaim = (rows: unknown[][]) => {
+    const rowIndex = rows.findIndex(
+      (row) =>
+        String(row[1] ?? "") === input.leadId &&
+        String(row[6] ?? "") === LEAD_UPDATE_CLAIM_MARKER &&
+        String(row[7] ?? "") === expectedVersion
+    );
+    if (rowIndex === -1) return null;
+    const row = rows[rowIndex];
+    const operationKey = String(row[9] ?? "");
+    // L:N make an interrupted winning operation recoverable by a later
+    // request. Older claims without a payload remain fail-closed because
+    // inventing their business values would corrupt CRM state.
+    if (!row[11]) throw new StaleLeadError();
+    return {
+      historyRow: rowIndex + 1,
+      token: String(row[8] ?? ""),
+      updatedAt: String(row[10] ?? ""),
+      operationKey,
+      status: String(row[11]) as LeadStatus,
+      managerName: String(row[12] ?? ""),
+      managerComment: String(row[13] ?? ""),
+    } satisfies LeadVersionClaim;
+  };
+
+  // Повтор после неопределённого результата записи продолжает ту же операцию,
+  // а не создаёт конфликт с собственной ранее записанной заявкой.
+  const existingClaim = findClaim(await readClaims());
+  if (existingClaim) return existingClaim;
+
+  const token = randomUUID();
+  const now = new Date().toISOString();
+  const updatedAt =
+    now === expectedVersion
+      ? new Date(new Date(now).getTime() + 1).toISOString()
+      : now;
+
+  await input.sheets.spreadsheets.values.append({
+    spreadsheetId: input.spreadsheetId,
+    range: `${SHEET.history}!A:N`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      // A:F остаются совместимыми с форматом истории; служебные данные
+      // находятся в G:N и не выглядят как бизнес-событие.
+      values: [
+        [
+          "",
+          input.leadId,
+          new Date().toISOString(),
+          "",
+          "",
+          "",
+          LEAD_UPDATE_CLAIM_MARKER,
+          expectedVersion,
+          token,
+          input.operationKey,
+          updatedAt,
+          input.status,
+          input.managerName,
+          input.managerComment,
+        ],
+      ],
+    },
+  });
+
+  const winningClaim = findClaim(await readClaims());
+  if (!winningClaim) throw new Error("Lead update claim was not persisted");
+  return winningClaim;
 }
 
 // Добавляет строку в лист «История заявок».
@@ -304,8 +496,11 @@ export async function updateLeadStatusInSheet(input: {
   status: LeadStatus;
   managerComment?: string;
   managerName?: string;
-}): Promise<void> {
-  if (!isGoogleSheetsEnabled()) return;
+  expectedUpdatedAt: string | null;
+}): Promise<string> {
+  if (!isGoogleSheetsEnabled()) {
+    throw new Error("Google Sheets is not configured");
+  }
   const { sheets, spreadsheetId } = await getClient();
 
   const res = await sheets.spreadsheets.values.get({
@@ -318,28 +513,81 @@ export async function updateLeadStatusInSheet(input: {
     throw new Error(`Заявка с ID ${input.leadId} не найдена в листе «Заявки»`);
   }
 
-  const rowNumber = idx + 2; // +1 заголовок, +1 1-based
-  const updatedAt = new Date().toISOString();
+  const operationKey = createHash("sha256")
+    .update(
+      JSON.stringify([
+        input.leadId,
+        input.expectedUpdatedAt ?? "",
+        input.status,
+        input.managerComment ?? "",
+        input.managerName ?? "",
+      ])
+    )
+    .digest("hex");
+  const claim = await claimLeadVersion({
+    sheets,
+    spreadsheetId,
+    leadId: input.leadId,
+    expectedUpdatedAt: input.expectedUpdatedAt,
+    operationKey,
+    status: input.status,
+    managerName: input.managerName ?? "",
+    managerComment: input.managerComment ?? "",
+  });
 
+  const history = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${SHEET.history}!A:N`,
+  });
+  const [currentLead] = applyCompletedLeadUpdates(
+    [
+      {
+        id: input.leadId,
+        updatedAt: String(rows[idx]?.[25] ?? "") || undefined,
+      } as ManagerLead,
+    ],
+    history.data.values ?? []
+  );
+  const currentUpdatedAt = currentLead.updatedAt ?? "";
+  // Предыдущая попытка могла применить batchUpdate, но потерять HTTP-ответ.
+  if (currentUpdatedAt === claim.updatedAt) {
+    if (claim.operationKey !== operationKey) throw new StaleLeadError();
+    return claim.updatedAt;
+  }
+  if (currentUpdatedAt !== (input.expectedUpdatedAt ?? "")) {
+    throw new StaleLeadError();
+  }
+
+  const historyId = `h_${claim.token}`;
+  // Complete only this operation's immutable claim row. Lead reads fold the
+  // completed claim chain, so a paused old worker can never overwrite fields
+  // produced by a newer version.
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
     requestBody: {
-      valueInputOption: "USER_ENTERED",
+      // CRM fields are untrusted text. RAW prevents comments or staff names
+      // beginning with formula markers from being evaluated by Google Sheets.
+      valueInputOption: "RAW",
       data: [
-        { range: `${SHEET.leads}!E${rowNumber}`, values: [[input.status]] },
         {
-          range: `${SHEET.leads}!X${rowNumber}:Z${rowNumber}`,
-          values: [[input.managerName ?? "", input.managerComment ?? "", updatedAt]],
+          range: `${SHEET.history}!A${claim.historyRow}:F${claim.historyRow}`,
+          values: [
+            [
+              historyId,
+              input.leadId,
+              claim.updatedAt,
+              claim.status,
+              claim.managerName,
+              claim.managerComment,
+            ],
+          ],
         },
       ],
     },
   });
-
-  await appendLeadHistoryToSheet({
-    leadId: input.leadId,
-    status: input.status,
-    managerComment: input.managerComment,
-    managerName: input.managerName,
-    createdAt: updatedAt,
-  });
+  // A different request may recover the immutable winning operation, but it
+  // must not report its own payload as applied. The caller reloads the lead
+  // and retries against the recovered version.
+  if (claim.operationKey !== operationKey) throw new StaleLeadError();
+  return claim.updatedAt;
 }
