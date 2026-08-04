@@ -45,7 +45,7 @@ export interface CreateAvailabilityHoldRpcInput {
   checkOut: string;
   heldBy: string;
   leadId?: string | null;
-  idempotencyKey?: string | null;
+  idempotencyKey: string;
 }
 
 export interface AvailabilityHoldRpcRow {
@@ -98,6 +98,7 @@ export interface RoomIdentityMappingEvidence {
   id: string;
   roomUnitId?: unknown;
   room_unit_id?: unknown;
+  status?: unknown;
 }
 
 export type RoomUnitMappingResult =
@@ -106,7 +107,7 @@ export type RoomUnitMappingResult =
       externalRoomId: string;
       roomUnitId: string;
     }
-  | { status: "missing" | "duplicated" | "ambiguous" };
+  | { status: "missing" | "duplicated" | "ambiguous" | "invalid" };
 
 function normalizeUuid(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -122,6 +123,18 @@ function explicitRoomUnitIds(room: RoomIdentityMappingEvidence): string[] {
         .filter((value): value is string => value !== null)
     ),
   ];
+}
+
+function hasInvalidExplicitRoomUnitId(
+  room: RoomIdentityMappingEvidence
+): boolean {
+  return [room.roomUnitId, room.room_unit_id].some(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      !(typeof value === "string" && value.trim().length === 0) &&
+      normalizeUuid(value) === null
+  );
 }
 
 function explicitRoomUnitId(room: RoomIdentityMappingEvidence): string | null {
@@ -156,6 +169,9 @@ export function resolveRoomUnitMapping(
   }
 
   const matchedRoom = matches[0];
+  if (hasInvalidExplicitRoomUnitId(matchedRoom)) {
+    return { status: "invalid" };
+  }
   const roomUnitIds = explicitRoomUnitIds(matchedRoom);
   if (roomUnitIds.length === 0) return { status: "missing" };
   if (roomUnitIds.length !== 1) return { status: "ambiguous" };
@@ -186,6 +202,48 @@ export class OwnerActionRequiredError extends Error {
     super("Authoritative Sheets synchronization evidence is incomplete");
     this.name = "OwnerActionRequiredError";
     this.reason = reason;
+  }
+}
+
+const INVENTORY_ROOM_STATUSES = new Set(["active", "maintenance", "do_not_sell"]);
+
+/**
+ * Availability is meaningful only when every inventory row has a complete,
+ * one-to-one external-id/UUID mapping and a recognized operational status.
+ * Rejecting the whole snapshot is deliberate: omitting only a corrupt row can
+ * hide occupancy which still refers to that row and make another answer look
+ * authoritative when the source snapshot is not.
+ */
+export function validateRoomInventoryForAvailability(
+  rooms: readonly RoomIdentityMappingEvidence[]
+): void {
+  for (const room of rooms) {
+    if (
+      typeof room.id !== "string" ||
+      room.id.trim().length === 0 ||
+      typeof room.status !== "string" ||
+      !INVENTORY_ROOM_STATUSES.has(room.status)
+    ) {
+      throw new OwnerActionRequiredError("invalid");
+    }
+    const mapping = resolveRoomUnitMapping(room.id, rooms);
+    if (mapping.status !== "mapped") {
+      throw new OwnerActionRequiredError(mapping.status);
+    }
+  }
+}
+
+function assertMappedRoomIsActive(
+  mapping: Extract<RoomUnitMappingResult, { status: "mapped" }>,
+  rooms: readonly RoomIdentityMappingEvidence[]
+): void {
+  const matches = rooms.filter(
+    (room) =>
+      room.id.trim() === mapping.externalRoomId &&
+      explicitRoomUnitId(room) === mapping.roomUnitId
+  );
+  if (matches.length !== 1 || matches[0].status !== "active") {
+    throw new OwnerActionRequiredError("invalid");
   }
 }
 
@@ -233,7 +291,12 @@ function isStrictDate(value: string): boolean {
 
 function normalizedSourceTimestamp(value: unknown): string | null {
   if (typeof value !== "string" || value.trim().length === 0) return null;
-  const parsed = new Date(value.trim());
+  const normalized = value.trim();
+  const match = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/i.exec(
+    normalized
+  );
+  if (!match || !isStrictDate(match[1])) return null;
+  const parsed = new Date(normalized);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString();
 }
@@ -274,6 +337,7 @@ export function prepareSheetsBookingSyncEvents(
     const status = record.status as BookingStatus;
     if (
       !externalBookingId ||
+      externalBookingId.length > 500 ||
       !record.roomId?.trim() ||
       !sourceUpdatedAt ||
       !isStrictDate(record.checkIn) ||
@@ -388,6 +452,7 @@ export interface SheetsBookingHoldRpcClient {
     name: "fn_sync_sheets_bookings_and_create_availability_hold",
     params: {
       p_events: SheetsBookingSyncEvent[];
+      p_snapshot_started_at: string;
       p_room_unit_id: string;
       p_check_in: string;
       p_check_out: string;
@@ -418,10 +483,35 @@ export function availabilityHoldRpcHttpStatus(code: string | undefined): number 
     case "AKB02":
     case "23P01":
       return 409;
+    case "AKB05":
+      return 400;
+    case "AKB06":
+      return 409;
     case "AKB03":
       return 404;
     default:
       return 503;
+  }
+}
+
+function normalizedIdempotencyKey(value: string | null | undefined): string {
+  if (typeof value !== "string") {
+    throw new AvailabilityHoldRpcError("AKB05");
+  }
+  const normalized = value.trim();
+  if (normalized.length === 0 || normalized.length > 200) {
+    throw new AvailabilityHoldRpcError("AKB05");
+  }
+  return normalized;
+}
+
+function assertValidHoldRange(checkIn: string, checkOut: string): void {
+  if (
+    !isStrictDate(checkIn) ||
+    !isStrictDate(checkOut) ||
+    checkOut <= checkIn
+  ) {
+    throw new AvailabilityHoldRpcError("AKB01");
   }
 }
 
@@ -432,6 +522,8 @@ export async function createAvailabilityHoldRpc(
   input: CreateAvailabilityHoldRpcInput,
   client?: AvailabilityHoldRpcClient
 ): Promise<AvailabilityHoldRpcRow> {
+  assertValidHoldRange(input.checkIn, input.checkOut);
+  const idempotencyKey = normalizedIdempotencyKey(input.idempotencyKey);
   // SupabaseClient.rpc is generated as a broader generic signature; this
   // narrow interface documents and constrains the only RPC used here.
   const rpcClient =
@@ -442,7 +534,7 @@ export async function createAvailabilityHoldRpc(
     p_check_out: input.checkOut,
     p_held_by: input.heldBy,
     p_lead_id: input.leadId ?? null,
-    p_idempotency_key: input.idempotencyKey ?? null,
+    p_idempotency_key: idempotencyKey,
   });
 
   if (error) throw new AvailabilityHoldRpcError(error.code);
@@ -462,6 +554,7 @@ export async function createAvailabilityHoldForMappedRoom(
   if (mapping.status !== "mapped") {
     throw new OwnerActionRequiredError(mapping.status);
   }
+  assertMappedRoomIsActive(mapping, input.rooms);
 
   return createAvailabilityHoldRpc(
     {
@@ -487,12 +580,21 @@ export async function syncSheetsBookingsAndCreateAvailabilityHold(
     externalRoomId: string;
     rooms: readonly RoomIdentityMappingEvidence[];
     occupancy: readonly OccupancyRecord[];
+    snapshotStartedAt: string;
   },
   client?: SheetsBookingHoldRpcClient
 ): Promise<AvailabilityHoldRpcRow> {
+  validateRoomInventoryForAvailability(input.rooms);
   const mapping = resolveRoomUnitMapping(input.externalRoomId, input.rooms);
   if (mapping.status !== "mapped") {
     throw new OwnerActionRequiredError(mapping.status);
+  }
+  assertMappedRoomIsActive(mapping, input.rooms);
+  assertValidHoldRange(input.checkIn, input.checkOut);
+  const idempotencyKey = normalizedIdempotencyKey(input.idempotencyKey);
+  const snapshotStartedAt = normalizedSourceTimestamp(input.snapshotStartedAt);
+  if (!snapshotStartedAt) {
+    throw new OwnerActionRequiredError("invalid");
   }
   const events = prepareSheetsBookingSyncEvents(input.occupancy, input.rooms);
   const rpcClient =
@@ -502,12 +604,13 @@ export async function syncSheetsBookingsAndCreateAvailabilityHold(
     "fn_sync_sheets_bookings_and_create_availability_hold",
     {
       p_events: events,
+      p_snapshot_started_at: snapshotStartedAt,
       p_room_unit_id: mapping.roomUnitId,
       p_check_in: input.checkIn,
       p_check_out: input.checkOut,
       p_held_by: input.heldBy,
       p_lead_id: input.leadId ?? null,
-      p_idempotency_key: input.idempotencyKey ?? null,
+      p_idempotency_key: idempotencyKey,
     }
   );
 

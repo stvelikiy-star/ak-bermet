@@ -149,6 +149,35 @@ const OCCUPANCY_COLS = [
 const toBool = (v: string) => v?.trim().toLowerCase() === "да" || v === "true";
 const toNum = (v: string) => (v ? Number(v) : undefined);
 
+// Preserve an absent/unknown operational status instead of inventing
+// `active`. The availability boundary validates the complete inventory and
+// fails closed before GET results or a hold RPC can use such a row.
+export function roomRowToRoomUnit(row: readonly unknown[]): RoomUnit {
+  const g = (key: (typeof ROOMS_COLS)[number]) =>
+    String(row[ROOMS_COLS.indexOf(key)] ?? "");
+  return {
+    id: g("id"),
+    roomUnitId: g("roomUnitId") || undefined,
+    building: g("building"),
+    floor: toNum(g("floor")),
+    roomNumber: g("roomNumber") || undefined,
+    category: g("category"),
+    bedType: (g("bedType") || undefined) as RoomUnit["bedType"],
+    capacity: toNum(g("capacity")) ?? 1,
+    hasSofa: g("hasSofa") ? toBool(g("hasSofa")) : undefined,
+    allowsExtraBed: g("allowsExtraBed")
+      ? toBool(g("allowsExtraBed"))
+      : undefined,
+    view: (g("view") || undefined) as RoomUnit["view"],
+    hasWifi: g("hasWifi") ? toBool(g("hasWifi")) : undefined,
+    repairLevel: (g("repairLevel") || undefined) as RoomUnit["repairLevel"],
+    distanceToSpaMeters: toNum(g("distanceToSpaMeters")),
+    distanceToBeachMeters: toNum(g("distanceToBeachMeters")),
+    status: g("status") as RoomUnit["status"],
+    notes: g("notes") || undefined,
+  };
+}
+
 // Читает «Номерной фонд». Если лист не подключён — возвращает [].
 //
 // Ошибка чтения НЕ проглатывается (см. getOccupancyFromSheet): пустой
@@ -165,34 +194,7 @@ export async function getRoomsFromSheet(): Promise<RoomUnit[]> {
       range: `${SHEET.rooms}!A2:Q`,
     });
     const rows = res.data.values ?? [];
-    return rows
-      .filter((r) => r[0])
-      .map((r) => {
-        const g = (k: (typeof ROOMS_COLS)[number]) =>
-          (r[ROOMS_COLS.indexOf(k)] ?? "") as string;
-        return {
-          id: g("id"),
-          roomUnitId: g("roomUnitId") || undefined,
-          building: g("building"),
-          floor: toNum(g("floor")),
-          roomNumber: g("roomNumber") || undefined,
-          category: g("category"),
-          bedType: (g("bedType") || undefined) as RoomUnit["bedType"],
-          capacity: toNum(g("capacity")) ?? 1,
-          hasSofa: g("hasSofa") ? toBool(g("hasSofa")) : undefined,
-          allowsExtraBed: g("allowsExtraBed")
-            ? toBool(g("allowsExtraBed"))
-            : undefined,
-          view: (g("view") || undefined) as RoomUnit["view"],
-          hasWifi: g("hasWifi") ? toBool(g("hasWifi")) : undefined,
-          repairLevel: (g("repairLevel") ||
-            undefined) as RoomUnit["repairLevel"],
-          distanceToSpaMeters: toNum(g("distanceToSpaMeters")),
-          distanceToBeachMeters: toNum(g("distanceToBeachMeters")),
-          status: (g("status") || "active") as RoomUnit["status"],
-          notes: g("notes") || undefined,
-        } satisfies RoomUnit;
-      });
+    return rows.filter((r) => r[0]).map(roomRowToRoomUnit);
   } catch (e) {
     console.error("[SHEETS] getRoomsFromSheet failed:", e);
     throw e;

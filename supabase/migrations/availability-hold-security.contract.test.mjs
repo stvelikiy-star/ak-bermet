@@ -65,6 +65,14 @@ test("hold RPC uses invoker rights and is executable only by service_role", () =
     ),
   ].map((match) => match[1].toLowerCase());
   assert.deepEqual(executeGrantees, ["service_role"]);
+  assert.match(
+    executableSql,
+    /revoke insert,\s*update,\s*delete on table public\.availability_holds from anon\s*;/i
+  );
+  assert.match(
+    executableSql,
+    /revoke insert,\s*update,\s*delete on table public\.availability_holds from authenticated\s*;/i
+  );
 });
 
 test("room eligibility is locked before expiration and insertion", () => {
@@ -109,11 +117,15 @@ test("hold expiry and idempotency behavior remain explicit", () => {
   );
   assert.match(
     executableSql,
-    /where idempotency_key\s*=\s*p_idempotency_key[\s\S]*?return v_existing/i
+    /where idempotency_key\s*=\s*v_idempotency_key[\s\S]*?return v_existing/i
   );
   assert.match(
     executableSql,
-    /v_existing\.room_unit_id\s*<>\s*p_room_unit_id[\s\S]*?v_existing\.date_range\s*<>\s*v_range[\s\S]*?errcode\s*=\s*'AKB02'/i
+    /v_existing\.room_unit_id\s*<>\s*p_room_unit_id[\s\S]*?v_existing\.date_range\s*<>\s*v_range[\s\S]*?errcode\s*=\s*'AKB06'/i
+  );
+  assert.match(
+    executableSql,
+    /v_idempotency_key\s*:=\s*btrim\(p_idempotency_key\)[\s\S]*?length\(v_idempotency_key\)\s*>\s*200[\s\S]*?errcode\s*=\s*'AKB05'/i
   );
   assert.match(executableSql, /when unique_violation then/i);
   assert.match(
@@ -195,8 +207,86 @@ test("replayed and out-of-order Sheets events cannot duplicate or overwrite newe
   );
 });
 
+test("complete Sheets snapshots durably reconcile deleted bookings before hold creation", () => {
+  assert.match(
+    executableSheetsSyncSql,
+    /create table public\.sheets_booking_snapshot_state[\s\S]*?snapshot_started_at timestamptz[\s\S]*?snapshot_events jsonb/i
+  );
+  assert.match(
+    executableSheetsSyncSql,
+    /alter table public\.sheets_booking_snapshot_state enable row level security[\s\S]*?revoke all on table public\.sheets_booking_snapshot_state from public/i
+  );
+  assert.match(
+    executableSheetsSyncSql,
+    /from public\.sheets_booking_snapshot_state[\s\S]*?where singleton\s*=\s*true[\s\S]*?for update/i
+  );
+
+  const releaseAt = executableSheetsSyncSql.search(
+    /update public\.occupancy_periods\s+set status\s*=\s*'cancelled'\s+where sheets_booking_occupancy_id is not null\s+and status\s*=\s*'active'/i
+  );
+  const reconcileAt = executableSheetsSyncSql.search(
+    /delete from public\.sheets_booking_occupancies as stored[\s\S]*?where not exists/i
+  );
+  const applyAt = executableSheetsSyncSql.search(
+    /perform public\.fn_apply_sheets_booking_event/i
+  );
+  const reprojectAt = executableSheetsSyncSql.search(
+    /update public\.sheets_booking_occupancies\s+set blocks_availability\s*=\s*blocks_availability\s+where blocks_availability\s*=\s*true/i
+  );
+  const projectionCleanupAt = executableSheetsSyncSql.search(
+    /delete from public\.occupancy_periods\s+where sheets_booking_occupancy_id is not null\s+and status\s*=\s*'cancelled'/i
+  );
+  const fenceUpdateAt = executableSheetsSyncSql.search(
+    /update public\.sheets_booking_snapshot_state[\s\S]*?snapshot_started_at\s*=\s*p_snapshot_started_at/i
+  );
+  const holdAt = executableSheetsSyncSql.search(
+    /v_hold\s*:=\s*public\.fn_create_availability_hold/i
+  );
+  assert.ok(releaseAt >= 0 && releaseAt < reconcileAt);
+  assert.ok(reconcileAt < applyAt && applyAt < projectionCleanupAt);
+  assert.ok(projectionCleanupAt < reprojectAt);
+  assert.ok(reprojectAt < fenceUpdateAt && fenceUpdateAt < holdAt);
+  assert.match(
+    executableSheetsSyncSql,
+    /jsonb_array_elements\(p_events\)[\s\S]*?external_booking_id[\s\S]*?stored\.external_booking_id/i
+  );
+});
+
+test("delayed and ambiguous snapshots fail closed under the durable fence", () => {
+  assert.match(
+    executableSheetsSyncSql,
+    /p_snapshot_started_at\s*<\s*v_snapshot_state\.snapshot_started_at[\s\S]*?stale Sheets snapshot[\s\S]*?errcode\s*=\s*'AKB04'/i
+  );
+  assert.match(
+    executableSheetsSyncSql,
+    /p_snapshot_started_at\s*=\s*v_snapshot_state\.snapshot_started_at[\s\S]*?p_events\s*<>\s*v_snapshot_state\.snapshot_events[\s\S]*?ambiguous Sheets snapshot version[\s\S]*?errcode\s*=\s*'AKB04'/i
+  );
+  assert.match(
+    executableSheetsSyncSql,
+    /count\(\*\)[\s\S]*?count\(distinct btrim\(value ->> 'external_booking_id'\)\)[\s\S]*?errcode\s*=\s*'AKB04'/i
+  );
+  assert.match(
+    executableSheetsSyncSql,
+    /join jsonb_array_elements\(p_events\)[\s\S]*?source_updated_at'\)::timestamptz\s*<\s*stored\.source_updated_at[\s\S]*?stale Sheets booking version in snapshot[\s\S]*?errcode\s*=\s*'AKB04'/i
+  );
+});
+
+test("Sheets sync releases stale hold projections before applying a newer event", () => {
+  const cleanupAt = executableSheetsSyncSql.search(
+    /update public\.availability_holds[\s\S]*?expires_at\s*<=\s*now\(\)/i
+  );
+  const eventUpdateAt = executableSheetsSyncSql.search(
+    /update public\.sheets_booking_occupancies[\s\S]*?set room_unit_id\s*=\s*p_room_unit_id/i
+  );
+  const eventInsertAt = executableSheetsSyncSql.search(
+    /insert into public\.sheets_booking_occupancies/i
+  );
+  assert.ok(cleanupAt >= 0 && cleanupAt < eventUpdateAt);
+  assert.ok(cleanupAt < eventInsertAt);
+});
+
 test("Sheets synchronization and hold creation are one service-role-only transaction", () => {
-  const signature = String.raw`public\.fn_sync_sheets_bookings_and_create_availability_hold\(\s*jsonb,\s*uuid,\s*date,\s*date,\s*uuid,\s*uuid,\s*text\s*\)`;
+  const signature = String.raw`public\.fn_sync_sheets_bookings_and_create_availability_hold\(\s*jsonb,\s*timestamptz,\s*uuid,\s*date,\s*date,\s*uuid,\s*uuid,\s*text\s*\)`;
   const applyAt = executableSheetsSyncSql.search(
     /perform public\.fn_apply_sheets_booking_event/i
   );
