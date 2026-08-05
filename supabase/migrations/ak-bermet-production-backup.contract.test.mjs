@@ -45,10 +45,10 @@ test("Docker client enforces read-only transactions and a hardened container", (
 test("archive and checksum validation happen before atomic publication", () => {
   const restoreListAt = script.indexOf('pg_restore --list "$dump_file"');
   const checksumCreateAt = script.indexOf(
-    'sha256sum --binary "$1" > SHA256SUMS'
+    'sha256sum "$1" > SHA256SUMS'
   );
   const checksumCheckAt = script.indexOf(
-    "sha256sum --check SHA256SUMS >/dev/null"
+    "sha256sum -c SHA256SUMS >/dev/null"
   );
   const publishAt = script.indexOf(
     'mv --no-target-directory -- "$staging_dir" "$final_dir"'

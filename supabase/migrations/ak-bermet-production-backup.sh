@@ -105,7 +105,7 @@ mkdir -m 0700 -- "$staging_dir" || fail 'Cannot create the staging directory.' 7
 log 'Starting approved read-only production backup.'
 
 # The secret is delivered over stdin, not in Docker argv or container metadata.
-# PGDATABASE is populated only inside the short-lived container. PGOPTIONS makes
+# The database URI is used only inside the short-lived container. PGOPTIONS makes
 # every server transaction read-only before pg_dump starts its own transaction.
 if ! printf '%s\n' "$database_url" | docker run \
   --rm \
@@ -124,8 +124,6 @@ if ! printf '%s\n' "$database_url" | docker run \
   sh -ceu '
     IFS= read -r database_url
     [ -n "$database_url" ] || exit 64
-    export PGDATABASE="$database_url"
-    database_url=
 
     dump_file="/backup/$1"
     error_file=/tmp/pg_dump.stderr
@@ -136,6 +134,7 @@ if ! printf '%s\n' "$database_url" | docker run \
       --no-owner \
       --no-privileges \
       --file="$dump_file" \
+      "$database_url" \
       2>"$error_file"; then
       rm -f -- "$error_file"
       exit 70
@@ -144,8 +143,8 @@ if ! printf '%s\n' "$database_url" | docker run \
 
     pg_restore --list "$dump_file" >/dev/null 2>&1
     cd /backup
-    sha256sum --binary "$1" > SHA256SUMS
-    sha256sum --check SHA256SUMS >/dev/null
+    sha256sum "$1" > SHA256SUMS
+    sha256sum -c SHA256SUMS >/dev/null
     chmod 0600 -- "$1" SHA256SUMS
   ' sh "$dump_name"; then
   fail 'Backup or archive validation failed; no backup was published.' 70
