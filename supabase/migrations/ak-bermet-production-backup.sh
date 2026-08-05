@@ -114,7 +114,7 @@ if ! printf '%s\n' "$database_url" | docker run \
   --cap-drop=ALL \
   --security-opt=no-new-privileges \
   --user "$(id -u):$(id -g)" \
-  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=0700 \
+  --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
   --mount "type=bind,src=${staging_dir},dst=/backup" \
   --env 'PGOPTIONS=-c default_transaction_read_only=on' \
   --env 'PGSSLMODE=require' \
