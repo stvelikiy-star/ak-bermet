@@ -4,7 +4,7 @@ import {
   canRoomBecomeReady,
   resultingRoomStatus,
   validateInspectionAction,
-} from "./inspection-rules.ts";
+} from "./inspection-rules";
 
 test("ready requires completed cleaning, required approval, and no blocking issue", () => {
   assert.equal(

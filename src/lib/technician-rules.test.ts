@@ -7,7 +7,7 @@ import {
   validateTechnicianAction,
   validateText,
   validateWorkLogInput,
-} from "./technician-rules.ts";
+} from "./technician-rules";
 
 test("authorization fails closed for configuration, session, activity and role", () => {
   assert.equal(technicianAuthorization(false, true, true, ["technician"]), 503);

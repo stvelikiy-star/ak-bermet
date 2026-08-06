@@ -1,6 +1,6 @@
-import type { RoleName } from "@/types/auth";
-import type { MaintenanceStatus } from "@/types/operations";
-import type { MaintenanceLogType } from "@/types/technician";
+import type { RoleName } from "../types/auth";
+import type { MaintenanceStatus } from "../types/operations";
+import type { MaintenanceLogType } from "../types/technician";
 
 export type TechnicianAction =
   | "accept"
