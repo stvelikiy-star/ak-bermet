@@ -9,7 +9,7 @@ import {
   validateCleaningPhotoFile,
   validateHousekeepingAction,
   validateRequiredCleaningPhotos,
-} from "./housekeeping-rules.ts";
+} from "./housekeeping-rules";
 
 test("housekeeping transitions allow only the prepared RPC state graph", () => {
   assert.equal(canPerformHousekeepingAction("pending", "accept"), true);

@@ -1,7 +1,7 @@
 import type {
   MaintenancePriority,
   MaintenanceStatus,
-} from "@/types/operations";
+} from "./operations";
 
 export type MaintenanceLogType =
   | "diagnosis"
