@@ -26,6 +26,14 @@ test("database secret is sent over stdin and is absent from Docker arguments", (
   );
   assert.doesNotMatch(script, /--env ['"]?(?:PGDATABASE|PGPASSWORD)=/);
   assert.doesNotMatch(script, /pg_dump[\s\\]*--dbname/);
+  assert.match(
+    script,
+    /IFS= read -r database_url[\s\S]*?PGDATABASE=\$database_url[\s\S]*?export PGDATABASE[\s\S]*?database_url=/
+  );
+  const pgDumpAt = script.indexOf("    if ! pg_dump");
+  const pgDumpEnd = script.indexOf('      2>"$error_file"; then', pgDumpAt);
+  assert.ok(pgDumpAt >= 0 && pgDumpEnd > pgDumpAt);
+  assert.doesNotMatch(script.slice(pgDumpAt, pgDumpEnd), /\$database_url/);
   assert.match(script, /Refusing to run with shell tracing enabled/);
   assert.match(script, /unset AK_BERMET_DATABASE_URL/);
 });

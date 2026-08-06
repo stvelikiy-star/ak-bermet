@@ -105,8 +105,10 @@ mkdir -m 0700 -- "$staging_dir" || fail 'Cannot create the staging directory.' 7
 log 'Starting approved read-only production backup.'
 
 # The secret is delivered over stdin, not in Docker argv or container metadata.
-# The database URI is used only inside the short-lived container. PGOPTIONS makes
-# every server transaction read-only before pg_dump starts its own transaction.
+# Inside the container it is exported as PGDATABASE instead of being passed as a
+# pg_dump argument, so it is not exposed in the process command line either.
+# PGOPTIONS makes every server transaction read-only before pg_dump starts its
+# own transaction.
 if ! printf '%s\n' "$database_url" | docker run \
   --rm \
   --interactive \
@@ -124,6 +126,9 @@ if ! printf '%s\n' "$database_url" | docker run \
   sh -ceu '
     IFS= read -r database_url
     [ -n "$database_url" ] || exit 64
+    PGDATABASE=$database_url
+    export PGDATABASE
+    database_url=
 
     dump_file="/backup/$1"
     error_file=/tmp/pg_dump.stderr
@@ -134,7 +139,6 @@ if ! printf '%s\n' "$database_url" | docker run \
       --no-owner \
       --no-privileges \
       --file="$dump_file" \
-      "$database_url" \
       2>"$error_file"; then
       rm -f -- "$error_file"
       exit 70
