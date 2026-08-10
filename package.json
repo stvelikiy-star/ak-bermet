@@ -7,6 +7,7 @@
     "test:room-master": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-room-master-tests src/data/room-master-v6.ts src/data/room-master-v6.test.ts && node --test /tmp/ak-bermet-room-master-tests/data/room-master-v6.test.js",
     "test:pricing-v6": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-pricing-v6-tests src/data/room-master-v6.ts src/data/room-master-v6-confirmed.ts src/data/pricing-v6.ts src/data/pricing-v6.test.ts && node --test /tmp/ak-bermet-pricing-v6-tests/data/pricing-v6.test.js",
     "test:lead-durability": "node --test src/app/api/leads/route.contract.test.mjs",
+    "test:room-public-catalog": "node --test src/data/room-public-catalog-v6.contract.test.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

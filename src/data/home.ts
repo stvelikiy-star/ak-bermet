@@ -1,4 +1,5 @@
-// TODO: заменить Unsplash-плейсхолдеры (поля img) на реальные фото из /public/images/.
+// Номерные карточки используют только подтверждённый локальный placeholder до загрузки реальных фото AK BERMET.
+// Для остальных направлений временные иллюстрации будут заменяться отдельно.
 import {
   IconSpring,
   IconSun,
@@ -16,7 +17,6 @@ import {
   IconUsers,
 } from "@/components/ui/icons";
 
-// Короткие факты под кнопками в hero
 export const heroFacts = [
   { icon: IconSpring, label: "Собственные термальные источники" },
   { icon: IconSun, label: "Чистый воздух и горный климат" },
@@ -24,7 +24,6 @@ export const heroFacts = [
   { icon: IconHeart, label: "Комфорт и сервис высокого уровня" },
 ];
 
-// Тонкая полоса преимуществ под hero
 export const miniBenefits = [
   { icon: IconSpring, label: "Собственные термальные источники" },
   { icon: IconDish, label: "3-разовое питание" },
@@ -32,14 +31,13 @@ export const miniBenefits = [
   { icon: IconUsers, label: "Конференц-залы до 250 человек" },
 ];
 
-// Быстрые направления (карточки)
 export const quickDirections = [
   {
     icon: IconBed,
     title: "Номера и коттеджи",
     href: "/rooms",
-    img: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=900&q=80",
-    alt: "Номера и коттеджи Ак-Бермет",
+    img: "/images/rooms/photo-pending.svg",
+    alt: "Номерной фонд AK BERMET — фото ожидает подтверждения",
   },
   {
     icon: IconSpring,
@@ -59,8 +57,8 @@ export const quickDirections = [
     icon: IconLeaf,
     title: "Garden Rooms 2026",
     href: "/garden",
-    img: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=900&q=80",
-    alt: "Новые корпуса Garden Rooms 2026",
+    img: "/images/rooms/photo-pending.svg",
+    alt: "Garden Rooms — фото ожидает подтверждения",
   },
   {
     icon: IconUsers,
@@ -78,7 +76,6 @@ export const quickDirections = [
   },
 ];
 
-// Почему выбирают Ак-Бермет
 export const whyChoose = [
   {
     icon: IconDrop,
@@ -92,8 +89,8 @@ export const whyChoose = [
   },
   {
     icon: IconLeaf,
-    title: "Новые Garden-корпуса",
-    text: "Современные номера сезона 2026 с Wi-Fi и новым ремонтом.",
+    title: "Garden Rooms",
+    text: "32 подтверждённых двухместных номера в Garden 1 и Garden 2.",
   },
   {
     icon: IconLotus,
@@ -112,7 +109,6 @@ export const whyChoose = [
   },
 ];
 
-// Отзывы — без выдуманных имён (нейтральные формулировки)
 export const reviews = [
   {
     text: "Гости отмечают горячие источники и возможность отдыха в любую погоду.",

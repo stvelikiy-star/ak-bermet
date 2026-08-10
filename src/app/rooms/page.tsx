@@ -21,7 +21,7 @@ import {
 export const metadata: Metadata = {
   title: "Номера и коттеджи",
   description:
-    "Обзор номеров AK BERMET на Иссык-Куле: Garden Lux, люксы, полулюксы, стандарты и коттеджи. Корпус, вместимость, Wi-Fi, питание и условия.",
+    "Подтверждённый номерной фонд AK BERMET 2026: Garden Rooms, люксы, полулюксы, стандарты, семейные номера, коттеджи и срубы.",
   alternates: { canonical: "/rooms" },
 };
 
@@ -31,17 +31,16 @@ export default function RoomsPage() {
       <PageHero
         badge="Размещение"
         title="Номера и коттеджи Ак-Бермет"
-        subtitle="Сначала изучите варианты проживания: Garden Lux, люксы, полулюксы, стандарты и коттеджи. Откройте «Подробнее», чтобы увидеть фото, условия и удобства, — а наличие уточните в WhatsApp."
-        image="https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=2000&q=80"
+        subtitle="Каталог синхронизирован с первичным реестром 2026. Реальные фотографии публикуются только после подтверждения материалов AK BERMET; наличие и конкретный номер подтверждает администратор."
+        image="/images/rooms/photo-pending.svg"
       />
 
-      {/* Карточки типов номеров → detail pages */}
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <SectionHeading
             eyebrow="Категории"
             title="Варианты проживания"
-            subtitle="Нажмите «Подробнее», чтобы изучить корпус, удобства и условия. «Узнать наличие» — это уже обращение к администратору."
+            subtitle="Нажмите «Подробнее», чтобы увидеть подтверждённые количества, вместимость и ограничения. «Узнать наличие» — обращение к администратору."
             className="mb-12"
           />
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -74,7 +73,6 @@ export default function RoomsPage() {
                     {card.short}
                   </p>
 
-                  {/* Быстрые факты */}
                   <ul className="mt-4 flex flex-wrap gap-2 text-[12px]">
                     <li className="inline-flex items-center gap-1.5 rounded-full bg-emerald-deep/5 px-2.5 py-1 text-emerald-deep">
                       <IconUsers className="h-3.5 w-3.5 text-gold-dark" />
@@ -82,15 +80,18 @@ export default function RoomsPage() {
                     </li>
                     <li className="inline-flex items-center gap-1.5 rounded-full bg-emerald-deep/5 px-2.5 py-1 text-emerald-deep">
                       <IconWifi className="h-3.5 w-3.5 text-gold-dark" />
-                      {card.wifi ? "Wi-Fi есть" : "Без Wi-Fi"}
+                      {card.wifi === true
+                        ? "Wi-Fi есть"
+                        : card.wifi === false
+                          ? "Без Wi-Fi"
+                          : "Wi-Fi уточнить"}
                     </li>
                     <li className="inline-flex items-center gap-1.5 rounded-full bg-emerald-deep/5 px-2.5 py-1 text-emerald-deep">
                       <IconDish className="h-3.5 w-3.5 text-gold-dark" />
-                      Питание включено
+                      Питание по тарифу
                     </li>
                   </ul>
 
-                  {/* CTA: Подробнее (первично) + Узнать наличие (вторично) */}
                   <div className="mt-5 flex flex-col gap-2.5">
                     <Link
                       href={`/rooms/${card.slug}`}
@@ -115,7 +116,6 @@ export default function RoomsPage() {
         </Container>
       </section>
 
-      {/* Что выбрать */}
       <section className="bg-beige py-16 sm:py-24">
         <Container>
           <SectionHeading
@@ -146,7 +146,6 @@ export default function RoomsPage() {
         </Container>
       </section>
 
-      {/* Важные заметки */}
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <div className="mx-auto max-w-3xl rounded-2xl border border-gold/20 bg-milk p-6 shadow-soft sm:p-8">
@@ -169,7 +168,6 @@ export default function RoomsPage() {
         </Container>
       </section>
 
-      {/* Форма заявки */}
       <section className="bg-beige py-16 sm:py-24">
         <Container className="max-w-3xl">
           <BookingLeadForm interest="rooms" anchorId="booking-form" />
@@ -178,7 +176,7 @@ export default function RoomsPage() {
 
       <PageCTA
         title="Подобрать номер"
-        text="Напишите нам в WhatsApp — администратор проверит наличие и подберёт подходящий вариант под ваши даты и количество гостей."
+        text="Напишите нам в WhatsApp — администратор проверит наличие, конкретный номер и применимый тариф под ваши даты и количество гостей."
         cta={{ label: "Узнать наличие номеров", href: WA.availability }}
       />
     </main>

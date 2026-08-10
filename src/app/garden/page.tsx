@@ -22,15 +22,15 @@ export const metadata: Metadata = {
   alternates: { canonical: "/garden" },
   title: "Garden Rooms 2026",
   description:
-    "Новые премиальные корпуса Garden 1 и Garden 2 на Иссык-Куле: современная мебель, Wi-Fi, рабочие зоны и трёхразовое питание.",
+    "Garden 1 и Garden 2 AK BERMET: 32 подтверждённых двухместных номера, по 16 в каждом корпусе.",
 };
 
 const featureItems = [
-  { icon: IconLeaf, label: "Новые корпуса 2026" },
-  { icon: IconBed2, label: "Современная мебель" },
-  { icon: IconBed, label: "Двуспальные кровати" },
-  { icon: IconDesk, label: "Рабочие зоны" },
-  { icon: IconWifi, label: "Стабильный Wi-Fi" },
+  { icon: IconLeaf, label: "Garden 1 и Garden 2" },
+  { icon: IconBed2, label: "32 номера" },
+  { icon: IconBed, label: "2 места / номер" },
+  { icon: IconDesk, label: "Конфигурация — по номеру" },
+  { icon: IconWifi, label: "Wi-Fi" },
   { icon: IconDish, label: "Трёхразовое питание" },
 ];
 
@@ -38,14 +38,13 @@ export default function GardenPage() {
   return (
     <main>
       <PageHero
-        badge="Новинка 2026"
+        badge="2026"
         title="Garden Rooms 2026"
-        subtitle="Новые премиальные корпуса Garden 1 и Garden 2 для комфортного отдыха на Иссык-Куле."
-        image="https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=2000&q=80"
+        subtitle="Подтверждённый фонд: 32 двухместных номера — по 16 в Garden 1 и Garden 2. Конкретную конфигурацию кроватей и наличие подтверждает администратор."
+        image="/images/rooms/photo-pending.svg"
         cta={{ label: "Узнать наличие Garden Rooms", href: WA.garden }}
       />
 
-      {/* Premium intro */}
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <div className="overflow-hidden rounded-2xl border border-gold/20 bg-gradient-to-br from-emerald-deep to-emerald-900 shadow-card">
@@ -55,7 +54,7 @@ export default function GardenPage() {
                   {garden.badge}
                 </span>
                 <h2 className="font-display text-3xl font-semibold text-white sm:text-4xl">
-                  Премиальные корпуса нового сезона
+                  Подтверждённый фонд Garden
                 </h2>
                 <p className="mt-4 max-w-md text-sm leading-relaxed text-white/75">
                   {garden.text}
@@ -71,19 +70,17 @@ export default function GardenPage() {
         </Container>
       </section>
 
-      {/* Feature grid */}
       <section className="bg-beige py-16 sm:py-24">
         <Container>
           <SectionHeading
-            eyebrow="Преимущества"
-            title="Что делает Garden особенным"
+            eyebrow="Данные 2026"
+            title="Что подтверждено"
             className="mb-12"
           />
           <FeatureGrid features={featureItems} columns={3} />
         </Container>
       </section>
 
-      {/* Что входит + кому подойдёт */}
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -123,12 +120,11 @@ export default function GardenPage() {
         </Container>
       </section>
 
-      {/* Форма заявки (предвыбран Garden люкс) */}
       <section className="bg-beige py-16 sm:py-24">
         <Container className="max-w-3xl">
           <BookingLeadForm
             interest="garden"
-            defaultCategory="Garden люкс"
+            defaultCategory="Garden Rooms"
             anchorId="booking-form"
             title="Заявка на Garden Rooms"
           />
@@ -137,7 +133,7 @@ export default function GardenPage() {
 
       <PageCTA
         title="Забронировать Garden Rooms"
-        text="Количество новых номеров ограничено. Напишите нам — администратор подтвердит наличие на ваши даты."
+        text="Напишите нам — администратор проверит конкретный номер, конфигурацию и наличие на ваши даты."
         cta={{ label: "Узнать наличие Garden Rooms", href: WA.garden }}
       />
     </main>
