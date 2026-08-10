@@ -38,6 +38,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Room master tests
+        run: npm run test:room-master
+
+      - name: Pricing V6 tests
+        run: npm run test:pricing-v6
+
       - name: Housekeeping tests
         run: npm run test:housekeeping
 
