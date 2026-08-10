@@ -30,26 +30,34 @@ export async function POST(request: Request) {
   // Полный объект заявки: id + createdAt + status:"new".
   const lead = buildLead(input as LeadInput);
 
-  if (isGoogleSheetsEnabled()) {
-    try {
-      await appendLeadToSheet(lead);
-    } catch (error) {
-      // Логируем техническую ошибку только на сервере.
-      console.error("[LEAD] Google Sheets append failed:", error);
-      // TODO Stage 06: уведомление администратора об ошибке записи.
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "Заявка принята не была. Пожалуйста, попробуйте ещё раз или напишите в WhatsApp.",
-        },
-        { status: 502 }
-      );
-    }
-  } else {
-    // Google Sheets выключен — работаем в mock-режиме, заявку не теряем.
-    console.warn("Google Sheets disabled. Lead saved in mock mode.");
-    console.log("[LEAD] mock:", JSON.stringify(lead));
+  // Production invariant: success may be returned only after a durable write.
+  // Server logs and process-local/mock storage are not durable lead storage.
+  if (!isGoogleSheetsEnabled()) {
+    console.error("[LEAD] Durable persistence is unavailable: Google Sheets is disabled or not configured.");
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Заявка сейчас не может быть надёжно сохранена. Пожалуйста, повторите позже или напишите в WhatsApp.",
+      },
+      { status: 503 }
+    );
+  }
+
+  try {
+    await appendLeadToSheet(lead);
+  } catch (error) {
+    // Логируем техническую ошибку только на сервере и fail closed:
+    // клиент не получает success, пока durable write не завершился.
+    console.error("[LEAD] Google Sheets append failed:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Заявка принята не была. Пожалуйста, попробуйте ещё раз или напишите в WhatsApp.",
+      },
+      { status: 502 }
+    );
   }
 
   return NextResponse.json({ ok: true, leadId: lead.id });
