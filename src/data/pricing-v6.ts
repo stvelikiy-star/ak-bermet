@@ -244,6 +244,12 @@ export function mapRoomToPrice2026(row: RoomMasterV6Row): RoomPriceMapping2026 {
       if (row.raw_source_category === "2-х места") return { status: "PRICED", priceKey: "wood_2" };
       if (row.raw_source_category === "7 мест") return { status: "PRICED", priceKey: "srub_7" };
       return { status: "UNRESOLVED_SOURCE_LABEL", reason: `Unknown cottage source category: ${row.raw_source_category}` };
+
+    default:
+      return {
+        status: "UNRESOLVED_SOURCE_LABEL",
+        reason: `Unknown accommodation object: ${row.raw_object_name}`,
+      };
   }
 }
 
