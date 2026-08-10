@@ -44,6 +44,9 @@ jobs:
       - name: Pricing V6 tests
         run: npm run test:pricing-v6
 
+      - name: Lead durability contract
+        run: npm run test:lead-durability
+
       - name: Housekeeping tests
         run: npm run test:housekeeping
 
