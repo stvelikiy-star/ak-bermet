@@ -37,6 +37,6 @@ test("public catalog contains the verified Room Master V6 structure", () => {
 test("AI room knowledge carries the canonical totals and price safety gaps", () => {
   assert.match(aiKnowledge, /169 подтверждённых единиц, 407 официальных мест, максимум 484/);
   assert.match(aiKnowledge, /14 стандартных номеров корпуса №3/);
-  assert.match(aiKnowledge, /номер 301 корпуса №3/);
+  assert.match(aiKnowledge, /номера 301 корпуса №3/);
   assert.match(aiKnowledge, /Парковка — 100 сом/);
 });
