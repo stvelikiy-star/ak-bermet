@@ -47,6 +47,9 @@ jobs:
       - name: Lead durability contract
         run: npm run test:lead-durability
 
+      - name: Public room catalog contract
+        run: npm run test:room-public-catalog
+
       - name: Housekeeping tests
         run: npm run test:housekeeping
 
