@@ -13,6 +13,17 @@ This runbook is intentionally fail-closed. It describes the production activatio
 - No timestamped SQL migrations were added after the release migration set.
 - Repository does not define a verified live hosting/deployment target. The actual target and currently deployed SHA must therefore be discovered from the live environment before any deploy.
 
+## Live discovery — 2026-08-11
+
+Read-only HTTP inspection of the canonical public domain from `src/data/site.ts` (`https://akbermet.kg`) showed that the domain currently serves the legacy AK BERMET hotel/booking site, not the Next.js application in this repository. The observed live site redirects to `/en/`, exposes a legacy account/quick-order booking flow, and contains content/contacts that differ from current repository `main`.
+
+Therefore:
+
+- current repository `main` is **not proven deployed** at `akbermet.kg`;
+- the existing live site must be treated as a separate legacy production system until its host, data ownership, booking dependencies, and cutover method are identified;
+- do not overwrite DNS, webroot, container, database, or booking data merely to publish the new Next.js site;
+- production cutover remains BLOCKED until the actual host/control plane and rollback path are known.
+
 ## Approved migration order
 
 1. `20260721000100_extensions_and_enums.sql`
@@ -46,14 +57,15 @@ Record the exact `main` commit intended for production. Do not deploy a moving b
 
 Before any write:
 
-- identify the real hosting/deployment target;
-- identify the currently deployed application SHA/version;
-- confirm the Supabase project reference;
-- inspect the production migration ledger;
+- identify the real hosting/deployment target behind the legacy public site;
+- identify how the current booking site stores/resolves reservations and whether it owns data that must survive cutover;
+- identify the currently deployed application/version and rollback mechanism;
+- confirm the Supabase project reference for the new application;
+- inspect the production Supabase migration ledger;
 - verify required application/release environment names exist without printing their values;
 - confirm the production database major version is compatible with the repository Supabase config.
 
-If any target/project/ledger identity is ambiguous: BLOCKED.
+If any target/project/ledger/cutover identity is ambiguous: BLOCKED.
 
 ### C3 — Repository and environment preflight
 
@@ -112,7 +124,7 @@ Only after C1–C5 PASS and explicit production-change approval:
 
 Deploy only the SHA recorded in C1 to the verified live target discovered in C2.
 
-The repository alone does not prove the hosting target, so this step remains BLOCKED until that live target is identified.
+The repository alone does not prove the hosting target, and the public domain currently serves a legacy production application, so this step remains BLOCKED until the host and safe cutover plan are identified.
 
 ### C8 — Production smoke
 
@@ -137,7 +149,8 @@ Do not auto-price the 14 standard rooms in Corpus 3 and do not auto-map room 301
 
 ## Production blockers that repository inspection cannot resolve
 
-- actual live hosting/deployment target and current deployed SHA;
+- actual host/control plane behind the current legacy `akbermet.kg` site;
+- legacy booking/data dependencies and a rollback-safe domain cutover method;
 - current production environment values/presence;
 - current Supabase project identity and migration ledger;
 - fresh backup for the upcoming activation cycle;
