@@ -50,6 +50,12 @@ jobs:
       - name: Public room catalog contract
         run: npm run test:room-public-catalog
 
+      - name: Production backup contract
+        run: npm run test:backup-contract
+
+      - name: Production preflight contract
+        run: npm run test:production-preflight
+
       - name: Housekeeping tests
         run: npm run test:housekeeping
 

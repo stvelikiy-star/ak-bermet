@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+
+const script = resolve(import.meta.dirname, "production-preflight.mjs");
+
+function run(args = [], env = process.env) {
+  return spawnSync(process.execPath, [script, ...args], {
+    encoding: "utf8",
+    env,
+  });
+}
+
+test("repository-only preflight is non-destructive and passes the approved migration/runtime contract", () => {
+  const result = run();
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /migration chain is exact and ordered \(18 files\)/);
+  assert.match(result.stdout, /RESULT: PASS/);
+  assert.match(result.stdout, /performs no network calls, backup, migration, deployment, or production writes/);
+});
+
+test("production-env mode fails closed without printing secret values", () => {
+  const secretSentinel = "DO_NOT_PRINT_THIS_SECRET";
+  const result = run(["--production-env"], {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "",
+    SUPABASE_SERVICE_ROLE_KEY: secretSentinel,
+  });
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /BLOCKED: production environment incomplete:/);
+  assert.match(result.stderr, /SUPABASE_ACCESS_TOKEN/);
+  assert.match(result.stderr, /AK_BERMET_DATABASE_URL/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secretSentinel));
+});
