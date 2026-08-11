@@ -1,0 +1,36 @@
+name: Security Lock Refresh
+
+on:
+  push:
+    branches: [fix/security-audit-20260811]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/security-audit-20260811
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply non-breaking audit lockfile fixes only
+        run: npm audit fix --package-lock-only
+      - name: Commit lockfile if changed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "fix: apply non-breaking dependency security updates"
+          git push origin HEAD:fix/security-audit-20260811
