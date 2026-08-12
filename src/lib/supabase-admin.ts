@@ -46,6 +46,8 @@ export interface CreateAvailabilityHoldRpcInput {
   idempotencyKey?: string | null;
 }
 
+// Application-facing shape. The database stores the dates in a PostgreSQL
+// daterange; this normalized shape is what the availability API consumes.
 export interface AvailabilityHoldRpcRow {
   id: string;
   room_unit_id: string;
@@ -54,9 +56,41 @@ export interface AvailabilityHoldRpcRow {
   status: string;
   created_at?: string;
   expires_at?: string;
-  hold_expires_at?: string;
   idempotency_key?: string;
   [key: string]: unknown;
+}
+
+interface AvailabilityHoldDbRow {
+  id: string;
+  room_unit_id: string;
+  date_range: string;
+  status: string;
+  created_at?: string;
+  expires_at?: string;
+  idempotency_key?: string;
+  [key: string]: unknown;
+}
+
+function normalizeAvailabilityHoldRow(
+  row: AvailabilityHoldDbRow
+): AvailabilityHoldRpcRow | null {
+  // fn_create_availability_hold always constructs [check_in, check_out).
+  // PostgreSQL serializes a date daterange in the same canonical form.
+  const match = /^\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})\)$/.exec(
+    row.date_range
+  );
+  if (!match) return null;
+  const [, checkIn, checkOut] = match;
+  return {
+    id: row.id,
+    room_unit_id: row.room_unit_id,
+    check_in: checkIn,
+    check_out: checkOut,
+    status: row.status,
+    created_at: row.created_at,
+    expires_at: row.expires_at,
+    idempotency_key: row.idempotency_key,
+  };
 }
 
 export class AvailabilityHoldReadError extends Error {
@@ -66,21 +100,44 @@ export class AvailabilityHoldReadError extends Error {
   }
 }
 
-// Availability GET must consult the same durable store used by the hold RPC.
-// Selecting only scheduling fields avoids exposing guest or payment data from
-// the service-role client used by the public availability endpoint.
+export interface AvailabilityHoldReadClient {
+  from(name: "availability_holds"): {
+    select(columns: string): {
+      eq(column: "status", value: "active"): {
+        gt(
+          column: "expires_at",
+          value: string
+        ): Promise<{
+          data: AvailabilityHoldDbRow[] | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
+}
+
+// Availability GET consults the exact same durable table written by
+// fn_create_availability_hold. A read failure or malformed daterange fails
+// closed rather than pretending a held room is available.
 export async function listActiveAvailabilityHolds(
   now: Date = new Date(),
-  client: SupabaseClient = getSupabaseAdminClient()
+  client: AvailabilityHoldReadClient =
+    getSupabaseAdminClient() as unknown as AvailabilityHoldReadClient
 ): Promise<AvailabilityHoldRpcRow[]> {
   const { data, error } = await client
-    .from("bookings")
-    .select("id, room_unit_id, check_in, check_out, status, hold_expires_at")
-    .eq("status", "pre_hold")
-    .gt("hold_expires_at", now.toISOString());
+    .from("availability_holds")
+    .select(
+      "id, room_unit_id, date_range, status, created_at, expires_at, idempotency_key"
+    )
+    .eq("status", "active")
+    .gt("expires_at", now.toISOString());
 
   if (error || !data) throw new AvailabilityHoldReadError();
-  return data as AvailabilityHoldRpcRow[];
+  const normalized = data.map(normalizeAvailabilityHoldRow);
+  if (normalized.some((row) => row === null)) {
+    throw new AvailabilityHoldReadError();
+  }
+  return normalized as AvailabilityHoldRpcRow[];
 }
 
 export interface AvailabilityHoldRpcClient {
@@ -95,7 +152,7 @@ export interface AvailabilityHoldRpcClient {
       p_idempotency_key: string | null;
     }
   ): Promise<{
-    data: AvailabilityHoldRpcRow | AvailabilityHoldRpcRow[] | null;
+    data: AvailabilityHoldDbRow | AvailabilityHoldDbRow[] | null;
     error: { code?: string; message?: string } | null;
   }>;
 }
@@ -142,7 +199,9 @@ export async function createAvailabilityHoldRpc(
   });
 
   if (error) throw new AvailabilityHoldRpcError(error.code);
-  const row = Array.isArray(data) ? data[0] : data;
+  const raw = Array.isArray(data) ? data[0] : data;
+  if (!raw) throw new AvailabilityHoldRpcError(undefined);
+  const row = normalizeAvailabilityHoldRow(raw);
   if (!row) throw new AvailabilityHoldRpcError(undefined);
   return row;
 }
