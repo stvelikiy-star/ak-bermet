@@ -2,23 +2,53 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync(
+const routeSource = readFileSync(
   new URL("./route.ts", import.meta.url),
   "utf8",
 );
+const persistenceSource = readFileSync(
+  new URL("../../../lib/public-lead-persistence.ts", import.meta.url),
+  "utf8",
+);
 
-test("lead API never reports success when durable persistence is unavailable", () => {
-  assert.match(source, /if \(!isGoogleSheetsEnabled\(\)\)/);
-  assert.match(source, /status:\s*503/);
-  assert.doesNotMatch(source, /saved in mock mode/i);
-  assert.doesNotMatch(source, /\[LEAD\]\s*mock/i);
+test("lead API reports success only after authoritative Supabase persistence", () => {
+  const persistIndex = routeSource.indexOf("await persistPublicLead(lead)");
+  const successIndex = routeSource.lastIndexOf(
+    "NextResponse.json({ ok: true, leadId: persistedLead.id })",
+  );
+
+  assert.notEqual(persistIndex, -1);
+  assert.notEqual(successIndex, -1);
+  assert.ok(successIndex > persistIndex);
+  assert.match(routeSource, /status:\s*503/);
+  assert.doesNotMatch(routeSource, /if \(!isGoogleSheetsEnabled\(\)\)/);
 });
 
-test("lead API reports success only after the durable append path", () => {
-  const appendIndex = source.indexOf("await appendLeadToSheet(lead)");
-  const successIndex = source.lastIndexOf("NextResponse.json({ ok: true, leadId: lead.id })");
+test("Google Sheets is optional and runs only after the durable Supabase write", () => {
+  const persistIndex = routeSource.indexOf("await persistPublicLead(lead)");
+  const sheetsGateIndex = routeSource.indexOf("if (isGoogleSheetsEnabled())");
+  const appendIndex = routeSource.indexOf("await appendLeadToSheet({ ...lead, id: persistedLead.id })");
 
+  assert.notEqual(sheetsGateIndex, -1);
   assert.notEqual(appendIndex, -1);
-  assert.notEqual(successIndex, -1);
-  assert.ok(successIndex > appendIndex);
+  assert.ok(sheetsGateIndex > persistIndex);
+  assert.ok(appendIndex > sheetsGateIndex);
+  assert.match(routeSource, /Secondary Google Sheets sync failed/);
+});
+
+test("public Supabase lead insert uses an explicit safe field allowlist", () => {
+  assert.match(persistenceSource, /\.from\("leads"\)/);
+  assert.match(persistenceSource, /\.insert\(payload\)/);
+  assert.match(persistenceSource, /\.select\("id, lead_number"\)/);
+  assert.match(persistenceSource, /\.single\(\)/);
+  assert.match(persistenceSource, /room_category_id:\s*roomCategoryId/);
+  assert.doesNotMatch(persistenceSource, /assigned_manager_id\s*:/);
+  assert.doesNotMatch(persistenceSource, /booking_id\s*:/);
+  assert.doesNotMatch(persistenceSource, /id:\s*lead\.id/);
+});
+
+test("unresolved room category is preserved instead of losing the lead", () => {
+  assert.match(persistenceSource, /Категория номера:/);
+  assert.match(persistenceSource, /roomCategoryId:\s*null/);
+  assert.match(persistenceSource, /preserveUnresolvedRoomCategory\(lead\)/);
 });
