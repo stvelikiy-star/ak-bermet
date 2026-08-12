@@ -56,6 +56,9 @@ export interface AvailabilityHoldRpcRow {
   status: string;
   created_at?: string;
   expires_at?: string;
+  // Legacy API compatibility only. The durable availability_holds table uses
+  // expires_at; no new database read populates hold_expires_at.
+  hold_expires_at?: string;
   idempotency_key?: string;
   [key: string]: unknown;
 }
