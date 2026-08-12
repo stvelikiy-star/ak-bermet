@@ -3,6 +3,7 @@ import type { LeadInput } from "@/types/lead";
 import { validateLead } from "@/lib/lead-schema";
 import { buildLead } from "@/lib/lead-utils";
 import { isGoogleSheetsEnabled, appendLeadToSheet } from "@/lib/google-sheets";
+import { persistPublicLead } from "@/lib/public-lead-persistence";
 
 // googleapis несовместим с Edge — используем Node.js runtime.
 export const runtime = "nodejs";
@@ -27,13 +28,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message, errors }, { status: 422 });
   }
 
-  // Полный объект заявки: id + createdAt + status:"new".
+  // Полный объект заявки: временный transport id + createdAt + status:"new".
+  // Канонический UUID создаёт Supabase и именно он возвращается клиенту.
   const lead = buildLead(input as LeadInput);
 
-  // Production invariant: success may be returned only after a durable write.
-  // Server logs and process-local/mock storage are not durable lead storage.
-  if (!isGoogleSheetsEnabled()) {
-    console.error("[LEAD] Durable persistence is unavailable: Google Sheets is disabled or not configured.");
+  let persistedLead: Awaited<ReturnType<typeof persistPublicLead>>;
+  try {
+    // Production invariant: success may be returned only after the
+    // authoritative durable Supabase write has completed.
+    persistedLead = await persistPublicLead(lead);
+  } catch (error) {
+    console.error("[LEAD] Supabase durable insert failed:", error);
     return NextResponse.json(
       {
         ok: false,
@@ -44,23 +49,19 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    await appendLeadToSheet(lead);
-  } catch (error) {
-    // Логируем техническую ошибку только на сервере и fail closed:
-    // клиент не получает success, пока durable write не завершился.
-    console.error("[LEAD] Google Sheets append failed:", error);
-    return NextResponse.json(
-      {
-        ok: false,
-        message:
-          "Заявка принята не была. Пожалуйста, попробуйте ещё раз или напишите в WhatsApp.",
-      },
-      { status: 502 }
-    );
+  // Google Sheets is a secondary compatibility/sync destination only.
+  // Its outage must never turn an already durable Supabase write into a
+  // false client failure or duplicate retry. Use the canonical DB UUID in
+  // the secondary record so future reconciliation has one stable identity.
+  if (isGoogleSheetsEnabled()) {
+    try {
+      await appendLeadToSheet({ ...lead, id: persistedLead.id });
+    } catch (error) {
+      console.warn("[LEAD] Secondary Google Sheets sync failed:", error);
+    }
   }
 
-  return NextResponse.json({ ok: true, leadId: lead.id });
+  return NextResponse.json({ ok: true, leadId: persistedLead.id });
 }
 
 export async function GET() {
