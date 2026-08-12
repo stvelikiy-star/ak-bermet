@@ -34,3 +34,24 @@ test("production-env mode fails closed without printing secret values", () => {
   assert.match(result.stderr, /AK_BERMET_DATABASE_URL/);
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secretSentinel));
 });
+
+test("production-env mode passes the Supabase release contract without Google Sheets credentials", () => {
+  const result = run(["--production-env"], {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "",
+    NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
+    SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
+    SUPABASE_ACCESS_TOKEN: "access-token-test",
+    SUPABASE_PROJECT_REF: "project-ref-test",
+    SUPABASE_DB_PASSWORD: "db-password-test",
+    AK_BERMET_DATABASE_URL: "postgresql://example.invalid/db",
+    AK_BERMET_BACKUP_APPROVED: "YES",
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /required Supabase\/release environment names are present/);
+  assert.match(result.stdout, /RESULT: PASS/);
+  assert.doesNotMatch(result.stdout + result.stderr, /GOOGLE_SERVICE_ACCOUNT/);
+  assert.doesNotMatch(result.stdout + result.stderr, /GOOGLE_SHEETS_ENABLED=true/);
+});
