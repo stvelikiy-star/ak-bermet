@@ -27,13 +27,13 @@ const EXPECTED_MIGRATIONS = [
   "20260728000100_availability_hold_atomicity.sql",
 ];
 
+// Supabase is the authoritative durable application/CRM store. Google Sheets
+// is an optional secondary synchronization destination and is intentionally
+// not a production release hard gate.
 const REQUIRED_PRODUCTION_ENV = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "GOOGLE_SHEETS_SPREADSHEET_ID",
-  "GOOGLE_SERVICE_ACCOUNT_EMAIL",
-  "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
   "SUPABASE_ACCESS_TOKEN",
   "SUPABASE_PROJECT_REF",
   "SUPABASE_DB_PASSWORD",
@@ -76,15 +76,12 @@ if (JSON.stringify(actualMigrations) === JSON.stringify(EXPECTED_MIGRATIONS)) {
 
 if (process.argv.includes("--production-env")) {
   const missing = REQUIRED_PRODUCTION_ENV.filter((name) => !process.env[name]?.trim());
-  if (process.env.GOOGLE_SHEETS_ENABLED !== "true") {
-    missing.push("GOOGLE_SHEETS_ENABLED=true");
-  }
   if (process.env.AK_BERMET_BACKUP_APPROVED !== "YES") {
     missing.push("AK_BERMET_BACKUP_APPROVED=YES");
   }
 
   if (missing.length === 0) {
-    pass("required production/release environment names are present");
+    pass("required Supabase/release environment names are present");
   } else {
     fail(`production environment incomplete: ${[...new Set(missing)].join(", ")}`);
   }
