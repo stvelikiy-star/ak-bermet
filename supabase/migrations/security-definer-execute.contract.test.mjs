@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const migrationPath = resolve(
   import.meta.dirname,
-  "20260813033600_security_definer_execute_lockdown.sql",
+  "20260813035252_security_definer_execute_lockdown.sql",
 );
 const sql = readFileSync(migrationPath, "utf8").toLowerCase();
 
