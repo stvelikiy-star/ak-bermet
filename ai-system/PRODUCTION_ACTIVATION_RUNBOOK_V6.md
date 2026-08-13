@@ -9,8 +9,7 @@ This runbook is intentionally fail-closed. It describes the production activatio
 - Runtime: Node >=22; production container uses Node 22 Alpine.
 - Production Readiness CI builds the Next.js production bundle and Docker image.
 - Hardened read-only PostgreSQL backup script exists at `supabase/migrations/ak-bermet-production-backup.sh`.
-- Approved schema chain contains exactly 18 timestamped SQL migrations.
-- No timestamped SQL migrations were added after the release migration set.
+- Approved schema chain contains exactly 19 timestamped SQL migrations, including the 2026-08-13 Supabase privilege hardening migration.
 - Repository does not define a verified live hosting/deployment target. The actual target and currently deployed SHA must therefore be discovered from the live environment before any deploy.
 
 ## Live discovery — 2026-08-11
@@ -23,6 +22,16 @@ Therefore:
 - the existing live site must be treated as a separate legacy production system until its host, data ownership, booking dependencies, and cutover method are identified;
 - do not overwrite DNS, webroot, container, database, or booking data merely to publish the new Next.js site;
 - production cutover remains BLOCKED until the actual host/control plane and rollback path are known.
+
+## Supabase read-only discovery — 2026-08-13
+
+The connected Supabase account exposes project `ak-bermet-dev` (`ednqgzgjhnalsiiuekmw`), status `ACTIVE_HEALTHY`, PostgreSQL 17. Its migration ledger contains the exact first 18 migrations listed below through `20260728000100_availability_hold_atomicity`.
+
+Supabase Security Advisor additionally identified a privilege gap in that database: operational `SECURITY DEFINER` functions retained explicit `anon` EXECUTE grants despite earlier migrations revoking EXECUTE from `PUBLIC`. Advisor also identified mutable `search_path` warnings and `btree_gist` installed in the exposed `public` schema.
+
+Migration `20260813033600_security_definer_execute_lockdown.sql` was added to close those findings. The SQL was validated against the connected database inside a transaction that ended with `ROLLBACK`; no database change was persisted during validation.
+
+The project name `ak-bermet-dev` is evidence that this is a development project, not proof that it is the production Supabase project. Production identity still must be confirmed before production writes.
 
 ## Approved migration order
 
@@ -44,6 +53,7 @@ Therefore:
 16. `20260722001700_operational_rls.sql`
 17. `20260727000100_manager_inspection_blocking_problem.sql`
 18. `20260728000100_availability_hold_atomicity.sql`
+19. `20260813033600_security_definer_execute_lockdown.sql`
 
 Never use `supabase db reset` against production. Never replay all migrations blindly. Apply only migrations proven missing from the production migration ledger, in filename order.
 
@@ -100,7 +110,7 @@ If backup or validation fails: STOP. Do not migrate or deploy.
 
 ### C5 — Migration ledger reconciliation
 
-Compare the production migration ledger with the exact 18-file list above.
+Compare the production migration ledger with the exact 19-file list above.
 
 Classify every migration as:
 
@@ -118,7 +128,8 @@ Only after C1–C5 PASS and explicit production-change approval:
 - stop on first failure;
 - do not run destructive reset/rollback automatically;
 - capture the resulting migration ledger;
-- run non-destructive schema/RLS/integrity validation before deploying the application.
+- run non-destructive schema/RLS/integrity validation before deploying the application;
+- re-run Supabase Security Advisor and require the SECURITY DEFINER EXECUTE/search_path findings addressed by migration 19 to be cleared.
 
 ### C7 — Deploy the frozen SHA
 
@@ -152,7 +163,7 @@ Do not auto-price the 14 standard rooms in Corpus 3 and do not auto-map room 301
 - actual host/control plane behind the current legacy `akbermet.kg` site;
 - legacy booking/data dependencies and a rollback-safe domain cutover method;
 - current production environment values/presence;
-- current Supabase project identity and migration ledger;
+- production Supabase project identity (the connected project is named `ak-bermet-dev` and is not assumed to be production);
 - fresh backup for the upcoming activation cycle;
 - owner/legal refund policy decision;
 - Corpus 3 standard price;
