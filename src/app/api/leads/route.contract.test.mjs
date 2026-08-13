@@ -21,19 +21,20 @@ test("lead API reports success only after authoritative Supabase persistence", (
   assert.notEqual(successIndex, -1);
   assert.ok(successIndex > persistIndex);
   assert.match(routeSource, /status:\s*503/);
-  assert.doesNotMatch(routeSource, /if \(!isGoogleSheetsEnabled\(\)\)/);
 });
 
-test("Google Sheets is optional and runs only after the durable Supabase write", () => {
-  const persistIndex = routeSource.indexOf("await persistPublicLead(lead)");
-  const sheetsGateIndex = routeSource.indexOf("if (isGoogleSheetsEnabled())");
-  const appendIndex = routeSource.indexOf("await appendLeadToSheet({ ...lead, id: persistedLead.id })");
+test("public request path never calls Google Sheets directly", () => {
+  assert.doesNotMatch(routeSource, /appendLeadToSheet/);
+  assert.doesNotMatch(routeSource, /isGoogleSheetsEnabled/);
+  assert.doesNotMatch(routeSource, /@\/lib\/google-sheets/);
+  assert.match(routeSource, /Google Sheets mirroring is asynchronous through the/);
+  assert.match(routeSource, /DB outbox/);
+});
 
-  assert.notEqual(sheetsGateIndex, -1);
-  assert.notEqual(appendIndex, -1);
-  assert.ok(sheetsGateIndex > persistIndex);
-  assert.ok(appendIndex > sheetsGateIndex);
-  assert.match(routeSource, /Secondary Google Sheets sync failed/);
+test("lead persistence errors are not serialized into logs", () => {
+  assert.match(routeSource, /console\.error\("\[LEAD\] Supabase durable insert failed"\)/);
+  assert.doesNotMatch(routeSource, /console\.error\([^\n]*,\s*error/);
+  assert.doesNotMatch(routeSource, /console\.warn/);
 });
 
 test("public Supabase lead insert uses an explicit safe field allowlist", () => {
