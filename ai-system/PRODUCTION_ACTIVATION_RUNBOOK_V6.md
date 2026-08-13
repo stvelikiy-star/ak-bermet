@@ -129,7 +129,7 @@ Only after C1–C5 PASS and explicit production-change approval:
 - do not run destructive reset/rollback automatically;
 - capture the resulting migration ledger;
 - run non-destructive schema/RLS/integrity validation before deploying the application;
-- re-run Supabase Security Advisor and require the SECURITY DEFINER EXECUTE/search_path findings addressed by migration 19 to be cleared.
+- re-run Supabase Security Advisor and direct ACL checks. Acceptance requires zero `anon` EXECUTE access to the operational `SECURITY DEFINER` functions, zero direct `authenticated` EXECUTE on internal helper/trigger functions, fixed `search_path` for migration-19 targets, and `btree_gist` outside `public`. Advisor may still report signed-in-user warnings for the intentionally authenticated staff RPCs; those are acceptable only where the function itself enforces the documented role/assignment authorization checks.
 
 ### C7 — Deploy the frozen SHA
 
