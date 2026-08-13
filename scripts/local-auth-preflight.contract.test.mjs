@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 const script = resolve(import.meta.dirname, "local-auth-preflight.mjs");
 
 function run(envFile, extraEnv = {}) {
-  return spawnSync(process.execPath, [script, "--env-file", envFile], {
+  return spawnSync(process.execPath, [script, "--config-file", envFile], {
     encoding: "utf8",
     env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...extraEnv },
   });
