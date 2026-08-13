@@ -27,11 +27,9 @@ const EXPECTED_MIGRATIONS = [
   "20260728000100_availability_hold_atomicity.sql",
   "20260813035252_security_definer_execute_lockdown.sql",
   "20260813060026_sheets_sync_outbox_plumbing.sql",
+  "20260813063603_leads_sheets_outbox.sql",
 ];
 
-// Supabase is the authoritative durable application/CRM store. Google Sheets
-// is an optional secondary synchronization destination and is intentionally
-// not a production release hard gate.
 const REQUIRED_PRODUCTION_ENV = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",

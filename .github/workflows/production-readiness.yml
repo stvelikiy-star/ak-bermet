@@ -50,6 +50,9 @@ jobs:
       - name: Lead durability contract
         run: npm run test:lead-durability
 
+      - name: Lead Sheets outbox contract
+        run: npm run test:leads-sheets-outbox
+
       - name: Public room catalog contract
         run: npm run test:room-public-catalog
 
