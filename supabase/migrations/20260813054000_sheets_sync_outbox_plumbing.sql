@@ -9,6 +9,16 @@
 
 begin;
 
+-- Existing Phase 1 queue rows did not need a claim timestamp because no worker
+-- existed yet. A real worker needs one so an interrupted claim can be safely
+-- recovered instead of remaining `in_progress` forever.
+alter table public.sheets_sync_queue
+  add column if not exists claimed_at timestamptz;
+
+create index if not exists idx_sheets_sync_stale_claims
+  on public.sheets_sync_queue(claimed_at)
+  where status = 'in_progress';
+
 create or replace function public.fn_enqueue_sheets_sync()
 returns trigger
 language plpgsql
@@ -49,7 +59,10 @@ begin
     'pending'
   );
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
 $$;
 
@@ -60,7 +73,8 @@ revoke all on function public.fn_enqueue_sheets_sync() from public, anon, authen
 grant execute on function public.fn_enqueue_sheets_sync() to service_role;
 
 -- Claim a bounded batch atomically. SKIP LOCKED lets multiple workers run
--- without claiming the same queue row. The function is service-role only.
+-- without claiming the same queue row. A claim older than 15 minutes is
+-- considered abandoned and can be reclaimed after a worker crash.
 create or replace function public.fn_claim_sheets_sync_batch(
   p_limit integer default 25
 )
@@ -79,7 +93,13 @@ begin
     select q.id
     from public.sheets_sync_queue q
     where q.direction = 'supabase_to_sheets'
-      and q.status = 'pending'
+      and (
+        q.status = 'pending'
+        or (
+          q.status = 'in_progress'
+          and (q.claimed_at is null or q.claimed_at < now() - interval '15 minutes')
+        )
+      )
     order by q.created_at, q.id
     for update skip locked
     limit p_limit
@@ -88,6 +108,7 @@ begin
   set status = 'in_progress',
       attempts = q.attempts + 1,
       last_error = null,
+      claimed_at = now(),
       processed_at = null
   from claimed
   where q.id = claimed.id
@@ -96,7 +117,7 @@ end;
 $$;
 
 comment on function public.fn_claim_sheets_sync_batch(integer) is
-  'Service-role worker RPC. Atomically claims pending Supabase-to-Sheets queue rows using FOR UPDATE SKIP LOCKED.';
+  'Service-role worker RPC. Atomically claims pending or abandoned Supabase-to-Sheets queue rows using FOR UPDATE SKIP LOCKED.';
 
 revoke all on function public.fn_claim_sheets_sync_batch(integer) from public, anon, authenticated;
 grant execute on function public.fn_claim_sheets_sync_batch(integer) to service_role;
@@ -126,7 +147,7 @@ begin
   if p_success is null then
     raise exception 'p_success is required';
   end if;
-  if p_max_attempts < 1 or p_max_attempts > 20 then
+  if p_max_attempts is null or p_max_attempts < 1 or p_max_attempts > 20 then
     raise exception 'p_max_attempts must be between 1 and 20';
   end if;
 
@@ -161,6 +182,7 @@ begin
   update public.sheets_sync_queue
   set status = v_queue_status,
       last_error = case when p_success then null else left(coalesce(p_error, 'Sheets mirror attempt failed'), 1000) end,
+      claimed_at = null,
       processed_at = case when p_success or v_queue_status = 'failed' then now() else null end
   where id = p_queue_id;
 
