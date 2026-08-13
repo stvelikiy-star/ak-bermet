@@ -56,6 +56,9 @@ jobs:
       - name: Production backup contract
         run: npm run test:backup-contract
 
+      - name: Supabase SECURITY DEFINER privilege contract
+        run: npm run test:supabase-security-contract
+
       - name: Production preflight contract
         run: npm run test:production-preflight
 
