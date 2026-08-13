@@ -13,82 +13,26 @@ export class SheetsSyncWorkerError extends Error {
 }
 
 export const MIRROR_CONFIG = Object.freeze({
-  buildings: {
-    sheet: "Корпуса",
-    idColumn: "M",
-    idIndex: 12,
-    width: 13,
-    allowAppend: false,
-    syncIndex: null,
-  },
-  room_units: {
-    sheet: "Номера",
-    idColumn: "B",
-    idIndex: 1,
-    width: 25,
-    allowAppend: false,
-    syncIndex: null,
-  },
-  customers: {
-    sheet: "Клиенты",
-    idColumn: "B",
-    idIndex: 1,
-    width: 20,
-    allowAppend: true,
-    syncIndex: 17,
-  },
-  bookings: {
-    sheet: "Бронирования",
-    idColumn: "B",
-    idIndex: 1,
-    width: 28,
-    allowAppend: true,
-    syncIndex: 26,
-  },
-  booking_rooms: {
-    sheet: "05_Бронь_Номера",
-    idColumn: "B",
-    idIndex: 1,
-    width: 20,
-    allowAppend: true,
-    syncIndex: 14,
-  },
-  availability_holds: {
-    sheet: "06_Удержания",
-    idColumn: "B",
-    idIndex: 1,
-    width: 20,
-    allowAppend: true,
-    syncIndex: 15,
-  },
-  cleaning_tasks: {
-    sheet: "Уборка",
-    idColumn: "B",
-    idIndex: 1,
-    width: 24,
-    allowAppend: true,
-    syncIndex: 22,
-  },
-  maintenance_requests: {
-    sheet: "Ремонт",
-    idColumn: "B",
-    idIndex: 1,
-    width: 26,
-    allowAppend: true,
-    syncIndex: 25,
-  },
-  room_inspections: {
-    sheet: "10_Проверки",
-    idColumn: "B",
-    idIndex: 1,
-    width: 20,
-    allowAppend: true,
-    syncIndex: 18,
-  },
+  buildings: { sheet: "Корпуса", idColumn: "M", idIndex: 12, width: 13, allowAppend: false, syncIndex: null },
+  room_units: { sheet: "Номера", idColumn: "B", idIndex: 1, width: 25, allowAppend: false, syncIndex: null },
+  customers: { sheet: "Клиенты", idColumn: "B", idIndex: 1, width: 20, allowAppend: true, syncIndex: 17 },
+  bookings: { sheet: "Бронирования", idColumn: "B", idIndex: 1, width: 28, allowAppend: true, syncIndex: 26 },
+  booking_rooms: { sheet: "05_Бронь_Номера", idColumn: "B", idIndex: 1, width: 20, allowAppend: true, syncIndex: 14 },
+  availability_holds: { sheet: "06_Удержания", idColumn: "B", idIndex: 1, width: 20, allowAppend: true, syncIndex: 15 },
+  cleaning_tasks: { sheet: "Уборка", idColumn: "B", idIndex: 1, width: 24, allowAppend: true, syncIndex: 22 },
+  maintenance_requests: { sheet: "Ремонт", idColumn: "B", idIndex: 1, width: 26, allowAppend: true, syncIndex: 25 },
+  room_inspections: { sheet: "10_Проверки", idColumn: "B", idIndex: 1, width: 20, allowAppend: true, syncIndex: 18 },
+  leads: { sheet: "07_Лиды", idColumn: "B", idIndex: 1, width: 30, allowAppend: true, syncIndex: 29 },
 });
 
 const yesNo = (value) => (value ? "Да" : "Нет");
-const cell = (value) => (value === null || value === undefined ? "" : value);
+const cell = (value) => {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+    return JSON.stringify(value);
+  }
+  return value;
+};
 
 export function extractRoomExternalId(notes, fallback = "") {
   const match = /(?:^|;\s*)V6_SOURCE_ID=([^;]+)/.exec(String(notes ?? ""));
@@ -96,17 +40,13 @@ export function extractRoomExternalId(notes, fallback = "") {
 }
 
 export function parseDateRange(value) {
-  const match = /^\["?(\d{4}-\d{2}-\d{2})"?,"?(\d{4}-\d{2}-\d{2})"?\)$/.exec(
-    String(value ?? ""),
-  );
+  const match = /^\["?(\d{4}-\d{2}-\d{2})"?,"?(\d{4}-\d{2}-\d{2})"?\)$/.exec(String(value ?? ""));
   if (!match) throw new SheetsSyncWorkerError("INVALID_DATE_RANGE");
   return { checkIn: match[1], checkOut: match[2] };
 }
 
 export function columnLetter(index) {
-  if (!Number.isInteger(index) || index < 0) {
-    throw new SheetsSyncWorkerError("INVALID_COLUMN_INDEX");
-  }
+  if (!Number.isInteger(index) || index < 0) throw new SheetsSyncWorkerError("INVALID_COLUMN_INDEX");
   let n = index + 1;
   let result = "";
   while (n > 0) {
@@ -122,12 +62,7 @@ export async function buildMirrorPatch(table, row, lookup = async () => "") {
 
   switch (table) {
     case "buildings":
-      return {
-        3: row.official_unit_count,
-        4: row.official_bed_count,
-        7: yesNo(!row.deleted_at),
-        12: row.id,
-      };
+      return { 3: row.official_unit_count, 4: row.official_bed_count, 7: yesNo(!row.deleted_at), 12: row.id };
 
     case "room_units":
       return {
@@ -160,6 +95,8 @@ export async function buildMirrorPatch(table, row, lookup = async () => "") {
         0: row.booking_number || row.id,
         1: row.id,
         3: row.booking_number,
+        4: row.created_at,
+        5: row.source,
         7: row.check_in,
         8: row.check_out,
         10: row.adults,
@@ -272,6 +209,40 @@ export async function buildMirrorPatch(table, row, lookup = async () => "") {
       };
     }
 
+    case "leads":
+      return {
+        0: row.lead_number || row.id,
+        1: row.id,
+        2: row.created_at,
+        3: row.source,
+        4: row.interest,
+        5: row.status,
+        6: row.name,
+        7: row.phone,
+        8: row.check_in,
+        9: row.check_out,
+        10: row.adults,
+        11: row.children,
+        12: row.children_ages,
+        13: row.room_category_id,
+        14: row.wants_double_bed,
+        15: row.needs_extra_bed,
+        16: row.needs_wifi,
+        17: row.needs_lower_floor,
+        18: row.event_type,
+        19: row.guests_count,
+        20: row.hall_size,
+        21: row.spa_service,
+        22: row.message,
+        23: row.preferred_contact,
+        24: row.assigned_manager_id,
+        25: row.manager_comment,
+        26: row.booking_id,
+        27: row.updated_at,
+        28: row.deleted_at,
+        29: "SYNCED",
+      };
+
     default:
       throw new SheetsSyncWorkerError("UNSUPPORTED_ENTITY_TABLE");
   }
@@ -284,12 +255,8 @@ function requiredEnv(name) {
 }
 
 export function validateMode(mode) {
-  if (!['dry-run', 'execute'].includes(mode)) {
-    throw new SheetsSyncWorkerError("INVALID_MODE");
-  }
-  if (process.env.GOOGLE_SHEETS_ENABLED !== "true") {
-    throw new SheetsSyncWorkerError("GOOGLE_SHEETS_DISABLED");
-  }
+  if (!["dry-run", "execute"].includes(mode)) throw new SheetsSyncWorkerError("INVALID_MODE");
+  if (process.env.GOOGLE_SHEETS_ENABLED !== "true") throw new SheetsSyncWorkerError("GOOGLE_SHEETS_DISABLED");
   if (mode === "execute" && process.env.AK_BERMET_SHEETS_MIRROR_ENABLED !== "YES") {
     throw new SheetsSyncWorkerError("MIRROR_EXECUTION_NOT_APPROVED");
   }
@@ -305,7 +272,6 @@ async function makeClients() {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-
   const { google } = await import("googleapis");
   const auth = new google.auth.JWT({
     email,
@@ -324,35 +290,19 @@ async function loadEntity(supabase, table, id) {
 
 async function lookupRelation(supabase, kind, id) {
   if (!id) return "";
-  let table;
-  let select;
-  switch (kind) {
-    case "room_external":
-      table = "room_units";
-      select = "id, notes, room_number";
-      break;
-    case "booking_external":
-      table = "bookings";
-      select = "id, booking_number";
-      break;
-    case "cleaning_external":
-      table = "cleaning_tasks";
-      select = "id, task_number";
-      break;
-    case "maintenance_external":
-      table = "maintenance_requests";
-      select = "id, request_number";
-      break;
-    default:
-      throw new SheetsSyncWorkerError("UNSUPPORTED_RELATION_LOOKUP");
-  }
-
+  const contracts = {
+    room_external: ["room_units", "id, notes, room_number"],
+    booking_external: ["bookings", "id, booking_number"],
+    cleaning_external: ["cleaning_tasks", "id, task_number"],
+    maintenance_external: ["maintenance_requests", "id, request_number"],
+  };
+  const contract = contracts[kind];
+  if (!contract) throw new SheetsSyncWorkerError("UNSUPPORTED_RELATION_LOOKUP");
+  const [table, select] = contract;
   const { data, error } = await supabase.from(table).select(select).eq("id", id).maybeSingle();
   if (error) throw new SheetsSyncWorkerError("SUPABASE_RELATION_READ_FAILED");
   if (!data) return String(id);
-  if (kind === "room_external") {
-    return extractRoomExternalId(data.notes, data.room_number || String(id));
-  }
+  if (kind === "room_external") return extractRoomExternalId(data.notes, data.room_number || String(id));
   if (kind === "booking_external") return data.booking_number || String(id);
   if (kind === "cleaning_external") return data.task_number || String(id);
   return data.request_number || String(id);
@@ -381,7 +331,6 @@ async function updatePatch(sheets, spreadsheetId, config, rowNumber, patch) {
       range: `${quotedSheet(config.sheet)}!${columnLetter(index)}${rowNumber}`,
       values: [[cell(value)]],
     }));
-
   if (data.length === 0) throw new SheetsSyncWorkerError("EMPTY_SHEET_PATCH");
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
@@ -393,13 +342,9 @@ async function appendPatch(sheets, spreadsheetId, config, patch) {
   const row = Array(config.width).fill("");
   for (const [rawIndex, value] of Object.entries(patch)) {
     const index = Number(rawIndex);
-    if (Number.isInteger(index) && index >= 0 && index < config.width) {
-      row[index] = cell(value);
-    }
+    if (Number.isInteger(index) && index >= 0 && index < config.width) row[index] = cell(value);
   }
-  if (String(row[config.idIndex] ?? "") === "") {
-    throw new SheetsSyncWorkerError("APPEND_UUID_ANCHOR_MISSING");
-  }
+  if (String(row[config.idIndex] ?? "") === "") throw new SheetsSyncWorkerError("APPEND_UUID_ANCHOR_MISSING");
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: `${quotedSheet(config.sheet)}!A1`,
@@ -410,27 +355,16 @@ async function appendPatch(sheets, spreadsheetId, config, patch) {
 }
 
 async function markMissingDynamicRow(sheets, spreadsheetId, config, rowNumber) {
-  if (config.syncIndex === null) {
-    throw new SheetsSyncWorkerError("AUTHORITATIVE_INVENTORY_ROW_MISSING");
-  }
-  await updatePatch(sheets, spreadsheetId, config, rowNumber, {
-    [config.syncIndex]: "DELETED_IN_SUPABASE",
-  });
+  if (config.syncIndex === null) throw new SheetsSyncWorkerError("AUTHORITATIVE_INVENTORY_ROW_MISSING");
+  await updatePatch(sheets, spreadsheetId, config, rowNumber, { [config.syncIndex]: "DELETED_IN_SUPABASE" });
 }
 
 async function inspectItem(clients, item) {
   const config = MIRROR_CONFIG[item.entity_table];
   if (!config) throw new SheetsSyncWorkerError("UNSUPPORTED_ENTITY_TABLE");
-  if (item.target_sheet !== config.sheet) {
-    throw new SheetsSyncWorkerError("QUEUE_TARGET_MISMATCH");
-  }
+  if (item.target_sheet !== config.sheet) throw new SheetsSyncWorkerError("QUEUE_TARGET_MISMATCH");
   const entity = await loadEntity(clients.supabase, item.entity_table, item.entity_id);
-  const rowNumber = await findSheetRow(
-    clients.sheets,
-    clients.spreadsheetId,
-    config,
-    item.entity_id,
-  );
+  const rowNumber = await findSheetRow(clients.sheets, clients.spreadsheetId, config, item.entity_id);
   if (!entity) {
     if (!config.allowAppend) throw new SheetsSyncWorkerError("AUTHORITATIVE_INVENTORY_ROW_MISSING");
     return { config, entity: null, rowNumber, action: rowNumber ? "mark_deleted" : "no_op" };
@@ -443,30 +377,23 @@ async function inspectItem(clients, item) {
 async function processItem(clients, item) {
   const inspected = await inspectItem(clients, item);
   const { config, entity, rowNumber, action } = inspected;
-
   if (action === "no_op") return action;
   if (action === "mark_deleted") {
     await markMissingDynamicRow(clients.sheets, clients.spreadsheetId, config, rowNumber);
     return action;
   }
-
   const patch = await buildMirrorPatch(
     item.entity_table,
     entity,
     (kind, id) => lookupRelation(clients.supabase, kind, id),
   );
-
-  if (action === "update") {
-    await updatePatch(clients.sheets, clients.spreadsheetId, config, rowNumber, patch);
-  } else {
-    await appendPatch(clients.sheets, clients.spreadsheetId, config, patch);
-  }
+  if (action === "update") await updatePatch(clients.sheets, clients.spreadsheetId, config, rowNumber, patch);
+  else await appendPatch(clients.sheets, clients.spreadsheetId, config, patch);
   return action;
 }
 
 function safeErrorCode(error) {
-  if (error instanceof SheetsSyncWorkerError) return error.code;
-  return "SHEETS_SYNC_WORKER_ERROR";
+  return error instanceof SheetsSyncWorkerError ? error.code : "SHEETS_SYNC_WORKER_ERROR";
 }
 
 async function finishItem(supabase, item, success, errorCode = null, action = null) {
@@ -505,9 +432,7 @@ async function runDry(clients, limit) {
 }
 
 async function runExecute(clients, limit) {
-  const { data, error } = await clients.supabase.rpc("fn_claim_sheets_sync_batch", {
-    p_limit: limit,
-  });
+  const { data, error } = await clients.supabase.rpc("fn_claim_sheets_sync_batch", { p_limit: limit });
   if (error) throw new SheetsSyncWorkerError("QUEUE_CLAIM_FAILED");
 
   let failures = 0;
@@ -536,9 +461,7 @@ function parseArgs(argv) {
   const mode = argv.includes("--execute") ? "execute" : "dry-run";
   const limitArg = argv.find((arg) => arg.startsWith("--limit="));
   const limit = limitArg ? Number(limitArg.split("=", 2)[1]) : 25;
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    throw new SheetsSyncWorkerError("INVALID_LIMIT");
-  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new SheetsSyncWorkerError("INVALID_LIMIT");
   return { mode, limit };
 }
 
