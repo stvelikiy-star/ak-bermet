@@ -59,6 +59,9 @@ jobs:
       - name: Supabase SECURITY DEFINER privilege contract
         run: npm run test:supabase-security-contract
 
+      - name: Sheets mirror outbox contract
+        run: npm run test:sheets-sync-outbox
+
       - name: Production preflight contract
         run: npm run test:production-preflight
 
