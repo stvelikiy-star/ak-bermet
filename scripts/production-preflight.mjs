@@ -25,7 +25,7 @@ const EXPECTED_MIGRATIONS = [
   "20260722001700_operational_rls.sql",
   "20260727000100_manager_inspection_blocking_problem.sql",
   "20260728000100_availability_hold_atomicity.sql",
-  "20260813033600_security_definer_execute_lockdown.sql",
+  "20260813035252_security_definer_execute_lockdown.sql",
 ];
 
 // Supabase is the authoritative durable application/CRM store. Google Sheets
