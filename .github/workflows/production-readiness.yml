@@ -62,6 +62,9 @@ jobs:
       - name: Sheets mirror outbox contract
         run: npm run test:sheets-sync-outbox
 
+      - name: Sheets mirror worker contract
+        run: npm run test:sheets-sync-worker
+
       - name: Production preflight contract
         run: npm run test:production-preflight
 
