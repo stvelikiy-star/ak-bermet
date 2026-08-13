@@ -23,15 +23,24 @@ Therefore:
 - do not overwrite DNS, webroot, container, database, or booking data merely to publish the new Next.js site;
 - production cutover remains BLOCKED until the actual host/control plane and rollback path are known.
 
-## Supabase read-only discovery — 2026-08-13
+## Supabase dev discovery and hardening — 2026-08-13
 
-The connected Supabase account exposes project `ak-bermet-dev` (`ednqgzgjhnalsiiuekmw`), status `ACTIVE_HEALTHY`, PostgreSQL 17. Its migration ledger contains the exact first 18 migrations listed below through `20260728000100_availability_hold_atomicity`.
+The connected Supabase account exposes project `ak-bermet-dev` (`ednqgzgjhnalsiiuekmw`), status `ACTIVE_HEALTHY`, PostgreSQL 17. This project is treated as development only; its name and connection do not prove that it is the production Supabase project.
 
-Supabase Security Advisor additionally identified a privilege gap in that database: operational `SECURITY DEFINER` functions retained explicit `anon` EXECUTE grants despite earlier migrations revoking EXECUTE from `PUBLIC`. Advisor also identified mutable `search_path` warnings and `btree_gist` installed in the exposed `public` schema.
+Initial inspection found the first 18 approved migrations through `20260728000100_availability_hold_atomicity`. Supabase Security Advisor additionally identified a privilege gap: operational `SECURITY DEFINER` functions retained explicit `anon` EXECUTE grants despite earlier migrations revoking EXECUTE from `PUBLIC`. Advisor also identified mutable `search_path` warnings and `btree_gist` installed in the exposed `public` schema.
 
-Migration `20260813033600_security_definer_execute_lockdown.sql` was added to close those findings. The SQL was validated against the connected database inside a transaction that ended with `ROLLBACK`; no database change was persisted during validation.
+The hardening SQL was first validated against the connected database inside a transaction ending with `ROLLBACK`, confirming all function signatures and DDL before any persistent change. After repository CI passed and PR #15 merged, the hardening migration was applied to `ak-bermet-dev` through the Supabase migration API. Supabase assigned the actual ledger version `20260813035252`, so the repository filename and release contract use `20260813035252_security_definer_execute_lockdown.sql`.
 
-The project name `ak-bermet-dev` is evidence that this is a development project, not proof that it is the production Supabase project. Production identity still must be confirmed before production writes.
+Post-migration verification in `ak-bermet-dev` confirmed:
+
+- all operational `SECURITY DEFINER` functions have `anon EXECUTE = false`;
+- internal helper/trigger functions are not directly executable by `authenticated` and remain available to `service_role`;
+- intended staff RPCs remain executable by `authenticated` and `service_role` and rely on their internal role/assignment authorization checks;
+- all migration-19 search-path targets are pinned to `search_path = public, pg_temp`;
+- `btree_gist` is installed in the `extensions` schema, not exposed `public`;
+- Security Advisor no longer reports the earlier anonymous-execution, mutable-search-path, or extension-in-public findings; it still reports expected signed-in-user warnings for intentionally authenticated staff `SECURITY DEFINER` RPCs.
+
+The `ak-bermet-dev` migration ledger now contains all 19 approved migrations in the order listed below. Production identity still must be confirmed before any production write.
 
 ## Approved migration order
 
@@ -53,7 +62,7 @@ The project name `ak-bermet-dev` is evidence that this is a development project,
 16. `20260722001700_operational_rls.sql`
 17. `20260727000100_manager_inspection_blocking_problem.sql`
 18. `20260728000100_availability_hold_atomicity.sql`
-19. `20260813033600_security_definer_execute_lockdown.sql`
+19. `20260813035252_security_definer_execute_lockdown.sql`
 
 Never use `supabase db reset` against production. Never replay all migrations blindly. Apply only migrations proven missing from the production migration ledger, in filename order.
 
