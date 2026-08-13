@@ -27,6 +27,8 @@ test("outbox trigger queues only Supabase-to-Sheets identifiers, not row payload
   assert.match(lower, /'supabase_to_sheets'/);
   assert.match(lower, /v_entity_id := old\.id/);
   assert.match(lower, /v_entity_id := new\.id/);
+  assert.match(lower, /if tg_op = 'delete' then\s+return old;/);
+  assert.match(lower, /return new;/);
   assert.doesNotMatch(lower, /to_jsonb\((new|old)\)/);
   assert.doesNotMatch(lower, /sheets_to_supabase/);
 });
@@ -44,21 +46,29 @@ test("all approved direct mirror datasets enqueue transactionally", () => {
   }
 });
 
-test("claim RPC is bounded and concurrency-safe", () => {
+test("claim RPC is bounded, concurrency-safe, and recovers abandoned claims", () => {
+  assert.match(lower, /add column if not exists claimed_at timestamptz/);
+  assert.match(lower, /idx_sheets_sync_stale_claims/);
   assert.match(lower, /fn_claim_sheets_sync_batch/);
-  assert.match(lower, /p_limit < 1 or p_limit > 100/);
+  assert.match(lower, /p_limit is null or p_limit < 1 or p_limit > 100/);
   assert.match(lower, /for update skip locked/);
+  assert.match(lower, /q\.status = 'pending'/);
+  assert.match(lower, /q\.status = 'in_progress'/);
+  assert.match(lower, /q\.claimed_at is null or q\.claimed_at < now\(\) - interval '15 minutes'/);
   assert.match(lower, /status = 'in_progress'/);
   assert.match(lower, /attempts = q\.attempts \+ 1/);
+  assert.match(lower, /claimed_at = now\(\)/);
 });
 
 test("finish RPC records immutable attempt history and bounded retries", () => {
   assert.match(lower, /fn_finish_sheets_sync/);
   assert.match(lower, /insert into public\.sheets_sync_history/);
+  assert.match(lower, /p_max_attempts is null or p_max_attempts < 1 or p_max_attempts > 20/);
   assert.match(lower, /v_item\.attempts >= p_max_attempts/);
   assert.match(lower, /v_queue_status := 'pending'/);
   assert.match(lower, /v_queue_status := 'failed'/);
   assert.match(lower, /v_queue_status := 'success'/);
+  assert.match(lower, /claimed_at = null/);
   assert.match(lower, /left\(coalesce\(p_error/);
 });
 
