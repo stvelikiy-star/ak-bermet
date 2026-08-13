@@ -12,6 +12,7 @@
     "test:lead-durability": "node --test src/app/api/leads/route.contract.test.mjs",
     "test:room-public-catalog": "node --test src/data/room-public-catalog-v6.contract.test.mjs",
     "test:backup-contract": "node --test supabase/migrations/ak-bermet-production-backup.contract.test.mjs",
+    "test:supabase-security-contract": "node --test supabase/migrations/security-definer-execute.contract.test.mjs",
     "test:production-preflight": "node --test scripts/production-preflight.contract.test.mjs",
     "preflight:production": "node scripts/production-preflight.mjs --production-env",
     "dev": "next dev",
