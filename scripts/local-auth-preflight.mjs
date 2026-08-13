@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
-const fileArgIndex = args.indexOf("--env-file");
+const fileArgIndex = args.indexOf("--config-file");
 const envFile = resolve(
   root,
   fileArgIndex >= 0 && args[fileArgIndex + 1] ? args[fileArgIndex + 1] : ".env.local",
