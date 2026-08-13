@@ -23,6 +23,7 @@ test("mirror allowlist uses dedicated Supabase UUID columns and never appends in
     "buildings",
     "cleaning_tasks",
     "customers",
+    "leads",
     "maintenance_requests",
     "room_inspections",
     "room_units",
@@ -38,6 +39,11 @@ test("mirror allowlist uses dedicated Supabase UUID columns and never appends in
   assert.equal(MIRROR_CONFIG.room_units.idIndex, 1);
   assert.equal(MIRROR_CONFIG.room_units.allowAppend, false);
 
+  assert.equal(MIRROR_CONFIG.leads.sheet, "07_Лиды");
+  assert.equal(MIRROR_CONFIG.leads.idColumn, "B");
+  assert.equal(MIRROR_CONFIG.leads.idIndex, 1);
+  assert.equal(MIRROR_CONFIG.leads.syncIndex, 29);
+
   for (const [table, config] of Object.entries(MIRROR_CONFIG)) {
     assert.ok(config.idColumn, `${table} must have a dedicated UUID lookup column`);
     assert.ok(Number.isInteger(config.idIndex), `${table} must have a UUID column index`);
@@ -46,10 +52,7 @@ test("mirror allowlist uses dedicated Supabase UUID columns and never appends in
 
 test("Room Master source identity and daterange parsing are deterministic", () => {
   assert.equal(
-    extractRoomExternalId(
-      "V6_SOURCE_ID=AKB-C3-301; OWNER_CONFIRMED 2026-08-10",
-      "fallback",
-    ),
+    extractRoomExternalId("V6_SOURCE_ID=AKB-C3-301; OWNER_CONFIRMED 2026-08-10", "fallback"),
     "AKB-C3-301",
   );
   assert.equal(extractRoomExternalId("no source", "fallback"), "fallback");
@@ -66,6 +69,7 @@ test("column conversion supports UUID anchors beyond Z", () => {
   assert.equal(columnLetter(12), "M");
   assert.equal(columnLetter(25), "Z");
   assert.equal(columnLetter(26), "AA");
+  assert.equal(columnLetter(29), "AD");
 });
 
 test("room mirror updates only DB-owned operational cells and preserves owner/source columns", async () => {
@@ -100,13 +104,7 @@ test("dynamic rows always include their Supabase UUID anchor", async () => {
   const fixtures = {
     customers: { id: "c", created_at: "now", updated_at: "now" },
     bookings: { id: "b", booking_number: "BK-1", created_at: "now", updated_at: "now" },
-    booking_rooms: {
-      id: "br",
-      booking_id: "b",
-      room_unit_id: "r",
-      created_at: "now",
-      updated_at: "now",
-    },
+    booking_rooms: { id: "br", booking_id: "b", room_unit_id: "r", created_at: "now", updated_at: "now" },
     availability_holds: {
       id: "h",
       room_unit_id: "r",
@@ -117,12 +115,35 @@ test("dynamic rows always include their Supabase UUID anchor", async () => {
     cleaning_tasks: { id: "cl", room_unit_id: "r", created_at: "now", updated_at: "now" },
     maintenance_requests: { id: "m", room_unit_id: "r", created_at: "now", updated_at: "now" },
     room_inspections: { id: "i", room_unit_id: "r", created_at: "now" },
+    leads: { id: "lead", lead_number: "LD-1", created_at: "now", updated_at: "now" },
   };
 
   for (const [table, row] of Object.entries(fixtures)) {
     const patch = await buildMirrorPatch(table, row, lookup);
     assert.equal(patch[MIRROR_CONFIG[table].idIndex], row.id, `${table} UUID anchor`);
   }
+});
+
+test("lead mirror matches the dedicated 30-column contract without inventing a second identity", async () => {
+  const patch = await buildMirrorPatch("leads", {
+    id: "lead-uuid",
+    lead_number: "LD-2026-001",
+    created_at: "2026-08-13T06:00:00Z",
+    source: "website",
+    interest: "room",
+    status: "new",
+    name: "Example",
+    phone: "+996000000000",
+    children_ages: [4, 7],
+    wants_double_bed: true,
+    updated_at: "2026-08-13T06:00:00Z",
+  });
+
+  assert.equal(patch[0], "LD-2026-001");
+  assert.equal(patch[1], "lead-uuid");
+  assert.deepEqual(patch[12], [4, 7]);
+  assert.equal(patch[29], "SYNCED");
+  assert.equal(Object.keys(patch).every((index) => Number(index) >= 0 && Number(index) < 30), true);
 });
 
 test("relationship fields are resolved without overwriting unrelated business columns", async () => {
