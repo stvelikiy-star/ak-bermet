@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const migrationPath = resolve(
   import.meta.dirname,
-  "20260813054000_sheets_sync_outbox_plumbing.sql",
+  "20260813060026_sheets_sync_outbox_plumbing.sql",
 );
 const sql = readFileSync(migrationPath, "utf8");
 const lower = sql.toLowerCase();
