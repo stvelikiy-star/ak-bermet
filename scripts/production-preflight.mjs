@@ -27,7 +27,7 @@ const EXPECTED_MIGRATIONS = [
   "20260728000100_availability_hold_atomicity.sql",
   "20260813035252_security_definer_execute_lockdown.sql",
   "20260813060026_sheets_sync_outbox_plumbing.sql",
-  "20260813064000_leads_sheets_outbox.sql",
+  "20260813063603_leads_sheets_outbox.sql",
 ];
 
 const REQUIRED_PRODUCTION_ENV = [
