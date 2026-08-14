@@ -7,11 +7,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# TEMPORARY branch-scoped write permission only to let npm regenerate the
-# deterministic lockfile after the newly disclosed nanoid advisory. This
-# workflow change is reverted immediately after the lock commit lands.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: production-readiness-${{ github.ref }}
@@ -31,30 +28,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Reconcile patched nanoid lockfile
-        if: github.event_name == 'pull_request' && github.head_ref == 'agent/staff-roles-booking-chessboard-final'
-        run: |
-          set -euo pipefail
-          npm install --package-lock-only --ignore-scripts
-          if git diff --quiet -- package-lock.json; then
-            echo "LOCKFILE_ALREADY_CURRENT=YES"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "security: refresh lockfile for nanoid 3.3.18"
-            git push origin "HEAD:${GITHUB_HEAD_REF}"
-            echo "LOCKFILE_REFRESH_PUSHED=YES"
-          fi
 
       - name: Install dependencies
         run: npm ci
