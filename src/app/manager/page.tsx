@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import ManagerHeader from "@/components/manager/ManagerHeader";
 import ManagerStatCard from "@/components/manager/ManagerStatCard";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
@@ -66,7 +68,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function AccessPanel({ children }: { children: React.ReactNode }) {
+function AccessPanel({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       {children}
@@ -108,7 +110,7 @@ export default async function ManagerDashboard() {
       supabase.from("leads").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "in_progress"),
       supabase.from("bookings").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "pending_confirmation"),
       supabase.from("bookings").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "confirmed"),
-      supabase.from("cleaning_tasks").select("id", { count: "exact", head: true }).not("status", "in", "(completed,cancelled)"),
+      supabase.from("cleaning_tasks").select("id", { count: "exact", head: true }).not("status", "in", "(done,cancelled)"),
       supabase.from("maintenance_requests").select("id", { count: "exact", head: true }).eq("blocks_room", true).not("status", "in", "(completed,closed,cancelled)"),
     ]);
 
