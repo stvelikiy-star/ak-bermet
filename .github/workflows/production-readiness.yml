@@ -65,6 +65,9 @@ jobs:
       - name: Manual booking transaction contract
         run: npm run test:manual-booking
 
+      - name: Manager live-data contract
+        run: npm run test:manager-live-data
+
       - name: Sheets mirror outbox contract
         run: npm run test:sheets-sync-outbox
 

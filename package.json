@@ -15,6 +15,7 @@
     "test:backup-contract": "node --test supabase/migrations/ak-bermet-production-backup.contract.test.mjs",
     "test:supabase-security-contract": "node --test supabase/migrations/security-definer-execute.contract.test.mjs",
     "test:manual-booking": "node --test supabase/migrations/manual-booking-transaction.contract.test.mjs",
+    "test:manager-live-data": "node --test src/app/manager/manager-live-data.contract.test.mjs",
     "test:sheets-sync-outbox": "node --test supabase/migrations/sheets-sync-outbox.contract.test.mjs",
     "test:sheets-sync-worker": "node --test scripts/sheets-sync-worker.contract.test.mjs",
     "test:production-preflight": "node --test scripts/production-preflight.contract.test.mjs",
