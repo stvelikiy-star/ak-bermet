@@ -17,8 +17,10 @@ import {
 const NAV = [
   { href: "/manager", label: "Обзор", icon: IconCalendar },
   { href: "/manager/leads", label: "Заявки", icon: IconUsers },
+  { href: "/manager/chessboard", label: "Шахматка", icon: IconCalendar },
   { href: "/manager/availability", label: "Занятость", icon: IconBed },
   { href: "/manager/rooms", label: "Номерной фонд", icon: IconBed2 },
+  { href: "/manager/staff", label: "Сотрудники", icon: IconUsers },
   { href: "/manager/operations", label: "Операции", icon: IconClock },
   { href: "/manager/inspections", label: "Проверки", icon: IconEye },
   { href: "/manager/payments", label: "Оплаты", icon: IconGift },
@@ -34,7 +36,7 @@ export default function ManagerSidebar({
   const pathname = usePathname();
 
   return (
-    <nav className="flex h-full flex-col gap-1 p-4">
+    <nav className="flex h-full flex-col gap-1 overflow-y-auto p-4">
       <div className="mb-4 px-2">
         <p className="font-display text-lg font-semibold text-white">
           AK BERMET
