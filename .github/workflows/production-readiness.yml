@@ -68,6 +68,9 @@ jobs:
       - name: Manager live-data contract
         run: npm run test:manager-live-data
 
+      - name: Staff Auth provisioner contract
+        run: npm run test:staff-auth-provisioner
+
       - name: Sheets mirror outbox contract
         run: npm run test:sheets-sync-outbox
 
