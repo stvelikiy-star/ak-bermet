@@ -9,7 +9,7 @@ export type RoleName =
   | "technician";
 
 export const ROLE_LABELS: Record<RoleName, string> = {
-  owner: "Владелец",
+  owner: "Собственник",
   administrator: "Администратор",
   manager: "Менеджер",
   housekeeping: "Горничная",
