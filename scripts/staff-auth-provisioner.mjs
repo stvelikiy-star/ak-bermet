@@ -59,6 +59,7 @@ export function validateManifest(value) {
   const expectedBySlot = new Map(EXPECTED_STAFF_SLOTS.map((slot) => [slot.slot, slot]));
   const seenSlots = new Set();
   const seenEmails = new Set();
+  const seenPasswords = new Set();
   const normalized = [];
 
   for (const entry of value.slots) {
@@ -77,11 +78,13 @@ export function validateManifest(value) {
     if (password.length < 14 || password.length > 256) {
       throw new ProvisioningError("MANIFEST_PASSWORD_LENGTH_INVALID", slot);
     }
+    if (seenPasswords.has(password)) throw new ProvisioningError("MANIFEST_PASSWORD_DUPLICATE", slot);
     if (password.toLowerCase().includes(slot.toLowerCase()) || password.toLowerCase().includes(email.split("@")[0])) {
       throw new ProvisioningError("MANIFEST_PASSWORD_TOO_PREDICTABLE", slot);
     }
     seenSlots.add(slot);
     seenEmails.add(email);
+    seenPasswords.add(password);
     normalized.push({ ...expected, email, password });
   }
 
@@ -120,9 +123,15 @@ export function validateDevEnvironment(env = process.env) {
 
 export function readSecureManifest(path) {
   const absolute = resolve(path);
-  const linkStat = lstatSync(absolute);
+  let linkStat;
+  let fileStat;
+  try {
+    linkStat = lstatSync(absolute);
+    fileStat = statSync(absolute);
+  } catch {
+    throw new ProvisioningError("MANIFEST_UNAVAILABLE");
+  }
   if (!linkStat.isFile() || linkStat.isSymbolicLink()) throw new ProvisioningError("MANIFEST_PATH_UNSAFE");
-  const fileStat = statSync(absolute);
   if (process.platform !== "win32" && (fileStat.mode & 0o077) !== 0) {
     throw new ProvisioningError("MANIFEST_PERMISSIONS_UNSAFE");
   }
