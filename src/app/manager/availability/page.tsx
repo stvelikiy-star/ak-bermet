@@ -98,13 +98,6 @@ function Chessboard({ data }: { data: BookingChessboardData }) {
           </tr>
         </thead>
         <tbody>
-          {[...groups.entries()].map(([building, rooms]) => (
-            <tr key={`group-${building}`} className="contents">
-              <td colSpan={dates.length + 1} className="border-y border-gold/15 bg-emerald-deep px-3 py-2 font-semibold text-white">
-                {building} · {rooms.length} ном.
-              </td>
-            </tr>
-          )).flatMap(() => [])}
           {[...groups.entries()].flatMap(([building, rooms]) => [
             <tr key={`header-${building}`}>
               <td colSpan={dates.length + 1} className="border-y border-gold/15 bg-emerald-deep px-3 py-2 font-semibold text-white">
