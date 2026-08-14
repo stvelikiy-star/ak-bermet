@@ -71,6 +71,9 @@ jobs:
       - name: Staff Auth provisioner contract
         run: npm run test:staff-auth-provisioner
 
+      - name: Staff real-session UAT offline contract
+        run: node --experimental-strip-types --test src/lib/staff-real-session-uat.contract.test.mjs
+
       - name: Sheets mirror outbox contract
         run: npm run test:sheets-sync-outbox
 
