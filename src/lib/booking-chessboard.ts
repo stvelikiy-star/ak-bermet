@@ -23,9 +23,7 @@ export interface BookingChessboardData {
   occupancies: ChessboardOccupancy[];
 }
 
-type RawRange = string;
-
-function parseDateRange(value: RawRange): { start: string; endExclusive: string } | null {
+function parseDateRange(value: string): { start: string; endExclusive: string } | null {
   const match = /^\[([^,]+),([^\)]+)\)$/.exec(value);
   if (!match) return null;
   return { start: match[1], endExclusive: match[2] };
@@ -59,8 +57,7 @@ export async function loadBookingChessboard(
     supabase
       .from("occupancy_periods")
       .select("room_unit_id,period,period_type,status,booking_room_id")
-      .eq("status", "active")
-      .lt("period", `[${endExclusive},)`),
+      .eq("status", "active"),
   ]);
 
   if (roomsResult.error || occupancyResult.error) {
@@ -75,7 +72,13 @@ export async function loadBookingChessboard(
     operationalStatus: String(row.operational_status),
   }));
 
-  const bookingRoomIds = (occupancyResult.data ?? [])
+  const visibleRows = (occupancyResult.data ?? []).filter((row) => {
+    if (typeof row.period !== "string") return false;
+    const parsed = parseDateRange(row.period);
+    return Boolean(parsed && parsed.endExclusive > start && parsed.start < endExclusive);
+  });
+
+  const bookingRoomIds = visibleRows
     .map((row) => row.booking_room_id)
     .filter((value): value is string => typeof value === "string");
 
@@ -98,11 +101,10 @@ export async function loadBookingChessboard(
   }
 
   const occupancies: ChessboardOccupancy[] = [];
-  for (const row of occupancyResult.data ?? []) {
+  for (const row of visibleRows) {
     if (typeof row.period !== "string") continue;
     const parsed = parseDateRange(row.period);
     if (!parsed) continue;
-    if (parsed.endExclusive <= start || parsed.start >= endExclusive) continue;
 
     const type = String(row.period_type);
     const state: Exclude<ChessboardState, "free"> =
