@@ -17,7 +17,8 @@ import {
 const NAV = [
   { href: "/manager", label: "Обзор", icon: IconCalendar },
   { href: "/manager/leads", label: "Заявки", icon: IconUsers },
-  { href: "/manager/availability", label: "Занятость", icon: IconBed },
+  { href: "/manager/bookings", label: "Бронирования", icon: IconCalendar },
+  { href: "/manager/availability", label: "Шахматка", icon: IconBed },
   { href: "/manager/rooms", label: "Номерной фонд", icon: IconBed2 },
   { href: "/manager/operations", label: "Операции", icon: IconClock },
   { href: "/manager/inspections", label: "Проверки", icon: IconEye },
