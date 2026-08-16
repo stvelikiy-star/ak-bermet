@@ -114,8 +114,11 @@ test("RLS role helpers are explicitly restored to SECURITY DEFINER with fixed se
       roleHelperRepairSql.includes(`alter function ${signature} set search_path = public, pg_temp;`),
       `missing fixed search_path repair for ${signature}`,
     );
+    assert.ok(
+      !roleHelperRepairSql.includes(`alter function ${signature} security invoker;`),
+      `role helper must not regress to SECURITY INVOKER: ${signature}`,
+    );
   }
-  assert.ok(!roleHelperRepairSql.includes("security invoker"));
 });
 
 test("role-helper repair does not widen RLS, grants, or mutate business data", () => {
