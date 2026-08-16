@@ -11,7 +11,7 @@ const sql = readFileSync(migrationPath, "utf8").toLowerCase();
 
 const roleHelperRepairPath = resolve(
   import.meta.dirname,
-  "20260816165000_restore_role_helper_security_definer.sql",
+  "20260816165855_restore_role_helper_security_definer.sql",
 );
 const roleHelperRepairSql = readFileSync(roleHelperRepairPath, "utf8").toLowerCase();
 

@@ -1,5 +1,6 @@
 -- =====================================================================
 -- AK BERMET — Restore RLS role-helper execution context
+-- DEV ledger version: 20260816165855
 -- =====================================================================
 --
 -- DEV real-session UAT exposed a recursive RLS failure (PostgreSQL 54001):
