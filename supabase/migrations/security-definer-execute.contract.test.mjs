@@ -9,6 +9,12 @@ const migrationPath = resolve(
 );
 const sql = readFileSync(migrationPath, "utf8").toLowerCase();
 
+const roleHelperRepairPath = resolve(
+  import.meta.dirname,
+  "20260816165000_restore_role_helper_security_definer.sql",
+);
+const roleHelperRepairSql = readFileSync(roleHelperRepairPath, "utf8").toLowerCase();
+
 const staffRpcs = [
   "public.fn_mark_notification_read(uuid)",
   "public.fn_assign_staff(public.assignment_task_type, uuid, uuid)",
@@ -96,4 +102,36 @@ test("all advisor-flagged functions use a fixed search_path", () => {
 
 test("btree_gist is moved out of the exposed public schema", () => {
   assert.ok(sql.includes("alter extension btree_gist set schema extensions;"));
+});
+
+test("RLS role helpers are explicitly restored to SECURITY DEFINER with fixed search_path", () => {
+  for (const signature of ["public.has_role(public.role_name)", "public.is_staff()"]) {
+    assert.ok(
+      roleHelperRepairSql.includes(`alter function ${signature} security definer;`),
+      `missing SECURITY DEFINER repair for ${signature}`,
+    );
+    assert.ok(
+      roleHelperRepairSql.includes(`alter function ${signature} set search_path = public, pg_temp;`),
+      `missing fixed search_path repair for ${signature}`,
+    );
+    assert.ok(
+      !roleHelperRepairSql.includes(`alter function ${signature} security invoker;`),
+      `role helper must not regress to SECURITY INVOKER: ${signature}`,
+    );
+  }
+});
+
+test("role-helper repair does not widen RLS, grants, or mutate business data", () => {
+  for (const forbidden of [
+    "create policy",
+    "alter policy",
+    "drop policy",
+    "grant ",
+    "revoke ",
+    "insert into",
+    "update public.",
+    "delete from",
+  ]) {
+    assert.ok(!roleHelperRepairSql.includes(forbidden), `unexpected authority/data change: ${forbidden}`);
+  }
 });
