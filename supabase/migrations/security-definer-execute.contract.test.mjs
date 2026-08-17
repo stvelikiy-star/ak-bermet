@@ -15,6 +15,12 @@ const roleHelperRepairPath = resolve(
 );
 const roleHelperRepairSql = readFileSync(roleHelperRepairPath, "utf8").toLowerCase();
 
+const auditTriggerRepairPath = resolve(
+  import.meta.dirname,
+  "20260817031000_restore_audit_trigger_security_definer.sql",
+);
+const auditTriggerRepairSql = readFileSync(auditTriggerRepairPath, "utf8").toLowerCase();
+
 const staffRpcs = [
   "public.fn_mark_notification_read(uuid)",
   "public.fn_assign_staff(public.assignment_task_type, uuid, uuid)",
@@ -133,5 +139,37 @@ test("role-helper repair does not widen RLS, grants, or mutate business data", (
     "delete from",
   ]) {
     assert.ok(!roleHelperRepairSql.includes(forbidden), `unexpected authority/data change: ${forbidden}`);
+  }
+});
+
+test("append-only audit trigger helpers are restored to SECURITY DEFINER with fixed search_path", () => {
+  for (const signature of ["public.log_lead_status_change()", "public.log_booking_status_change()"]) {
+    assert.ok(
+      auditTriggerRepairSql.includes(`alter function ${signature} security definer;`),
+      `missing SECURITY DEFINER repair for ${signature}`,
+    );
+    assert.ok(
+      auditTriggerRepairSql.includes(`alter function ${signature} set search_path = public, pg_temp;`),
+      `missing fixed search_path repair for ${signature}`,
+    );
+    assert.ok(
+      !auditTriggerRepairSql.includes(`alter function ${signature} security invoker;`),
+      `audit trigger helper must not regress to SECURITY INVOKER: ${signature}`,
+    );
+  }
+});
+
+test("audit-trigger repair changes function mode only and does not touch RLS, grants, or business data", () => {
+  for (const forbidden of [
+    "create policy",
+    "alter policy",
+    "drop policy",
+    "grant ",
+    "revoke ",
+    "insert into",
+    "update public.",
+    "delete from",
+  ]) {
+    assert.ok(!auditTriggerRepairSql.includes(forbidden), `unexpected authority/data change: ${forbidden}`);
   }
 });

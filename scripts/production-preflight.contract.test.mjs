@@ -15,7 +15,7 @@ function run(args = [], env = process.env) {
 test("repository-only preflight is non-destructive and passes the approved migration/runtime contract", () => {
   const result = run();
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /migration chain is exact and ordered \(23 files\)/);
+  assert.match(result.stdout, /migration chain is exact and ordered \(24 files\)/);
   assert.match(result.stdout, /RESULT: PASS/);
   assert.match(result.stdout, /performs no network calls, backup, migration, deployment, or production writes/);
 });

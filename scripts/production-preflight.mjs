@@ -30,6 +30,7 @@ const EXPECTED_MIGRATIONS = [
   "20260813063603_leads_sheets_outbox.sql",
   "20260814082834_manual_booking_transaction_rpc.sql",
   "20260816165855_restore_role_helper_security_definer.sql",
+  "20260817031000_restore_audit_trigger_security_definer.sql",
 ];
 
 const REQUIRED_PRODUCTION_ENV = [
