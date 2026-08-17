@@ -17,7 +17,7 @@ const roleHelperRepairSql = readFileSync(roleHelperRepairPath, "utf8").toLowerCa
 
 const auditTriggerRepairPath = resolve(
   import.meta.dirname,
-  "20260817031000_restore_audit_trigger_security_definer.sql",
+  "20260817031654_restore_audit_trigger_security_definer.sql",
 );
 const auditTriggerRepairSql = readFileSync(auditTriggerRepairPath, "utf8").toLowerCase();
 
@@ -40,7 +40,7 @@ const staffRpcs = [
 const internalFunctions = [
   "public.fn_transition_room_status(uuid, public.room_operational_status, uuid, uuid, uuid, text)",
   "public.fn_notify_role(public.role_name, public.operational_notification_type, text, text, text, uuid)",
-  "public.fn_notify_user(uuid, public.operational_notification_type, text, text, text, uuid)",
+  "public.fn_notify_user(uuid, public.operational_notification_type, text, text, text, uuid)" ,
   "public.fn_checkout_creates_cleaning_task()",
   "public.fn_audit_row_change()",
   "public.fn_notify_inspection_failed()",
