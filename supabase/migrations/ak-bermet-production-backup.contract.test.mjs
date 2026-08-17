@@ -19,23 +19,36 @@ test("backup is operator-gated and uses the fixed private destination", () => {
   assert.match(script, /The backup root must not be a symbolic link/);
 });
 
-test("database secret is sent over stdin and is absent from Docker arguments", () => {
+test("database password is sent over stdin and absent from Docker/process arguments", () => {
   assert.match(
     script,
-    /printf '%s\\n' "\$database_url" \| docker run[\s\S]*?--interactive/
+    /printf '%s\\n' "\$database_password" \| docker run[\s\S]*?--interactive/
   );
-  assert.doesNotMatch(script, /--env ['"]?(?:PGDATABASE|PGPASSWORD)=/);
+  assert.doesNotMatch(script, /--env ['"]?PGPASSWORD=/);
   assert.doesNotMatch(script, /pg_dump[\s\\]*--dbname/);
-  assert.match(
-    script,
-    /IFS= read -r database_url[\s\S]*?PGDATABASE=\$database_url[\s\S]*?export PGDATABASE[\s\S]*?database_url=/
-  );
+  assert.match(script, /--env "PGHOST=\$\{database_host\}"/);
+  assert.match(script, /--env "PGPORT=\$\{database_port\}"/);
+  assert.match(script, /--env "PGUSER=\$\{database_user\}"/);
+  assert.match(script, /--env "PGDATABASE=\$\{database_name\}"/);
+  assert.match(script, /passfile=\/tmp\/ak-bermet\.pgpass/);
+  assert.match(script, /export PGPASSFILE="\$passfile"/);
+  assert.match(script, /chmod 0600 "\$passfile"/);
   const pgDumpAt = script.indexOf("    if ! pg_dump");
   const pgDumpEnd = script.indexOf('      2>"$error_file"; then', pgDumpAt);
   assert.ok(pgDumpAt >= 0 && pgDumpEnd > pgDumpAt);
-  assert.doesNotMatch(script.slice(pgDumpAt, pgDumpEnd), /\$database_url/);
+  assert.doesNotMatch(script.slice(pgDumpAt, pgDumpEnd), /\$database_password|\$database_url/);
   assert.match(script, /Refusing to run with shell tracing enabled/);
   assert.match(script, /unset AK_BERMET_DATABASE_URL/);
+  assert.match(script, /unset SUPABASE_DB_PASSWORD/);
+});
+
+test("Session Pooler URI is decomposed into non-secret libpq parameters", () => {
+  assert.match(script, /uri_rest=\$\{database_url#\*:\/\/\}/);
+  assert.match(script, /database_user=\$\{userinfo%%:\*\}/);
+  assert.match(script, /database_host=\$\{hostport%:\*\}/);
+  assert.match(script, /database_port=\$\{hostport##:\*\}/);
+  assert.match(script, /database_name=\$\{host_and_path#\*\/\}/);
+  assert.match(script, /database_url=''/);
 });
 
 test("Docker client enforces read-only transactions and a hardened container", () => {
@@ -90,6 +103,7 @@ test("missing approval fails before a supplied secret can be exposed", () => {
     env: {
       PATH: process.env.PATH ?? "",
       AK_BERMET_DATABASE_URL: `postgresql://backup:${sentinel}@example.invalid/db`,
+      SUPABASE_DB_PASSWORD: sentinel,
     },
   });
 
@@ -108,6 +122,7 @@ test("connection parameters cannot override read-only or TLS enforcement", () =>
       AK_BERMET_BACKUP_APPROVED: "YES",
       AK_BERMET_DATABASE_URL:
         `postgresql://backup:${sentinel}@example.invalid/db?sslmode=disable`,
+      SUPABASE_DB_PASSWORD: sentinel,
     },
   });
 
