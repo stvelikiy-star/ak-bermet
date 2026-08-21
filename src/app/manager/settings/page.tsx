@@ -133,8 +133,8 @@ export default function ManagerSettingsPage() {
             <Row label="Заезд" value="13:00" />
             <Row label="Выезд" value="11:00" />
             <Row
-              label="Отмена"
-              value="14+ дн. — 100%, 7–14 дн. — 50%, менее 7 дн. — сутки"
+              label="Отмена / возврат"
+              value="Не утверждено — старые 14+/7–14/<7 правила не применять"
             />
           </dl>
         </section>
