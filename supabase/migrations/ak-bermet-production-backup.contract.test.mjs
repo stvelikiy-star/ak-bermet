@@ -46,7 +46,7 @@ test("Session Pooler URI is decomposed into non-secret libpq parameters", () => 
   assert.match(script, /uri_rest=\$\{database_url#\*:\/\/\}/);
   assert.match(script, /database_user=\$\{userinfo%%:\*\}/);
   assert.match(script, /database_host=\$\{hostport%:\*\}/);
-  assert.match(script, /database_port=\$\{hostport##:\*\}/);
+  assert.match(script, /database_port=\$\{hostport##\*:\}/);
   assert.match(script, /database_name=\$\{host_and_path#\*\/\}/);
   assert.match(script, /database_url=''/);
 });
