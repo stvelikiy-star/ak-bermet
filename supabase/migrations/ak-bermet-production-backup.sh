@@ -5,6 +5,7 @@
 # Required environment (values must be supplied by the approved operator):
 #   AK_BERMET_BACKUP_APPROVED=YES
 #   AK_BERMET_DATABASE_URL=postgresql://...
+#   SUPABASE_DB_PASSWORD=...
 #
 # Optional, non-secret environment:
 #   AK_BERMET_POSTGRES_IMAGE=postgres:17-alpine
@@ -14,8 +15,8 @@
 
 set -Eeuo pipefail
 
-# Bash xtrace would expose the database URL when it is read or piped. Refuse it
-# before the secret is copied into a local variable.
+# Bash xtrace would expose secrets when they are read or piped. Refuse it
+# before either credential value is copied into a local variable.
 if [[ $- == *x* ]]; then
   set +x
   printf '%s\n' '[ak-bermet-backup] Refusing to run with shell tracing enabled.' >&2
@@ -55,6 +56,48 @@ esac
 [[ $database_url != *\?* ]] ||
   fail 'The database URL must not contain query parameters.' 64
 
+[[ -n ${SUPABASE_DB_PASSWORD:-} ]] ||
+  fail 'SUPABASE_DB_PASSWORD is required.' 64
+database_password=${SUPABASE_DB_PASSWORD}
+unset SUPABASE_DB_PASSWORD
+[[ $database_password != *$'\n'* && $database_password != *$'\r'* ]] ||
+  fail 'The database password contains an invalid line break.' 64
+
+# Parse only the non-secret connection identity from the URI. The password in
+# the URI is intentionally ignored: the raw password is delivered separately
+# over stdin and written only to an ephemeral 0600 pgpass file inside /tmp.
+uri_rest=${database_url#*://}
+[[ $uri_rest == *@*/* ]] || fail 'The database URL is missing user, host, or database components.' 64
+userinfo=${uri_rest%%@*}
+host_and_path=${uri_rest#*@}
+hostport=${host_and_path%%/*}
+database_name=${host_and_path#*/}
+[[ $userinfo == *:* ]] || fail 'The database URL must contain a user and password placeholder.' 64
+database_user=${userinfo%%:*}
+[[ -n $database_user && -n $hostport && -n $database_name && $database_name != "$host_and_path" ]] ||
+  fail 'The database URL is missing user, host, or database components.' 64
+
+case "$hostport" in
+  \[*\]:*)
+    database_host=${hostport%:*}
+    database_host=${database_host#[}
+    database_host=${database_host%]}
+    database_port=${hostport##*:}
+    ;;
+  *:*)
+    database_host=${hostport%:*}
+    database_port=${hostport##*:}
+    ;;
+  *)
+    fail 'The database URL must include an explicit TCP port.' 64
+    ;;
+esac
+[[ -n $database_host && $database_port =~ ^[0-9]+$ ]] ||
+  fail 'The database URL host or port is invalid.' 64
+[[ $database_name != */* ]] || fail 'The database URL database name is invalid.' 64
+
+database_url=''
+
 postgres_image=${AK_BERMET_POSTGRES_IMAGE:-$DEFAULT_POSTGRES_IMAGE}
 case "$postgres_image" in
   '' | -* | *[!a-zA-Z0-9_./:@-]*)
@@ -83,6 +126,7 @@ final_dir="${BACKUP_ROOT}/${backup_name}"
 cleanup() {
   local status=$?
   database_url=''
+  database_password=''
 
   if (( status != 0 )) && [[ -n ${staging_dir:-} && -d $staging_dir ]]; then
     case "$staging_dir" in
@@ -104,12 +148,13 @@ mkdir -m 0700 -- "$staging_dir" || fail 'Cannot create the staging directory.' 7
 
 log 'Starting approved read-only production backup.'
 
-# The secret is delivered over stdin, not in Docker argv or container metadata.
-# Inside the container it is exported as PGDATABASE instead of being passed as a
-# pg_dump argument, so it is not exposed in the process command line either.
-# PGOPTIONS makes every server transaction read-only before pg_dump starts its
-# own transaction.
-if ! printf '%s\n' "$database_url" | docker run \
+# The secret is delivered over stdin, never in Docker argv/container metadata
+# or the pg_dump command line. Inside the read-only container it is written to
+# an ephemeral 0600 pgpass file on tmpfs. Non-secret connection identity is
+# passed separately so Session Pooler URIs work without relying on PGDATABASE
+# URI expansion. PGOPTIONS makes every server transaction read-only before
+# pg_dump starts its own transaction.
+if ! printf '%s\n' "$database_password" | docker run \
   --rm \
   --interactive \
   --read-only \
@@ -118,17 +163,27 @@ if ! printf '%s\n' "$database_url" | docker run \
   --user "$(id -u):$(id -g)" \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
   --mount "type=bind,src=${staging_dir},dst=/backup" \
+  --env "PGHOST=${database_host}" \
+  --env "PGPORT=${database_port}" \
+  --env "PGUSER=${database_user}" \
+  --env "PGDATABASE=${database_name}" \
   --env 'PGOPTIONS=-c default_transaction_read_only=on' \
   --env 'PGSSLMODE=require' \
   --env 'PGCONNECT_TIMEOUT=20' \
   --env 'PGAPPNAME=ak-bermet-production-backup' \
   "$postgres_image" \
   sh -ceu '
-    IFS= read -r database_url
-    [ -n "$database_url" ] || exit 64
-    PGDATABASE=$database_url
-    export PGDATABASE
-    database_url=
+    IFS= read -r database_password
+    [ -n "$database_password" ] || exit 64
+
+    passfile=/tmp/ak-bermet.pgpass
+    escaped_password=$(printf "%s" "$database_password" | sed "s/\\\\/\\\\\\\\/g; s/:/\\\\:/g")
+    database_password=
+    umask 077
+    printf "%s:%s:%s:%s:%s\n" "$PGHOST" "$PGPORT" "$PGDATABASE" "$PGUSER" "$escaped_password" > "$passfile"
+    escaped_password=
+    chmod 0600 "$passfile"
+    export PGPASSFILE="$passfile"
 
     dump_file="/backup/$1"
     error_file=/tmp/pg_dump.stderr
@@ -140,10 +195,10 @@ if ! printf '%s\n' "$database_url" | docker run \
       --no-privileges \
       --file="$dump_file" \
       2>"$error_file"; then
-      rm -f -- "$error_file"
+      rm -f -- "$error_file" "$passfile"
       exit 70
     fi
-    rm -f -- "$error_file"
+    rm -f -- "$error_file" "$passfile"
 
     pg_restore --list "$dump_file" >/dev/null 2>&1
     cd /backup
@@ -154,7 +209,7 @@ if ! printf '%s\n' "$database_url" | docker run \
   fail 'Backup or archive validation failed; no backup was published.' 70
 fi
 
-database_url=''
+database_password=''
 mv --no-target-directory -- "$staging_dir" "$final_dir" ||
   fail 'Cannot publish the validated backup.' 73
 log "Backup validated and published at ${final_dir}."
