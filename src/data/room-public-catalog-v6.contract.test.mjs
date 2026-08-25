@@ -16,8 +16,8 @@ test("room and Garden public surfaces do not use Unsplash room imagery", () => {
   assert.doesNotMatch(rooms, /images\.unsplash\.com/);
   assert.doesNotMatch(roomsPage, /images\.unsplash\.com/);
   assert.doesNotMatch(gardenPage, /images\.unsplash\.com/);
-  assert.match(home, /title:\s*"Номера и коттеджи"[\s\S]*?img:\s*"\/images\/rooms\/photo-pending\.svg"/);
-  assert.match(home, /title:\s*"Garden Rooms 2026"[\s\S]*?img:\s*"\/images\/rooms\/photo-pending\.svg"/);
+  assert.match(home, /title:\s*"Номера и коттеджи"[\s\S]*?img:\s*"\/images\/hero\/rooms-hero\.png"/);
+  assert.match(home, /title:\s*"Garden Rooms 2026"[\s\S]*?img:\s*"\/images\/garden\/garden-01\.png"/);
 });
 
 test("public catalog contains the verified Room Master V6 structure", () => {
