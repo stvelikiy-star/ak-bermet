@@ -12,6 +12,14 @@ const files = [
 const contents = Object.fromEntries(
   files.map((path) => [path, fs.readFileSync(new URL(path, import.meta.url), "utf8")]),
 );
+const availabilityPage = fs.readFileSync(
+  new URL("./availability/page.tsx", import.meta.url),
+  "utf8",
+);
+const chessboardLoader = fs.readFileSync(
+  new URL("../../lib/booking-chessboard.ts", import.meta.url),
+  "utf8",
+);
 
 test("manager operational pages do not import demo manager-mock data", () => {
   for (const [path, source] of Object.entries(contents)) {
@@ -49,4 +57,14 @@ test("reports are computed from Supabase leads and bookings", () => {
   assert.match(source, /\.from\("leads"\)/);
   assert.match(source, /\.from\("bookings"\)/);
   assert.match(source, /Не равно фактически оплаченному/);
+});
+
+test("booking chessboard reads authoritative Supabase inventory without mock fallback", () => {
+  assert.match(availabilityPage, /loadBookingChessboard/);
+  assert.doesNotMatch(availabilityPage, /manager-mock|mockRooms|mockOccupancy/);
+  assert.match(chessboardLoader, /\.from\("room_units"\)/);
+  assert.match(chessboardLoader, /\.from\("occupancy_periods"\)/);
+  assert.match(chessboardLoader, /getCurrentStaff/);
+  assert.match(chessboardLoader, /BookingChessboardError\("READ_FAILED"\)/);
+  assert.doesNotMatch(chessboardLoader, /manager-mock|mockRooms|mockOccupancy/);
 });
