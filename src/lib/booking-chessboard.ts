@@ -1,27 +1,28 @@
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
-export type ChessboardState = "free" | "hold" | "booking" | "blocked";
+import {
+  chessboardStateForDate,
+  daysBetween,
+  parseDateRange,
+  type ChessboardPeriod,
+  type ChessboardRoom,
+  type ChessboardState,
+} from "@/lib/booking-chessboard-rules";
 
-export interface ChessboardRoom {
-  readonly id: string;
-  readonly building: string;
-  readonly roomNumber: string;
-  readonly floor: number | null;
-  readonly category: string;
-  readonly sellableStatus: string;
-  readonly operationalStatus: string;
-}
-
-export interface ChessboardPeriod {
-  readonly id: string;
-  readonly roomId: string;
-  readonly start: string;
-  readonly end: string;
-  readonly state: Exclude<ChessboardState, "free">;
-  readonly label: string;
-  readonly sourceId: string | null;
-}
+export {
+  chessboardStateForDate,
+  daysBetween,
+  parseDateRange,
+  periodOverlapsDate,
+  isRoomOperationallyBlocked,
+  isIsoDate,
+} from "@/lib/booking-chessboard-rules";
+export type {
+  ChessboardPeriod,
+  ChessboardRoom,
+  ChessboardState,
+} from "@/lib/booking-chessboard-rules";
 
 export interface BookingChessboardData {
   readonly rooms: readonly ChessboardRoom[];
@@ -80,48 +81,10 @@ interface HoldRow {
 
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
 const ACTIVE_BOOKING_STATUSES = new Set(["pending_confirmation", "confirmed", "checked_in"]);
-const OPERATIONALLY_BLOCKED = new Set(["maintenance_required", "maintenance_in_progress", "blocked"]);
 
 function firstRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
-}
-
-export function parseDateRange(value: string): { start: string; end: string } | null {
-  const match = /^\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})\)$/.exec(value);
-  if (!match) return null;
-  return { start: match[1], end: match[2] };
-}
-
-function isIsoDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
-}
-
-export function daysBetween(from: string, to: string): number {
-  if (!isIsoDate(from) || !isIsoDate(to)) return Number.NaN;
-  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
-}
-
-export function isRoomOperationallyBlocked(room: Pick<ChessboardRoom, "sellableStatus" | "operationalStatus">): boolean {
-  return room.sellableStatus !== "active" || OPERATIONALLY_BLOCKED.has(room.operationalStatus);
-}
-
-export function periodOverlapsDate(period: Pick<ChessboardPeriod, "start" | "end">, date: string): boolean {
-  return period.start <= date && date < period.end;
-}
-
-export function chessboardStateForDate(
-  room: ChessboardRoom,
-  periods: readonly ChessboardPeriod[],
-  date: string,
-): { state: ChessboardState; label: string } {
-  if (isRoomOperationallyBlocked(room)) {
-    return { state: "blocked", label: "Технически заблокирован" };
-  }
-
-  const active = periods.find((period) => period.roomId === room.id && periodOverlapsDate(period, date));
-  if (!active) return { state: "free", label: "Свободно" };
-  return { state: active.state, label: active.label };
 }
 
 export async function loadBookingChessboard(from: string, to: string): Promise<BookingChessboardData> {
