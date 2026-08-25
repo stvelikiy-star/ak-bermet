@@ -84,3 +84,8 @@ input:focus-visible {
   outline: 2px solid #c2a059;
   outline-offset: 2px;
 }
+
+/* Премиальный бренд-интро показывается один раз за сессию. */
+.ak-intro-seen .ak-brand-intro {
+  display: none !important;
+}

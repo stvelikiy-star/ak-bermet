@@ -31,7 +31,21 @@ export const AK_BERMET_EXTRA_CHARGES_2026 = {
   adult_additional_meals: 1800,
   deduct_meals_child: 1200,
   deduct_meals_adult: 1500,
-  parking_per_day: 100,
+
+  // Owner-confirmed AK BERMET rule:
+  // children aged 3 through 12 on a main place receive a 20% discount.
+  child_main_place_discount_age_from: 3,
+  child_main_place_discount_age_to_inclusive: 12,
+  child_main_place_discount_percent: 20,
+
+  // Owner-confirmed AK BERMET rule:
+  // when occupancy is below the room's official places,
+  // only the meal component for unused places is deducted.
+  under_occupancy_deduct_meals_only: true,
+
+  // Owner-confirmed seasonal rule. Exact summer date boundaries are not auto-derived here.
+  parking_summer_per_day: 150,
+  parking_other_seasons_per_day: 100,
   early_checkin_from: "06:00",
   early_checkin_surcharge_fraction_of_day: 0.5,
   late_checkout_until: "21:00",

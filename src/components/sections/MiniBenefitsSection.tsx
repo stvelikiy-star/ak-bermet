@@ -1,6 +1,9 @@
-import { miniBenefits } from "@/data/home";
+﻿import { miniBenefits } from "@/data/home";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 
-export default function MiniBenefitsSection() {
+export default async function MiniBenefitsSection() {
+  const locale = await getLocale();
   return (
     <section className="relative bg-emerald-900">
       <div className="grain absolute inset-0 opacity-50" aria-hidden />
@@ -15,7 +18,7 @@ export default function MiniBenefitsSection() {
                 <b.icon className="h-5 w-5" />
               </span>
               <span className="text-[13px] font-medium leading-tight text-white/85">
-                {b.label}
+                {t(b.label, locale)}
               </span>
             </div>
           ))}

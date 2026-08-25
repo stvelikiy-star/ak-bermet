@@ -3,6 +3,8 @@ import Logo from "@/components/ui/Logo";
 import { SITE, WA } from "@/data/site";
 import { FOOTER_NAV } from "@/data/navigation";
 import { LEGAL_PAGES } from "@/data/legal";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import {
 
   IconPhone,
@@ -16,7 +18,8 @@ import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 // Пока массив пуст — блок соцсетей не отображается (никаких "#"-заглушек).
 const SOCIAL_LINKS: { label: string; href: string }[] = [];
 
-export default function Footer() {
+export default async function Footer() {
+  const locale = await getLocale();
   return (
     <footer id="footer" className="relative bg-emerald-deep pt-16 text-white/80">
       <div className="grain absolute inset-0 opacity-50" aria-hidden />
@@ -26,7 +29,7 @@ export default function Footer() {
           <div>
             <Logo variant="light" />
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/60">
-              {SITE.footerText}
+              {t(SITE.footerText, locale)}
             </p>
             {SOCIAL_LINKS.length > 0 && (
               <div className="mt-5 flex gap-2.5">
@@ -66,7 +69,7 @@ export default function Footer() {
                 >
                   {SITE.springsPhoneDisplay}
                   <span className="ml-1 text-xs text-white/45">
-                    (источники)
+                    {t("(источники)", locale)}
                   </span>
                 </a>
               </li>
@@ -100,7 +103,7 @@ export default function Footer() {
                     href={item.href}
                     className="text-white/70 hover:text-gold-soft"
                   >
-                    {item.label}
+                    {t(item.label, locale)}
                   </Link>
                 </li>
               ))}
@@ -137,7 +140,7 @@ export default function Footer() {
                 </span>
               </div>
               <span className="flex items-center justify-center gap-1.5 bg-white/5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white/80 transition-colors group-hover:text-gold-soft">
-                Показать на карте (2GIS){" "}
+                {t("Показать на карте (2GIS)", locale)}{" "}
                 <IconArrowRight className="h-3.5 w-3.5" />
               </span>
             </a>
@@ -156,7 +159,7 @@ export default function Footer() {
                   href={doc.href}
                   className="text-white/70 hover:text-gold-soft"
                 >
-                  {doc.label}
+                  {t(doc.label, locale)}
                 </Link>
               </li>
             ))}
@@ -165,13 +168,15 @@ export default function Footer() {
 
         <div className="gold-rule" />
         <div className="flex flex-col items-center justify-between gap-3 py-6 text-xs text-white/50 sm:flex-row">
-          <p>© {new Date().getFullYear()} Ак-Бермет. Все права защищены.</p>
+          <p>
+            © {new Date().getFullYear()} {t("Ак-Бермет. Все права защищены.", locale)}
+          </p>
           <div className="flex gap-5">
             <Link href="/legal/public-offer" className="hover:text-gold-soft">
-              Публичная оферта
+              {t("Публичная оферта", locale)}
             </Link>
             <Link href="/legal/privacy" className="hover:text-gold-soft">
-              Политика конфиденциальности
+              {t("Политика конфиденциальности", locale)}
             </Link>
           </div>
         </div>

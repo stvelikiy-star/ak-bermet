@@ -3,9 +3,12 @@ import Container from "@/components/ui/Container";
 import SectionHeading from "@/components/ui/SectionHeading";
 import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
+import Photo from "@/components/ui/Photo";
 import EventLeadForm from "@/components/forms/EventLeadForm";
 import PriceCard from "@/components/ui/PriceCard";
 import { WA } from "@/data/site";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import {
   halls,
   suitableFor,
@@ -29,24 +32,40 @@ export const metadata: Metadata = {
     "Конференц-залы, проживание, питание, кофе-брейки и SPA для корпоративов, семинаров и тренингов на Иссык-Куле.",
 };
 
-export default function EventsPage() {
+
+const eventsGallery = [
+  { src: "/images/events/conference-hall-big-01.png", alt: "Большой конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-big-03.png", alt: "Большой конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-big-04.png", alt: "Большой конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-big-05.png", alt: "Большой конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-big-07.png", alt: "Большой конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-25p-01.png", alt: "Конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-25p-02.png", alt: "Конференц-зал AK BERMET" },
+  { src: "/images/events/conference-hall-25p-03.png", alt: "Конференц-зал AK BERMET" },
+  { src: "/images/events/conference-room-small-01.png", alt: "Переговорный зал AK BERMET" },
+  { src: "/images/events/conference-room-small-02.png", alt: "Переговорный зал AK BERMET" },
+];
+
+export default async function EventsPage() {
+  const locale = await getLocale();
+
   return (
     <main>
       <PageHero
-        badge="Деловые события"
-        title="Корпоративы и мероприятия на Иссык-Куле"
-        subtitle="Конференц-залы, проживание, питание, кофе-брейки, SPA и горячие источники в одном комплексе."
-        image="https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=2000&q=80"
-        cta={{ label: "Рассчитать мероприятие", href: WA.events }}
+        badge={t("Деловые события", locale)}
+        title={t("Корпоративы и мероприятия на Иссык-Куле", locale)}
+        subtitle={t("Конференц-залы, проживание, питание, кофе-брейки, SPA и горячие источники в одном комплексе.", locale)}
+        image="/images/events/conference-hall-big-02.png"
+        cta={{ label: t("Рассчитать мероприятие", locale), href: WA.events }}
       />
 
       {/* Кому подходит */}
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <SectionHeading
-            eyebrow="Форматы"
-            title="Подходит для"
-            subtitle="Комплекс хорошо подходит для зимнего сезона и корпоративных клиентов."
+            eyebrow={t("Форматы", locale)}
+            title={t("Подходит для", locale)}
+            subtitle={t("Комплекс хорошо подходит для зимнего сезона и корпоративных клиентов.", locale)}
             className="mb-12"
           />
           <div className="flex flex-wrap justify-center gap-3">
@@ -56,8 +75,31 @@ export default function EventsPage() {
                 className="inline-flex items-center gap-2 rounded-full border border-gold/25 bg-milk px-4 py-2 text-sm font-medium text-emerald-deep shadow-soft"
               >
                 <IconCheck className="h-4 w-4 text-gold-dark" />
-                {s}
+                {t(s, locale)}
               </span>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+
+      <section className="bg-cream py-16 sm:py-24">
+        <Container>
+          <SectionHeading
+            eyebrow={t("Фотогалерея", locale)}
+            title={t("Реальные фотографии AK BERMET", locale)}
+            subtitle={t("Только подтверждённые фотографии комплекса.", locale)}
+            className="mb-10"
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {eventsGallery.map((photo) => (
+              <Photo
+                key={photo.src}
+                src={photo.src}
+                alt={t(photo.alt, locale)}
+                className="aspect-[4/3] w-full overflow-hidden rounded-2xl"
+                imgClassName="transition-transform duration-500 hover:scale-105"
+              />
             ))}
           </div>
         </Container>
@@ -67,21 +109,21 @@ export default function EventsPage() {
       <section className="bg-beige py-16 sm:py-24">
         <Container>
           <SectionHeading
-            eyebrow="Конференц-залы"
-            title="Вместимость и стоимость"
+            eyebrow={t("Конференц-залы", locale)}
+            title={t("Вместимость и стоимость", locale)}
             className="mb-12"
           />
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {halls.map((h, i) => (
               <PriceCard
                 key={h.capacity}
-                title={h.capacity}
+                title={t(h.capacity, locale)}
                 icon={IconUsers}
                 rows={[
-                  { label: "Полный день", price: h.fullDay },
-                  { label: "Полдня", price: h.halfDay },
+                  { label: t("Полный день", locale), price: t(h.fullDay, locale) },
+                  { label: t("Полдня", locale), price: t(h.halfDay, locale) },
                 ]}
-                note={i === 0 ? hallsTimeNote : undefined}
+                note={i === 0 ? t(hallsTimeNote, locale) : undefined}
                 highlight={i === halls.length - 1}
               />
             ))}
@@ -92,7 +134,7 @@ export default function EventsPage() {
             <div className="rounded-2xl border border-gold/15 bg-milk p-6 shadow-soft">
               <h3 className="mb-4 flex items-center gap-2.5 font-display text-lg font-semibold text-emerald-deep">
                 <IconProjector className="h-5 w-5 text-gold-dark" />
-                Оборудование залов
+                {t("Оборудование залов", locale)}
               </h3>
               <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {equipmentList.map((e) => (
@@ -101,7 +143,7 @@ export default function EventsPage() {
                     className="flex items-start gap-2.5 text-sm text-muted"
                   >
                     <IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold-dark" />
-                    {e}
+                    {t(e, locale)}
                   </li>
                 ))}
               </ul>
@@ -110,10 +152,10 @@ export default function EventsPage() {
               <IconCoffee className="mt-0.5 h-6 w-6 shrink-0 text-gold-dark" />
               <div>
                 <h3 className="mb-1 font-display text-lg font-semibold text-emerald-deep">
-                  Кофе-брейк
+                  {t("Кофе-брейк", locale)}
                 </h3>
                 <p className="text-sm leading-relaxed text-muted">
-                  {coffeeBreak}
+                  {t(coffeeBreak, locale)}
                 </p>
               </div>
             </div>
@@ -130,15 +172,16 @@ export default function EventsPage() {
             </span>
             <div>
               <h3 className="mb-2 font-display text-xl font-semibold text-white">
-                Пакет под ключ
+                {t("Пакет под ключ", locale)}
               </h3>
               <p className="text-sm leading-relaxed text-white/75">
-                {corporatePackage}
+                {t(corporatePackage, locale)}
               </p>
             </div>
           </div>
         </Container>
       </section>
+
 
       {/* Форма заявки */}
       <section className="bg-cream py-16 sm:py-24">
@@ -148,9 +191,9 @@ export default function EventsPage() {
       </section>
 
       <PageCTA
-        title="Организуем ваше мероприятие"
-        text="Расскажите про формат, даты и число участников — подготовим условия по залам, проживанию и питанию."
-        cta={{ label: "Рассчитать мероприятие", href: WA.events }}
+        title={t("Организуем ваше мероприятие", locale)}
+        text={t("Расскажите про формат, даты и число участников — подготовим условия по залам, проживанию и питанию.", locale)}
+        cta={{ label: t("Рассчитать мероприятие", locale), href: WA.events }}
       />
     </main>
   );

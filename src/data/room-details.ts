@@ -26,6 +26,26 @@ const pendingGallery = (alt: string) => [
   },
 ];
 
+
+const verifiedRoomGallery = (
+  folder: string,
+  files: string[],
+  alt: string
+) =>
+  files.map((file) => ({
+    src: `/images/rooms/${folder}/${file}.webp`,
+    alt,
+  }));
+
+const verifiedGardenGallery = [
+  { src: "/images/garden/garden-02.png", alt: "Garden Rooms AK BERMET" },
+  { src: "/images/garden/garden-03.png", alt: "Garden Rooms AK BERMET" },
+  { src: "/images/garden/garden-04.png", alt: "Garden Rooms AK BERMET" },
+  { src: "/images/garden/garden-06.png", alt: "Garden Rooms AK BERMET" },
+  { src: "/images/garden/garden-07.png", alt: "Garden Rooms AK BERMET" },
+  { src: "/images/garden/garden-08.png", alt: "Garden Rooms AK BERMET" },
+];
+
 export const roomDetails: RoomDetail[] = [
   {
     // Slug сохранён для обратной совместимости со старой ссылкой.
@@ -57,9 +77,18 @@ export const roomDetails: RoomDetail[] = [
     conditions: [
       "Чётные номера: вид на природу; нечётные: двор / служебная сторона / стройка / забор.",
       "Конкретный номер и наличие подтверждает администратор.",
-      "Реальные фотографии будут опубликованы после загрузки подтверждённых материалов AK BERMET.",
+      "Фотографии ниже относятся к подтверждённому номеру 302 корпуса №1; другие номера корпуса могут отличаться.",
     ],
-    gallery: pendingGallery("Корпус №1"),
+    gallery: verifiedRoomGallery(
+      "building-1-room-302-2-bed",
+      [
+        "gallery-02-living-room-main",
+        "gallery-06-bedroom-twin-01",
+        "gallery-06-bedroom-twin-02",
+        "gallery-08-bathroom-main",
+      ],
+      "Корпус №1 — подтверждённый пример номера 302"
+    ),
     whatsappKey: "availability",
     metaDescription:
       "Корпус №1 AK BERMET: 24 номера, 55 официальных мест, до 78 мест с подтверждёнными дополнительными местами.",
@@ -73,6 +102,7 @@ export const roomDetails: RoomDetail[] = [
     description: [
       "По первичному реестру 2026 стандартный фонд корпуса №2 включает 36 двухместных номеров.",
       "В исходных данных конфигурация кроватей записана отдельными маркерами «одна» / «две», поэтому точную конфигурацию конкретного номера подтверждает администратор — без автоматической подмены на double/twin.",
+      "Фотографии ниже относятся к подтверждённому стандартному номеру 104 корпуса №2; другие номера категории могут отличаться.",
     ],
     facts: [
       { label: "Корпус", value: "№2" },
@@ -91,7 +121,16 @@ export const roomDetails: RoomDetail[] = [
       "Чётные номера: вид на природу; нечётные: двор / служебная сторона / стройка / забор.",
       "Конкретный номер и наличие подтверждает администратор.",
     ],
-    gallery: pendingGallery("Стандарт, корпус №2"),
+    gallery: verifiedRoomGallery(
+      "building-2-room-104-standard-2-bed",
+      [
+        "gallery-02-living-room-main",
+        "gallery-06-bedroom-twin-01",
+        "gallery-08-bathroom-main",
+        "gallery-12-balcony",
+      ],
+      "Стандарт корпуса №2 — подтверждённый номер 104"
+    ),
     whatsappKey: "availability",
     metaDescription:
       "Стандарт корпуса №2 AK BERMET: 36 двухместных номеров, подтверждённый номерной фонд 2026.",
@@ -105,6 +144,7 @@ export const roomDetails: RoomDetail[] = [
     description: [
       "По первичному реестру 2026 в корпусе №2 — 20 двухместных номеров категории люкс.",
       "Дополнительные места указаны построчно в реестре: часть люксов имеет +1 место, часть — +2 места. Всего по корпусу №2 подтверждено 28 дополнительных мест, все они учтены в Room Master V6.",
+      "Фотографии ниже относятся к подтверждённому люксу №101 корпуса №2; другие номера категории могут отличаться.",
     ],
     facts: [
       { label: "Корпус", value: "№2" },
@@ -123,7 +163,20 @@ export const roomDetails: RoomDetail[] = [
       "Чётные номера: вид на природу; нечётные: двор / служебная сторона / стройка / забор.",
       "Конфигурацию кроватей и дополнительных мест подтверждает администратор по номеру.",
     ],
-    gallery: pendingGallery("Люкс, корпус №2"),
+    gallery: verifiedRoomGallery(
+      "building-2-room-101-lux-2-bed",
+      [
+        "gallery-02-living-room-main",
+        "gallery-03-living-room-second-angle",
+        "gallery-04-bedroom-main",
+        "gallery-05-bedroom-second-angle",
+        "gallery-08-bathroom-main",
+        "gallery-12-balcony",
+        "gallery-13-details",
+        "gallery-13-details-02",
+      ],
+      "Люкс корпуса №2 — подтверждённый номер 101"
+    ),
     whatsappKey: "availability",
     metaDescription:
       "Люкс корпуса №2 AK BERMET: 20 двухместных номеров и подтверждённые дополнительные места по конкретным номерам.",
@@ -276,7 +329,7 @@ export const roomDetails: RoomDetail[] = [
       "Чётные номера: вид на природу; нечётные: двор / служебная сторона / стройка / забор.",
       "Конкретный номер и наличие подтверждает администратор.",
     ],
-    gallery: pendingGallery("Garden Rooms"),
+    gallery: verifiedGardenGallery,
     whatsappKey: "garden",
     metaDescription:
       "Garden Rooms AK BERMET: 32 подтверждённых двухместных номера в Garden 1 и Garden 2.",
@@ -290,6 +343,7 @@ export const roomDetails: RoomDetail[] = [
     description: [
       "Первичный реестр 2026 подтверждает 3 кирпичных двухместных коттеджа — 6 официальных мест.",
       "Деревянный фонд включает 14 объектов: 4 на 8 мест, 4 на 4 места, 4 на 2 места и 2 сруба на 7 мест. Итого деревянный фонд — 70 официальных мест и 10 подтверждённых дополнительных мест.",
+      "Фотогалерея ниже относится только к конкретному объекту «Сруб 1» и не смешивается с фотографиями других коттеджей.",
     ],
     facts: [
       { label: "Количество", value: "17 объектов" },
@@ -308,7 +362,22 @@ export const roomDetails: RoomDetail[] = [
       "Правило чётного/нечётного вида автоматически к коттеджам и срубам не применяется.",
       "Конкретный объект и наличие подтверждает администратор.",
     ],
-    gallery: pendingGallery("Коттеджи и срубы"),
+    gallery: verifiedRoomGallery(
+      "log-house-1",
+      [
+        "gallery-01-exterior",
+        "gallery-02-living-room-main",
+        "gallery-04-bedroom-main",
+        "gallery-06-bedroom-twin-01",
+        "gallery-06-bedroom-twin-02",
+        "gallery-06-bedroom-twin-03",
+        "gallery-07-kitchen",
+        "gallery-08-bathroom-main",
+        "gallery-11-stairs",
+        "gallery-13-details",
+      ],
+      "Сруб 1 — подтверждённая фотогалерея"
+    ),
     whatsappKey: "availability",
     metaDescription:
       "Коттеджи и срубы AK BERMET: 17 объектов — 3 кирпичных и 14 деревянных / срубов, 76 официальных мест.",

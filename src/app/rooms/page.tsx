@@ -10,6 +10,8 @@ import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import { WA } from "@/data/site";
 import { accommodationByType, roomsNotes } from "@/data/rooms";
 import { roomOverviewCards } from "@/data/room-details";
+import { getLocale } from "@/i18n/locale.server";
+import { t } from "@/i18n/dictionary";
 import {
   IconUsers,
   IconShield,
@@ -25,22 +27,24 @@ export const metadata: Metadata = {
   alternates: { canonical: "/rooms" },
 };
 
-export default function RoomsPage() {
+export default async function RoomsPage() {
+  const locale = await getLocale();
+
   return (
     <main>
       <PageHero
-        badge="Размещение"
-        title="Номера и коттеджи Ак-Бермет"
-        subtitle="Каталог синхронизирован с первичным реестром 2026. Реальные фотографии публикуются только после подтверждения материалов AK BERMET; наличие и конкретный номер подтверждает администратор."
-        image="/images/rooms/photo-pending.svg"
+        badge={t("Размещение", locale)}
+        title={t("Номера и коттеджи Ак-Бермет", locale)}
+        subtitle={t("Каталог синхронизирован с первичным реестром 2026. Используются только подтверждённые фотографии AK BERMET; наличие и конкретный номер подтверждает администратор.", locale)}
+        image="/images/hero/rooms-hero.png"
       />
 
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <SectionHeading
-            eyebrow="Категории"
-            title="Варианты проживания"
-            subtitle="Нажмите «Подробнее», чтобы увидеть подтверждённые количества, вместимость и ограничения. «Узнать наличие» — обращение к администратору."
+            eyebrow={t("Категории", locale)}
+            title={t("Варианты проживания", locale)}
+            subtitle={t("Нажмите «Подробнее», чтобы увидеть подтверждённые количества, вместимость и ограничения. «Узнать наличие» — обращение к администратору.", locale)}
             className="mb-12"
           />
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -52,43 +56,43 @@ export default function RoomsPage() {
                 <Link href={`/rooms/${card.slug}`} className="relative block">
                   <Photo
                     src={card.img}
-                    alt={card.alt}
+                    alt={t(card.alt, locale)}
                     className="aspect-[4/3] w-full"
                     imgClassName="group-hover:scale-105"
                   />
                   {card.badge && (
                     <span className="absolute left-3 top-3 rounded-full bg-gradient-to-b from-gold-soft to-gold px-3 py-1 text-[11px] font-semibold text-emerald-deep shadow-gold">
-                      {card.badge}
+                      {t(card.badge, locale)}
                     </span>
                   )}
                 </Link>
                 <div className="flex flex-1 flex-col p-5">
                   <h3 className="font-display text-xl font-semibold text-emerald-deep">
-                    {card.title}
+                    {t(card.title, locale)}
                   </h3>
                   <p className="mt-1 text-xs font-medium uppercase tracking-wide text-gold-dark">
-                    {card.building}
+                    {t(card.building, locale)}
                   </p>
                   <p className="mt-3 flex-1 text-sm leading-relaxed text-muted">
-                    {card.short}
+                    {t(card.short, locale)}
                   </p>
 
                   <ul className="mt-4 flex flex-wrap gap-2 text-[12px]">
                     <li className="inline-flex items-center gap-1.5 rounded-full bg-emerald-deep/5 px-2.5 py-1 text-emerald-deep">
                       <IconUsers className="h-3.5 w-3.5 text-gold-dark" />
-                      {card.capacity}
+                      {t(card.capacity, locale)}
                     </li>
                     <li className="inline-flex items-center gap-1.5 rounded-full bg-emerald-deep/5 px-2.5 py-1 text-emerald-deep">
                       <IconWifi className="h-3.5 w-3.5 text-gold-dark" />
                       {card.wifi === true
-                        ? "Wi-Fi есть"
+                        ? t("Wi-Fi есть", locale)
                         : card.wifi === false
-                          ? "Без Wi-Fi"
-                          : "Wi-Fi уточнить"}
+                          ? t("Без Wi-Fi", locale)
+                          : t("Wi-Fi уточнить", locale)}
                     </li>
                     <li className="inline-flex items-center gap-1.5 rounded-full bg-emerald-deep/5 px-2.5 py-1 text-emerald-deep">
                       <IconDish className="h-3.5 w-3.5 text-gold-dark" />
-                      Питание по тарифу
+                      {t("Питание по тарифу", locale)}
                     </li>
                   </ul>
 
@@ -97,7 +101,7 @@ export default function RoomsPage() {
                       href={`/rooms/${card.slug}`}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-deep px-5 py-2.5 text-sm font-semibold text-gold-soft transition-colors hover:bg-emerald-800"
                     >
-                      Подробнее <IconArrowRight className="h-4 w-4" />
+                      {t("Подробнее", locale)} <IconArrowRight className="h-4 w-4" />
                     </Link>
                     <a
                       href={WA[card.slug === "garden-lux" ? "garden" : "availability"]}
@@ -106,7 +110,7 @@ export default function RoomsPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-5 py-2.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
                     >
                       <WhatsAppIcon size={18} className="shrink-0" />
-                      Узнать наличие
+                      {t("Узнать наличие", locale)}
                     </a>
                   </div>
                 </div>
@@ -119,8 +123,8 @@ export default function RoomsPage() {
       <section className="bg-beige py-16 sm:py-24">
         <Container>
           <SectionHeading
-            eyebrow="Подбор под гостя"
-            title="Что выбрать?"
+            eyebrow={t("Подбор под гостя", locale)}
+            title={t("Что выбрать?", locale)}
             className="mb-12"
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -134,10 +138,10 @@ export default function RoomsPage() {
                 </span>
                 <div>
                   <p className="font-display text-base font-semibold text-emerald-deep">
-                    {a.type}
+                    {t(a.type, locale)}
                   </p>
                   <p className="mt-1 text-sm leading-relaxed text-muted">
-                    {a.text}
+                    {t(a.text, locale)}
                   </p>
                 </div>
               </div>
@@ -151,7 +155,7 @@ export default function RoomsPage() {
           <div className="mx-auto max-w-3xl rounded-2xl border border-gold/20 bg-milk p-6 shadow-soft sm:p-8">
             <h3 className="mb-5 flex items-center gap-2.5 font-display text-xl font-semibold text-emerald-deep">
               <IconShield className="h-6 w-6 text-gold-dark" />
-              Важно знать
+              {t("Важно знать", locale)}
             </h3>
             <ul className="space-y-3">
               {roomsNotes.map((n) => (
@@ -160,7 +164,7 @@ export default function RoomsPage() {
                   className="flex items-start gap-2.5 text-sm leading-relaxed text-muted"
                 >
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-                  {n}
+                  {t(n, locale)}
                 </li>
               ))}
             </ul>
@@ -175,9 +179,9 @@ export default function RoomsPage() {
       </section>
 
       <PageCTA
-        title="Подобрать номер"
-        text="Напишите нам в WhatsApp — администратор проверит наличие, конкретный номер и применимый тариф под ваши даты и количество гостей."
-        cta={{ label: "Узнать наличие номеров", href: WA.availability }}
+        title={t("Подобрать номер", locale)}
+        text={t("Напишите нам в WhatsApp — администратор проверит наличие, конкретный номер и применимый тариф под ваши даты и количество гостей.", locale)}
+        cta={{ label: t("Узнать наличие номеров", locale), href: WA.availability }}
       />
     </main>
   );

@@ -3,9 +3,12 @@ import Container from "@/components/ui/Container";
 import SectionHeading from "@/components/ui/SectionHeading";
 import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
+import Photo from "@/components/ui/Photo";
 import SpaLeadForm from "@/components/forms/SpaLeadForm";
 import PriceCard from "@/components/ui/PriceCard";
 import { SITE, WA } from "@/data/site";
+import { getLocale } from "@/i18n/locale.server";
+import { t } from "@/i18n/dictionary";
 import {
   springsFacts,
   wellInfo,
@@ -26,23 +29,34 @@ export const metadata: Metadata = {
     "Круглогодичные горячие минеральные источники Ак-Бермет на Иссык-Куле: бассейны, цены и условия посещения.",
 };
 
-export default function HotSpringsPage() {
+
+const springsGallery = [
+  { src: "/images/hot-springs/hot-springs-entrance-01.png", alt: "Горячие источники AK BERMET" },
+  { src: "/images/hot-springs/hot-springs-entrance-02.png", alt: "Горячие источники AK BERMET" },
+  { src: "/images/hot-springs/hot-springs-outdoor-pool-01.png", alt: "Термальный бассейн AK BERMET" },
+  { src: "/images/hot-springs/hot-springs-outdoor-pool-02.png", alt: "Термальный бассейн AK BERMET" },
+  { src: "/images/hot-springs/hot-springs-outdoor-pool-03.png", alt: "Термальный бассейн AK BERMET" },
+];
+
+export default async function HotSpringsPage() {
+  const locale = await getLocale();
+
   return (
     <main>
       <PageHero
-        badge="Термальный комплекс"
-        title="Горячие источники Ак-Бермет"
-        subtitle="Круглогодичный термальный комплекс с минеральной хлоридно-натриевой водой, 7 бассейнами и температурой воды до +44 °C."
-        image="https://images.unsplash.com/photo-1545389336-cf090694435e?auto=format&fit=crop&w=2000&q=80"
-        cta={{ label: "Уточнить посещение источников", href: WA.springs }}
+        badge={t("Термальный комплекс", locale)}
+        title={t("Горячие источники Ак-Бермет", locale)}
+        subtitle={t("Круглогодичный термальный комплекс с минеральной хлоридно-натриевой водой, 7 бассейнами и температурой воды до +44 °C.", locale)}
+        image="/images/hot-springs/hot-springs-main.png"
+        cta={{ label: t("Уточнить посещение источников", locale), href: WA.springs }}
       />
 
       {/* Факты */}
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <SectionHeading
-            eyebrow="О комплексе"
-            title="Что важно знать"
+            eyebrow={t("О комплексе", locale)}
+            title={t("Что важно знать", locale)}
             className="mb-12"
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -53,9 +67,32 @@ export default function HotSpringsPage() {
               >
                 <IconCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold-dark" />
                 <span className="text-sm font-medium text-emerald-deep">
-                  {f}
+                  {t(f, locale)}
                 </span>
               </div>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+
+      <section className="bg-cream py-16 sm:py-24">
+        <Container>
+          <SectionHeading
+            eyebrow={t("Фотогалерея", locale)}
+            title={t("Реальные фотографии AK BERMET", locale)}
+            subtitle={t("Только подтверждённые фотографии комплекса.", locale)}
+            className="mb-10"
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {springsGallery.map((photo) => (
+              <Photo
+                key={photo.src}
+                src={photo.src}
+                alt={t(photo.alt, locale)}
+                className="aspect-[4/3] w-full overflow-hidden rounded-2xl"
+                imgClassName="transition-transform duration-500 hover:scale-105"
+              />
             ))}
           </div>
         </Container>
@@ -70,9 +107,9 @@ export default function HotSpringsPage() {
             </span>
             <div>
               <h3 className="mb-2 font-display text-lg font-semibold text-emerald-deep">
-                Минеральная вода
+                {t("Минеральная вода", locale)}
               </h3>
-              <p className="text-sm leading-relaxed text-muted">{wellInfo}</p>
+              <p className="text-sm leading-relaxed text-muted">{t(wellInfo, locale)}</p>
             </div>
           </div>
         </Container>
@@ -83,15 +120,15 @@ export default function HotSpringsPage() {
         <Container>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <PriceCard
-              title="Стоимость посещения"
+              title={t("Стоимость посещения", locale)}
               icon={IconDrop}
-              rows={springsPricing}
-              note="Гости без проживания могут посещать источники платно, предварительная запись не требуется."
+              rows={springsPricing.map((r) => ({ label: t(r.label, locale), price: t(r.price, locale) }))}
+              note={t("Гости без проживания могут посещать источники платно, предварительная запись не требуется.", locale)}
             />
             <div className="rounded-2xl border border-gold/15 bg-milk p-6 shadow-soft">
               <h3 className="mb-4 flex items-center gap-2.5 font-display text-lg font-semibold text-emerald-deep">
                 <IconShield className="h-5 w-5 text-gold-dark" />
-                Правила посещения
+                {t("Правила посещения", locale)}
               </h3>
               <ul className="space-y-3">
                 {springsRules.map((r) => (
@@ -100,7 +137,7 @@ export default function HotSpringsPage() {
                     className="flex items-start gap-2.5 text-sm leading-relaxed text-muted"
                   >
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-                    {r}
+                    {t(r, locale)}
                   </li>
                 ))}
               </ul>
@@ -128,9 +165,9 @@ export default function HotSpringsPage() {
       </section>
 
       <PageCTA
-        title="Запланировать визит"
-        text="Напишите нам, чтобы уточнить часы работы и условия посещения горячих источников."
-        cta={{ label: "Уточнить посещение источников", href: WA.springs }}
+        title={t("Запланировать визит", locale)}
+        text={t("Напишите нам, чтобы уточнить часы работы и условия посещения горячих источников.", locale)}
+        cta={{ label: t("Уточнить посещение источников", locale), href: WA.springs }}
       />
     </main>
   );

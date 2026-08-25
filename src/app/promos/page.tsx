@@ -5,6 +5,8 @@ import PageCTA from "@/components/sections/PageCTA";
 import BookingLeadForm from "@/components/forms/BookingLeadForm";
 import { WA } from "@/data/site";
 import { promos, promosPlaceholder } from "@/data/promos";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import { IconGift, IconArrowRight } from "@/components/ui/icons";
 
 export const metadata: Metadata = {
@@ -14,15 +16,17 @@ export const metadata: Metadata = {
     "Сезонные предложения для отдыха, номеров и корпоративных заездов в комплексе AK BERMET на Иссык-Куле.",
 };
 
-export default function PromosPage() {
+export default async function PromosPage() {
+  const locale = await getLocale();
+
   return (
     <main>
       <PageHero
-        badge="Выгода"
-        title="Акции и специальные предложения"
-        subtitle="Сезонные предложения для отдыха, номеров и корпоративных заездов."
-        image="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=2000&q=80"
-        cta={{ label: "Уточнить актуальные акции", href: WA.promo31 }}
+        badge={t("Выгода", locale)}
+        title={t("Акции и специальные предложения", locale)}
+        subtitle={t("Сезонные предложения для отдыха, номеров и корпоративных заездов.", locale)}
+        image="/images/hero/home-hero.png"
+        cta={{ label: t("Уточнить актуальные акции", locale), href: WA.promo31 }}
       />
 
       <section className="bg-cream py-16 sm:py-24">
@@ -37,17 +41,17 @@ export default function PromosPage() {
                   <IconGift className="h-7 w-7" />
                 </span>
                 <span className="mt-5 inline-block rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-gold-soft">
-                  {p.badge}
+                  {t(p.badge, locale)}
                 </span>
                 <h2 className="mt-3 font-display text-2xl font-semibold text-white">
-                  {p.title}
+                  {t(p.title, locale)}
                 </h2>
                 <p className="mt-2 text-lg font-semibold text-gold-soft">
-                  {p.offer}
+                  {t(p.offer, locale)}
                 </p>
-                <p className="mt-2 text-sm text-white/75">{p.details}</p>
+                <p className="mt-2 text-sm text-white/75">{t(p.details, locale)}</p>
                 <p className="mt-3 text-xs leading-relaxed text-white/45">
-                  {p.note}
+                  {t(p.note, locale)}
                 </p>
                 <a
                   href={p.cta.href}
@@ -55,7 +59,7 @@ export default function PromosPage() {
                   rel="noopener noreferrer"
                   className="mt-5 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-6 py-3 text-sm font-semibold text-emerald-deep transition-transform hover:-translate-y-0.5"
                 >
-                  {p.cta.label} <IconArrowRight className="h-4 w-4" />
+                  {t(p.cta.label, locale)} <IconArrowRight className="h-4 w-4" />
                 </a>
               </div>
             ))}
@@ -66,11 +70,13 @@ export default function PromosPage() {
                 <IconGift className="h-6 w-6" />
               </span>
               <p className="font-display text-lg font-semibold text-emerald-deep">
-                {promosPlaceholder}
+                {t(promosPlaceholder, locale)}
               </p>
               <p className="mt-2 text-sm text-muted">
-                Следите за обновлениями или уточняйте актуальные предложения у
-                администратора.
+                {t(
+                  "Следите за обновлениями или уточняйте актуальные предложения у администратора.",
+                  locale,
+                )}
               </p>
             </div>
           </div>
@@ -83,16 +89,16 @@ export default function PromosPage() {
           <BookingLeadForm
             interest="promo"
             anchorId="promo-form"
-            title="Заявка по акции"
-            subtitle="Оставьте контакты — администратор подтвердит актуальность и условия акции."
+            title={t("Заявка по акции", locale)}
+            subtitle={t("Оставьте контакты — администратор подтвердит актуальность и условия акции.", locale)}
           />
         </Container>
       </section>
 
       <PageCTA
-        title="Уточнить актуальную акцию"
-        text="Актуальность предложения и условия подтверждает администратор. Напишите нам в WhatsApp."
-        cta={{ label: "Уточнить актуальные акции", href: WA.promo31 }}
+        title={t("Уточнить актуальную акцию", locale)}
+        text={t("Актуальность предложения и условия подтверждает администратор. Напишите нам в WhatsApp.", locale)}
+        cta={{ label: t("Уточнить актуальные акции", locale), href: WA.promo31 }}
       />
     </main>
   );

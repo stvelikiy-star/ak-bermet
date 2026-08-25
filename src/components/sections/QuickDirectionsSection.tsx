@@ -1,8 +1,11 @@
-import Photo from "@/components/ui/Photo";
+﻿import Photo from "@/components/ui/Photo";
 import { quickDirections } from "@/data/home";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import { IconArrowRight } from "@/components/ui/icons";
 
-export default function QuickDirectionsSection() {
+export default async function QuickDirectionsSection() {
+  const locale = await getLocale();
   return (
     <section
       id="directions"
@@ -10,7 +13,7 @@ export default function QuickDirectionsSection() {
     >
       <div className="mx-auto max-w-site px-4 sm:px-6 lg:px-8">
         <p className="mb-8 text-center text-[11px] font-semibold uppercase tracking-wider2 text-gold-dark">
-          Быстрый выбор · куда поедем
+          {t("Быстрый выбор · куда поедем", locale)}
         </p>
         <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 xl:grid-cols-6">
           {quickDirections.map((item) => (
@@ -24,7 +27,7 @@ export default function QuickDirectionsSection() {
                   <item.icon className="h-5 w-5" />
                 </span>
                 <span className="font-display text-[14px] font-semibold leading-tight text-emerald-deep">
-                  {item.title}
+                  {t(item.title, locale)}
                 </span>
               </div>
               <Photo
@@ -34,7 +37,7 @@ export default function QuickDirectionsSection() {
                 imgClassName="group-hover:scale-110"
               />
               <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-gold-dark opacity-0 transition-opacity group-hover:opacity-100">
-                Подробнее <IconArrowRight className="h-3.5 w-3.5" />
+                {t("Подробнее", locale)} <IconArrowRight className="h-3.5 w-3.5" />
               </span>
             </a>
           ))}
