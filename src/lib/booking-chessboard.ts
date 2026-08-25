@@ -113,7 +113,8 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
       .select(
         "id, room_unit_id, period, period_type, booking_room_id, availability_hold_id, room_block_id",
       )
-      .eq("status", "active"),
+      .eq("status", "active")
+      .overlaps("period", `[${from},${to})`),
   ]);
 
   if (roomsResult.error || occupancyResult.error || !roomsResult.data || !occupancyResult.data) {
