@@ -14,7 +14,7 @@ export const springs = {
   note: `Посещение для гостей без проживания возможно без предварительной записи. Для подробной информации по источникам: ${SITE.springsPhoneDisplay}.`,
   button: { label: "Подробнее об источниках", href: "/hot-springs" },
   waButton: { label: "Задать вопрос", href: WA.springs },
-  img: "https://images.unsplash.com/photo-1545389336-cf090694435e?auto=format&fit=crop&w=1000&q=80",
+  img: "/images/hot-springs/hot-springs-main.png",
   alt: "Горячие термальные источники под открытым небом",
 };
 
@@ -24,7 +24,7 @@ export const spa = {
   points: ["Бассейн", "Тренажёрный зал", "Релакс-зоны", "Wellness-процедуры"],
   button: { label: "Подробнее о SPA", href: "/spa" },
   waButton: { label: "Уточнить услуги", href: WA.spa },
-  img: "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=1000&q=80",
+  img: "/images/hero/spa-hero.png",
   alt: "SPA-комплекс AK BERMET",
 };
 

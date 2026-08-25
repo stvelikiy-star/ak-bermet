@@ -4,6 +4,8 @@ import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
 import GeneralLeadForm from "@/components/forms/GeneralLeadForm";
 import { SITE, WA } from "@/data/site";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import {
   IconPin,
 
@@ -19,15 +21,17 @@ export const metadata: Metadata = {
     "Контакты комплекса AK BERMET на Иссык-Куле: адрес, WhatsApp, телефон по источникам, карта 2GIS и как добраться.",
 };
 
-export default function ContactsPage() {
+export default async function ContactsPage() {
+  const locale = await getLocale();
+
   return (
     <main>
       <PageHero
-        badge="Контакты"
-        title="Контакты Ак-Бермет"
-        subtitle="Свяжитесь с нами для бронирования, вопросов по источникам, SPA и мероприятиям."
-        image="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=2000&q=80"
-        cta={{ label: "Написать в WhatsApp", href: WA.booking }}
+        badge={t("Контакты", locale)}
+        title={t("Контакты Ак-Бермет", locale)}
+        subtitle={t("Свяжитесь с нами для бронирования, вопросов по источникам, SPA и мероприятиям.", locale)}
+        image="/images/hero/contact-hero.png"
+        cta={{ label: t("Написать в WhatsApp", locale), href: WA.booking }}
       />
 
       <section className="bg-cream py-16 sm:py-24">
@@ -37,7 +41,7 @@ export default function ContactsPage() {
             <div className="space-y-6">
               <div className="rounded-2xl border border-gold/15 bg-milk p-6 shadow-soft sm:p-8">
                 <h2 className="mb-5 font-display text-xl font-semibold text-emerald-deep">
-                  Реквизиты
+                  {t("Реквизиты", locale)}
                 </h2>
                 <ul className="space-y-5 text-sm">
                   <li className="flex items-start gap-3">
@@ -47,7 +51,7 @@ export default function ContactsPage() {
                     </span>
                   </li>
                   <li className="flex items-center gap-3">
-                    <WhatsAppIcon size={20} className="shrink-0 shrink-0 text-gold-dark" />
+                    <WhatsAppIcon size={20} className="shrink-0 text-gold-dark" />
                     <a
                       href={`tel:+${SITE.phoneRaw}`}
                       className="text-ink/80 hover:text-emerald-deep"
@@ -63,7 +67,7 @@ export default function ContactsPage() {
                       className="text-ink/80 hover:text-emerald-deep"
                     >
                       {SITE.springsPhoneDisplay}{" "}
-                      <span className="text-xs text-muted">(источники)</span>
+                      <span className="text-xs text-muted">{t("(источники)", locale)}</span>
                     </a>
                   </li>
                   <li className="flex items-center gap-3">
@@ -80,10 +84,10 @@ export default function ContactsPage() {
 
               <div className="rounded-2xl border border-gold/15 bg-milk p-6 shadow-soft sm:p-8">
                 <h2 className="mb-3 font-display text-xl font-semibold text-emerald-deep">
-                  Как добраться
+                  {t("Как добраться", locale)}
                 </h2>
                 <p className="text-sm leading-relaxed text-muted">
-                  {SITE.directions}
+                  {t(SITE.directions, locale)}
                 </p>
                 <ul className="mt-4 space-y-2">
                   {SITE.distances.map((d) => (
@@ -92,7 +96,7 @@ export default function ContactsPage() {
                       className="flex items-start gap-2.5 text-sm text-emerald-deep"
                     >
                       <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-                      {d}
+                      {t(d, locale)}
                     </li>
                   ))}
                 </ul>
@@ -109,7 +113,7 @@ export default function ContactsPage() {
                   className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3.5 text-sm font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5"
                 >
                   <WhatsAppIcon size={16} className="shrink-0" />
-                  Написать в WhatsApp
+                  {t("Написать в WhatsApp", locale)}
                 </a>
                 <a
                   href={WA.availability}
@@ -117,7 +121,7 @@ export default function ContactsPage() {
                   rel="noopener noreferrer"
                   className="flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-milk px-5 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
                 >
-                  Узнать наличие
+                  {t("Узнать наличие", locale)}
                 </a>
               </div>
 
@@ -138,11 +142,11 @@ export default function ContactsPage() {
                     aria-hidden
                   />
                   <span className="relative flex items-center gap-2 font-display text-lg font-semibold text-gold-soft">
-                    <IconPin className="h-5 w-5" /> Ак-Бермет на карте
+                    <IconPin className="h-5 w-5" /> {t("Ак-Бермет на карте", locale)}
                   </span>
                 </div>
                 <span className="flex items-center justify-center gap-1.5 bg-milk py-3 text-sm font-semibold text-emerald-deep transition-colors group-hover:text-gold-dark">
-                  Открыть 2ГИС <IconArrowRight className="h-4 w-4" />
+                  {t("Открыть 2ГИС", locale)} <IconArrowRight className="h-4 w-4" />
                 </span>
               </a>
             </div>
@@ -158,9 +162,9 @@ export default function ContactsPage() {
       </section>
 
       <PageCTA
-        title="Готовы помочь с бронированием"
-        text="Напишите нам в WhatsApp — ответим на вопросы по номерам, источникам, SPA и мероприятиям."
-        cta={{ label: "Написать в WhatsApp", href: WA.booking }}
+        title={t("Готовы помочь с бронированием", locale)}
+        text={t("Напишите нам в WhatsApp — ответим на вопросы по номерам, источникам, SPA и мероприятиям.", locale)}
+        cta={{ label: t("Написать в WhatsApp", locale), href: WA.booking }}
       />
     </main>
   );

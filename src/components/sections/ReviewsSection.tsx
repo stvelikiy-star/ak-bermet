@@ -1,15 +1,21 @@
-import SectionHeading from "@/components/ui/SectionHeading";
+﻿import SectionHeading from "@/components/ui/SectionHeading";
 import { reviews } from "@/data/home";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import { IconHeart } from "@/components/ui/icons";
 
-export default function ReviewsSection() {
+export default async function ReviewsSection() {
+  const locale = await getLocale();
   return (
     <section className="bg-cream py-16 sm:py-24">
       <div className="mx-auto max-w-site px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="Что отмечают гости"
-          title="Отзывы гостей"
-          subtitle="Реальные отзывы добавляются по мере получения. Ниже — то, на что чаще всего обращают внимание гости."
+          eyebrow={t("Что отмечают гости", locale)}
+          title={t("Отзывы гостей", locale)}
+          subtitle={t(
+            "Реальные отзывы добавляются по мере получения. Ниже — то, на что чаще всего обращают внимание гости.",
+            locale
+          )}
           className="mb-10 sm:mb-14"
         />
 
@@ -23,11 +29,11 @@ export default function ReviewsSection() {
                 <IconHeart className="h-5 w-5" />
               </span>
               <blockquote className="flex-1 text-sm leading-relaxed text-ink/80">
-                {r.text}
+                {t(r.text, locale)}
               </blockquote>
               <figcaption className="mt-5 border-t border-gold/15 pt-4">
                 <span className="rounded-full bg-emerald-deep/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-gold-dark">
-                  {r.tag}
+                  {t(r.tag, locale)}
                 </span>
               </figcaption>
             </figure>

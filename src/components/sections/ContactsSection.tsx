@@ -1,21 +1,24 @@
-import SectionHeading from "@/components/ui/SectionHeading";
+﻿import SectionHeading from "@/components/ui/SectionHeading";
 import { SITE, WA } from "@/data/site";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
+import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import {
   IconPin,
-
+  IconWhatsApp,
   IconMail,
   IconPhone,
   IconArrowRight,
 } from "@/components/ui/icons";
-import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
-export default function ContactsSection() {
+export default async function ContactsSection() {
+  const locale = await getLocale();
   return (
     <section id="contacts" className="bg-cream py-16 sm:py-24">
       <div className="mx-auto max-w-site px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="Свяжитесь с нами"
-          title="Контакты"
+          eyebrow={t("Свяжитесь с нами", locale)}
+          title={t("Контакты", locale)}
           className="mb-12"
         />
 
@@ -30,7 +33,7 @@ export default function ContactsSection() {
                 </span>
               </li>
               <li className="flex items-center gap-3">
-                <WhatsAppIcon size={20} className="shrink-0 shrink-0 text-gold-dark" />
+                <IconWhatsApp className="h-5 w-5 shrink-0 text-gold-dark" />
                 <a
                   href={`tel:+${SITE.phoneRaw}`}
                   className="text-ink/80 hover:text-emerald-deep"
@@ -46,7 +49,7 @@ export default function ContactsSection() {
                   className="text-ink/80 hover:text-emerald-deep"
                 >
                   {SITE.springsPhoneDisplay}{" "}
-                  <span className="text-xs text-muted">(источники)</span>
+                  <span className="text-xs text-muted">{t("(источники)", locale)}</span>
                 </a>
               </li>
               <li className="flex items-center gap-3">
@@ -71,7 +74,7 @@ export default function ContactsSection() {
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3.5 text-sm font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5"
               >
                 <WhatsAppIcon size={16} className="shrink-0" />
-                Написать в WhatsApp
+                {t("Написать в WhatsApp", locale)}
               </a>
               <a
                 href={WA.availability}
@@ -79,7 +82,7 @@ export default function ContactsSection() {
                 rel="noopener noreferrer"
                 className="flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-milk px-5 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
               >
-                Узнать наличие
+                {t("Узнать наличие", locale)}
               </a>
             </div>
 
@@ -89,22 +92,19 @@ export default function ContactsSection() {
               rel="noopener noreferrer"
               className="group flex flex-1 flex-col overflow-hidden rounded-2xl border border-gold/15 shadow-soft"
             >
-              <div className="relative flex flex-1 items-center justify-center bg-gradient-to-br from-teal-700 via-emerald-800 to-emerald-deep p-8">
+              <div className="relative flex flex-1 items-center justify-center p-8">
                 <div
-                  className="absolute inset-0 opacity-25"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(rgba(255,255,255,.2) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.2) 1px,transparent 1px)",
-                    backgroundSize: "26px 26px",
-                  }}
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: "url('/images/hero/territory-hero.png')" }}
                   aria-hidden
                 />
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-deep/90 via-emerald-800/75 to-emerald-deep/60" />
                 <span className="relative flex items-center gap-2 font-display text-lg font-semibold text-gold-soft">
-                  <IconPin className="h-5 w-5" /> Ак-Бермет на карте
+                  <IconPin className="h-5 w-5" /> {t("Ак-Бермет на карте", locale)}
                 </span>
               </div>
               <span className="flex items-center justify-center gap-1.5 bg-milk py-3 text-sm font-semibold text-emerald-deep transition-colors group-hover:text-gold-dark">
-                Показать на карте (2GIS){" "}
+                {t("Показать на карте (2GIS)", locale)}{" "}
                 <IconArrowRight className="h-4 w-4" />
               </span>
             </a>

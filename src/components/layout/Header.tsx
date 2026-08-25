@@ -4,18 +4,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "@/components/ui/Logo";
+import LanguageSwitcher from "@/components/ui/LanguageSwitcher";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 import { SITE, WA } from "@/data/site";
 import { MAIN_NAV } from "@/data/navigation";
 import {
 
-  IconGlobe,
   IconMenu,
   IconClose,
-  IconChevronDown,
 } from "@/components/ui/icons";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
-export default function Header() {
+export default function Header({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
@@ -63,7 +64,7 @@ export default function Header() {
                 isActive(item.href) ? "text-gold-soft" : "text-white/80"
               }`}
             >
-              {item.label}
+              {t(item.label, locale)}
             </Link>
           ))}
         </nav>
@@ -78,7 +79,7 @@ export default function Header() {
           >
             <WhatsAppIcon size={16} className="shrink-0" />
             <span className="leading-tight">
-              Забронировать
+              {t("Забронировать", locale)}
               <span className="block text-[10px] font-medium opacity-80">
                 WhatsApp
               </span>
@@ -93,26 +94,20 @@ export default function Header() {
             className="flex items-center gap-1.5 rounded-full bg-gradient-to-b from-gold-soft to-gold px-4 py-2 text-xs font-semibold text-emerald-deep sm:hidden"
           >
             <WhatsAppIcon size={16} className="shrink-0" />
-            Бронь
+            {t("Бронь", locale)}
           </a>
 
           {/* Переключатель языка */}
-          <button
-            type="button"
-            className="hidden items-center gap-1 rounded-full border border-white/20 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:border-gold/60 hover:text-gold-soft lg:flex"
-            aria-label="Сменить язык"
-          >
-            <IconGlobe className="h-4 w-4" />
-            RU
-            <IconChevronDown className="h-3 w-3" />
-          </button>
+          <div className="hidden lg:block">
+            <LanguageSwitcher locale={locale} />
+          </div>
 
           {/* Бургер */}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white xl:hidden"
-            aria-label={open ? "Закрыть меню" : "Открыть меню"}
+            aria-label={open ? t("Закрыть меню", locale) : t("Открыть меню", locale)}
             aria-expanded={open}
           >
             {open ? (
@@ -139,7 +134,7 @@ export default function Header() {
                 isActive(item.href) ? "text-gold-soft" : "text-white/85"
               }`}
             >
-              {item.label}
+              {t(item.label, locale)}
             </Link>
           ))}
           <a
@@ -149,9 +144,12 @@ export default function Header() {
             className="mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3 text-sm font-semibold text-emerald-deep"
           >
             <WhatsAppIcon size={16} className="shrink-0" />
-            Забронировать через WhatsApp
+            {t("Забронировать через WhatsApp", locale)}
           </a>
           <p className="px-4 pt-3 text-xs text-white/50">{SITE.phoneDisplay}</p>
+          <div className="mt-3 border-t border-white/10 px-4 pt-4">
+            <LanguageSwitcher locale={locale} variant="mobile" />
+          </div>
         </nav>
       </div>
     </header>

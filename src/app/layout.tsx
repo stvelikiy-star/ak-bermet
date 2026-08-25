@@ -3,6 +3,10 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import AiChat from "@/components/AiChat";
+import BrandIntro from "@/components/BrandIntro";
+import ConditionalSiteChrome from "@/components/layout/ConditionalSiteChrome";
+import { htmlLangFor } from "@/i18n/locale";
+import { getLocale } from "@/i18n/locale.server";
 import { SITE } from "@/data/site";
 
 export const metadata: Metadata = {
@@ -46,14 +50,22 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="ru">
+    <html lang={htmlLangFor(locale)}>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(sessionStorage.getItem('akbermet_brand_intro_seen')==='1'){document.documentElement.classList.add('ak-intro-seen')}}catch(e){}",
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -62,10 +74,14 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <Header />
-        {children}
-        <Footer />
-        <AiChat />
+        <ConditionalSiteChrome
+          intro={<BrandIntro />}
+          header={<Header locale={locale} />}
+          footer={<Footer />}
+          aiChat={<AiChat />}
+        >
+          {children}
+        </ConditionalSiteChrome>
       </body>
     </html>
   );

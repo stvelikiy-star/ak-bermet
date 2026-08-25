@@ -1,17 +1,18 @@
-import SectionHeading from "@/components/ui/SectionHeading";
+﻿import SectionHeading from "@/components/ui/SectionHeading";
 import { foodIntro, schedule, venues } from "@/data/food";
-import { WA } from "@/data/site";
-import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
-import { IconClock, IconDish, IconArrowRight } from "@/components/ui/icons";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
+import { IconClock, IconDish } from "@/components/ui/icons";
 
-export default function FoodSection() {
+export default async function FoodSection() {
+  const locale = await getLocale();
   return (
     <section id="food" className="bg-cream py-16 sm:py-24">
       <div className="mx-auto max-w-site px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="Гастрономия"
-          title="Питание и рестораны"
-          subtitle={foodIntro}
+          eyebrow={t("Гастрономия", locale)}
+          title={t("Питание и рестораны", locale)}
+          subtitle={t(foodIntro, locale)}
           className="mb-12"
         />
 
@@ -21,7 +22,7 @@ export default function FoodSection() {
             <div className="rounded-2xl border border-gold/15 bg-milk p-6 shadow-soft">
               <h3 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold text-emerald-deep">
                 <IconClock className="h-5 w-5 text-gold-dark" />
-                Расписание питания
+                {t("Расписание питания", locale)}
               </h3>
               <ul className="divide-y divide-gold/10">
                 {schedule.map((s) => (
@@ -29,7 +30,7 @@ export default function FoodSection() {
                     key={s.meal}
                     className="flex items-center justify-between py-2.5 text-sm"
                   >
-                    <span className="text-emerald-deep">{s.meal}</span>
+                    <span className="text-emerald-deep">{t(s.meal, locale)}</span>
                     <span className="font-medium text-gold-dark">{s.time}</span>
                   </li>
                 ))}
@@ -49,9 +50,9 @@ export default function FoodSection() {
                 </span>
                 <div>
                   <h4 className="font-display text-base font-semibold text-emerald-deep">
-                    {v.name}
+                    {t(v.name, locale)}
                   </h4>
-                  <p className="mt-1 text-sm text-muted">{v.cuisine}</p>
+                  <p className="mt-1 text-sm text-muted">{t(v.cuisine, locale)}</p>
                   <p className="mt-1 text-xs font-medium text-gold-dark">
                     {v.time}
                   </p>
@@ -59,24 +60,6 @@ export default function FoodSection() {
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <a
-            href="/food"
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-7 py-3.5 text-sm font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5"
-          >
-            Подробнее о питании <IconArrowRight className="h-4 w-4" />
-          </a>
-          <a
-            href={WA.food}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-milk px-7 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
-          >
-            <WhatsAppIcon size={18} className="shrink-0" />
-            Уточнить меню
-          </a>
         </div>
       </div>
     </section>
