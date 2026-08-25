@@ -64,6 +64,7 @@ test("booking chessboard reads authoritative Supabase inventory without mock fal
   assert.doesNotMatch(availabilityPage, /manager-mock|mockRooms|mockOccupancy/);
   assert.match(chessboardLoader, /\.from\("room_units"\)/);
   assert.match(chessboardLoader, /\.from\("occupancy_periods"\)/);
+  assert.match(chessboardLoader, /\.overlaps\("period", `\[\$\{from\},\$\{to\}\)`\)/);
   assert.match(chessboardLoader, /getCurrentStaff/);
   assert.match(chessboardLoader, /BookingChessboardError\("READ_FAILED"\)/);
   assert.doesNotMatch(chessboardLoader, /manager-mock|mockRooms|mockOccupancy/);
