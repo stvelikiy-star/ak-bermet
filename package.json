@@ -14,7 +14,7 @@
     "test:room-public-catalog": "node --test src/data/room-public-catalog-v6.contract.test.mjs",
     "test:backup-contract": "node --test supabase/migrations/ak-bermet-production-backup.contract.test.mjs",
     "test:supabase-security-contract": "node --test supabase/migrations/security-definer-execute.contract.test.mjs",
-    "test:manual-booking": "node --test supabase/migrations/manual-booking-transaction.contract.test.mjs",
+    "test:manual-booking": "node --test supabase/migrations/manual-booking-transaction.contract.test.mjs src/app/api/manager/bookings/route.contract.test.mjs",
     "test:manager-live-data": "node --test src/app/manager/manager-live-data.contract.test.mjs",
     "test:staff-auth-provisioner": "node --test scripts/staff-auth-provisioner.contract.test.mjs",
     "test:sheets-sync-outbox": "node --test supabase/migrations/sheets-sync-outbox.contract.test.mjs",
