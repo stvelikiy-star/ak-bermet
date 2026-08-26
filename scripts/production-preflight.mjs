@@ -6,33 +6,6 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const migrationDir = resolve(root, "supabase/migrations");
 
-const EXPECTED_MIGRATIONS = [
-  "20260721000100_extensions_and_enums.sql",
-  "20260721000200_identity_and_roles.sql",
-  "20260721000300_inventory.sql",
-  "20260721000400_customers_leads.sql",
-  "20260721000500_booking_core.sql",
-  "20260721000600_booking_integrity.sql",
-  "20260721000700_audit_and_integrations.sql",
-  "20260721000800_rls_policies.sql",
-  "20260721000900_seed_reference_data.sql",
-  "20260722001100_operational_enums.sql",
-  "20260722001200_cleaning.sql",
-  "20260722001300_maintenance.sql",
-  "20260722001400_room_inspections.sql",
-  "20260722001500_attachments_and_history.sql",
-  "20260722001600_operational_automation.sql",
-  "20260722001700_operational_rls.sql",
-  "20260727000100_manager_inspection_blocking_problem.sql",
-  "20260728000100_availability_hold_atomicity.sql",
-  "20260813035252_security_definer_execute_lockdown.sql",
-  "20260813060026_sheets_sync_outbox_plumbing.sql",
-  "20260813063603_leads_sheets_outbox.sql",
-  "20260814082834_manual_booking_transaction_rpc.sql",
-  "20260816165855_restore_role_helper_security_definer.sql",
-  "20260817031654_restore_audit_trigger_security_definer.sql",
-];
-
 const REQUIRED_PRODUCTION_ENV = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -47,6 +20,21 @@ const failures = [];
 const pass = (message) => console.log(`PASS: ${message}`);
 const fail = (message) => failures.push(message);
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+
+const migrationManifest = JSON.parse(read("scripts/production-migrations-approved.json"));
+const expectedMigrations = Array.isArray(migrationManifest.migrations)
+  ? migrationManifest.migrations
+  : [];
+const migrationNamePattern = /^\d{14}_.+\.sql$/;
+const manifestValid =
+  migrationManifest.schema_version === 1 &&
+  expectedMigrations.length > 0 &&
+  expectedMigrations.every((name) => migrationNamePattern.test(name)) &&
+  new Set(expectedMigrations).size === expectedMigrations.length &&
+  JSON.stringify(expectedMigrations) === JSON.stringify([...expectedMigrations].sort());
+
+if (manifestValid) pass("approved production migration manifest is valid, unique, and ordered");
+else fail("approved production migration manifest is invalid, duplicated, or unordered");
 
 const packageJson = JSON.parse(read("package.json"));
 if (packageJson.engines?.node === ">=22.0.0") pass("Node runtime contract is >=22.0.0");
@@ -66,15 +54,26 @@ for (const path of [
 }
 
 const actualMigrations = readdirSync(migrationDir)
-  .filter((name) => /^\d{14}_.+\.sql$/.test(name))
+  .filter((name) => migrationNamePattern.test(name))
   .sort();
 
-if (JSON.stringify(actualMigrations) === JSON.stringify(EXPECTED_MIGRATIONS)) {
-  pass(`migration chain is exact and ordered (${EXPECTED_MIGRATIONS.length} files)`);
-} else {
-  fail(
-    `migration chain differs from the approved release set; expected ${EXPECTED_MIGRATIONS.length}, found ${actualMigrations.length}`,
-  );
+if (manifestValid) {
+  if (JSON.stringify(actualMigrations) === JSON.stringify(expectedMigrations)) {
+    pass(`migration chain is exact and ordered (${expectedMigrations.length} files)`);
+  } else {
+    const expectedSet = new Set(expectedMigrations);
+    const actualSet = new Set(actualMigrations);
+    const missing = expectedMigrations.filter((name) => !actualSet.has(name));
+    const unexpected = actualMigrations.filter((name) => !expectedSet.has(name));
+    const detail = [
+      `expected ${expectedMigrations.length}, found ${actualMigrations.length}`,
+      missing.length ? `missing: ${missing.join(", ")}` : null,
+      unexpected.length ? `unexpected: ${unexpected.join(", ")}` : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    fail(`migration chain differs from the approved release manifest; ${detail}`);
+  }
 }
 
 if (process.argv.includes("--production-env")) {

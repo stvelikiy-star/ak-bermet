@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
+const root = resolve(import.meta.dirname, "..");
 const script = resolve(import.meta.dirname, "production-preflight.mjs");
+const migrationDir = resolve(root, "supabase/migrations");
+const manifestPath = resolve(import.meta.dirname, "production-migrations-approved.json");
+const migrationNamePattern = /^\d{14}_.+\.sql$/;
 
 function run(args = [], env = process.env) {
   return spawnSync(process.execPath, [script, ...args], {
@@ -12,10 +17,25 @@ function run(args = [], env = process.env) {
   });
 }
 
+test("approved migration manifest exactly matches the ordered repository migration chain", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const actualMigrations = readdirSync(migrationDir)
+    .filter((name) => migrationNamePattern.test(name))
+    .sort();
+
+  assert.equal(manifest.schema_version, 1);
+  assert.ok(Array.isArray(manifest.migrations));
+  assert.ok(manifest.migrations.length > 0);
+  assert.equal(new Set(manifest.migrations).size, manifest.migrations.length);
+  assert.deepEqual(manifest.migrations, [...manifest.migrations].sort());
+  assert.deepEqual(manifest.migrations, actualMigrations);
+});
+
 test("repository-only preflight is non-destructive and passes the approved migration/runtime contract", () => {
   const result = run();
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /migration chain is exact and ordered \(24 files\)/);
+  assert.match(result.stdout, /approved production migration manifest is valid, unique, and ordered/);
+  assert.match(result.stdout, /migration chain is exact and ordered \(\d+ files\)/);
   assert.match(result.stdout, /RESULT: PASS/);
   assert.match(result.stdout, /performs no network calls, backup, migration, deployment, or production writes/);
 });
