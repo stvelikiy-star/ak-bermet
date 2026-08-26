@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { isIsoDate } from "@/lib/booking-chessboard-rules";
 
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
 const ALLOWED_SOURCES = new Set([
@@ -27,10 +28,6 @@ interface ManualBookingPayload {
   source: string;
   totalAmountKgs: number;
   notes?: string;
-}
-
-function isIsoDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
 
 function isUuid(value: string): boolean {
