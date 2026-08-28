@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Real AI (если включён) или mock — внутри уже есть fallback на mock.
+    // Mock работает только в явно выбранном mock-режиме. Real AI fail-closed.
     const base = await generateAIResponse({
       message,
       history: body.history,
@@ -35,7 +35,9 @@ export async function POST(request: Request) {
     });
 
     // Принудительный handoff по чувствительным темам.
-    const shouldHandoff = Boolean(base.shouldHandoff) || shouldForceHandoff(message, base.message);
+    const shouldHandoff =
+      Boolean(base.shouldHandoff) ||
+      shouldForceHandoff(message, base.message);
 
     // Если провайдер не вернул действия — добавляем по теме.
     const suggestedActions =
@@ -50,15 +52,18 @@ export async function POST(request: Request) {
       suggestedActions,
       shouldHandoff,
     });
-  } catch (error) {
-    console.error("[CHAT] route failed:", error);
+  } catch {
+    // Не логируем исходную ошибку: provider response может содержать
+    // чувствительные внутренние сведения. Клиент получает безопасный handoff.
+    console.error("[CHAT] AI response unavailable");
     return NextResponse.json(
       {
         ok: false,
         message:
           "Не удалось получить ответ. Попробуйте ещё раз или напишите администратору в WhatsApp.",
+        shouldHandoff: true,
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
 }
