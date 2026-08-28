@@ -1,5 +1,6 @@
 import ManagerHeader from "@/components/manager/ManagerHeader";
 import { SITE } from "@/data/site";
+import { LEGAL } from "@/data/legal";
 import { STAFF_SLOTS, STAFF_SLOT_TOTAL } from "@/data/staff-slots";
 import { ROLE_LABELS, type RoleName } from "@/types/auth";
 import { isGoogleSheetsEnabled } from "@/lib/google-sheets";
@@ -134,7 +135,9 @@ export default function ManagerSettingsPage() {
             <Row label="Выезд" value="11:00" />
             <Row
               label="Отмена"
-              value="14+ дн. — 100%, 7–14 дн. — 50%, менее 7 дн. — сутки"
+              value={LEGAL.refundTiers
+                .map((tier) => `${tier.term}: ${tier.result}`)
+                .join(" · ")}
             />
           </dl>
         </section>
