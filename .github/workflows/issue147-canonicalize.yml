@@ -1,0 +1,49 @@
+name: One-shot issue 147 canonicalization
+
+on:
+  push:
+    branches: [fix/issue-147-public-availability-supabase]
+
+permissions:
+  contents: write
+
+jobs:
+  canonicalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply exact scoped patch
+        run: python3 .github/issue147_patch.py
+
+      - name: Verify availability authority contract
+        run: node --test src/app/api/availability/route.contract.test.mjs
+
+      - name: Commit exact final scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          rm -f .github/issue147_patch.py .github/workflows/issue147-canonicalize.yml
+          git add -A
+
+          actual="$(git diff --cached --name-only origin/main | sort)"
+          expected="$(printf '%s\n' \
+            src/app/api/availability/route.contract.test.mjs \
+            src/app/api/availability/route.ts \
+            src/lib/availability.ts \
+            src/lib/supabase-admin.ts \
+            src/types/availability.ts | sort)"
+
+          echo '--- FINAL SCOPE ---'
+          printf '%s\n' "$actual"
+          test "$actual" = "$expected"
+          git diff --cached --check
+
+          git config user.name "ai-prof-repair-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix(availability): use Supabase as public authority"
+          git push origin HEAD:${GITHUB_REF_NAME}
