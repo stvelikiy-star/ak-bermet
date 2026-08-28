@@ -1,4 +1,4 @@
-// Модель доступности (готовится под Stage 05 — Google Sheets / CRM).
+// Модель доступности: Supabase — операционный источник истины; mock только для явного local dev/test режима.
 
 export type RoomStatus = "active" | "maintenance" | "do_not_sell";
 
@@ -9,6 +9,8 @@ export type BookingStatus =
   | "confirmed"
   | "checked_in"
   | "checking_out"
+  | "maintenance_block"
+  | "stop_sale"
   | "no_show"
   | "cancelled";
 
@@ -60,6 +62,8 @@ export const BLOCKING_BOOKING_STATUSES: readonly BookingStatus[] = [
   "confirmed",
   "checked_in",
   "checking_out",
+  "maintenance_block",
+  "stop_sale",
 ];
 
 // Параметры предварительной проверки наличия
