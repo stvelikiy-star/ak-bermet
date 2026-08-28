@@ -266,7 +266,7 @@ export async function loadAuthoritativeAvailability(
 '''
 if 'export async function loadAuthoritativeAvailability(' in supabase:
     raise SystemExit('authoritative availability reader already exists unexpectedly')
-supabase = supabase.rstrip() + append + '\n'
+supabase = supabase.rstrip() + append.rstrip() + '\n'
 supabase_path.write_text(supabase, encoding='utf-8')
 
 # ---- route contract ----
