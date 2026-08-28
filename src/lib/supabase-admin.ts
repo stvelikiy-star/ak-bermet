@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { OccupancyRecord, RoomUnit } from "@/types/availability";
 
 // Серверный клиент Supabase (Operational CRM).
 // ВАЖНО: использует Service Role ключ — импортировать этот модуль
@@ -207,4 +208,156 @@ export async function createAvailabilityHoldRpc(
   const row = normalizeAvailabilityHoldRow(raw);
   if (!row) throw new AvailabilityHoldRpcError(undefined);
   return row;
+}
+
+interface PublicAvailabilityRelationName {
+  name?: string | null;
+}
+
+interface PublicAvailabilityRoomRow {
+  id: string;
+  room_number: string;
+  floor: number | null;
+  max_capacity: number;
+  extra_places: number;
+  view_side: string;
+  has_wifi: boolean;
+  distance_to_spa_meters: number | null;
+  distance_to_beach_meters: number | null;
+  sellable_status: string;
+  operational_status: string;
+  notes: string | null;
+  buildings: PublicAvailabilityRelationName | PublicAvailabilityRelationName[] | null;
+  room_categories: PublicAvailabilityRelationName | PublicAvailabilityRelationName[] | null;
+}
+
+interface PublicAvailabilityOccupancyRow {
+  id: string;
+  room_unit_id: string;
+  period: string;
+  period_type: "booking" | "hold" | "maintenance_block" | "stop_sale";
+  availability_hold_id: string | null;
+}
+
+export class PublicAvailabilityReadError extends Error {
+  constructor() {
+    super("Authoritative public availability read failed");
+    this.name = "PublicAvailabilityReadError";
+  }
+}
+
+function firstPublicAvailabilityRelation<T>(value: T | T[] | null): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function parsePublicAvailabilityPeriod(period: string): { checkIn: string; checkOut: string } | null {
+  const match = /^\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})\)$/.exec(period);
+  if (!match) return null;
+  return { checkIn: match[1], checkOut: match[2] };
+}
+
+export async function loadAuthoritativeAvailability(
+  now: Date = new Date(),
+  client: SupabaseClient = getSupabaseAdminClient()
+): Promise<{ rooms: RoomUnit[]; occupancy: OccupancyRecord[] }> {
+  const [roomsResult, occupancyResult, activeHolds] = await Promise.all([
+    client
+      .from("room_units")
+      .select(
+        "id, room_number, floor, max_capacity, extra_places, view_side, has_wifi, distance_to_spa_meters, distance_to_beach_meters, sellable_status, operational_status, notes, buildings ( name ), room_categories ( name )"
+      )
+      .is("deleted_at", null),
+    client
+      .from("occupancy_periods")
+      .select("id, room_unit_id, period, period_type, availability_hold_id")
+      .eq("status", "active"),
+    listActiveAvailabilityHolds(
+      now,
+      client as unknown as AvailabilityHoldReadClient
+    ),
+  ]);
+
+  if (
+    roomsResult.error ||
+    occupancyResult.error ||
+    !roomsResult.data ||
+    !occupancyResult.data
+  ) {
+    throw new PublicAvailabilityReadError();
+  }
+
+  const activeHoldById = new Map(activeHolds.map((hold) => [hold.id, hold]));
+
+  const rooms: RoomUnit[] = (
+    roomsResult.data as unknown as PublicAvailabilityRoomRow[]
+  ).map((row) => {
+    const status: RoomUnit["status"] =
+      row.sellable_status !== "active"
+        ? "do_not_sell"
+        : row.operational_status === "ready"
+          ? "active"
+          : "maintenance";
+    const view: RoomUnit["view"] =
+      row.view_side === "preferred_nature"
+        ? "forest"
+        : row.view_side === "service_yard"
+          ? "yard"
+          : "other";
+
+    return {
+      id: row.id,
+      building:
+        firstPublicAvailabilityRelation(row.buildings)?.name ?? "Без корпуса",
+      floor: row.floor ?? undefined,
+      roomNumber: row.room_number,
+      category:
+        firstPublicAvailabilityRelation(row.room_categories)?.name ??
+        "Без категории",
+      capacity: row.max_capacity,
+      allowsExtraBed: row.extra_places > 0,
+      view,
+      hasWifi: row.has_wifi,
+      distanceToSpaMeters: row.distance_to_spa_meters ?? undefined,
+      distanceToBeachMeters: row.distance_to_beach_meters ?? undefined,
+      status,
+      notes: row.notes ?? undefined,
+    };
+  });
+
+  const occupancy: OccupancyRecord[] = [];
+  for (const row of occupancyResult.data as unknown as PublicAvailabilityOccupancyRow[]) {
+    const range = parsePublicAvailabilityPeriod(row.period);
+    if (!range) throw new PublicAvailabilityReadError();
+
+    if (row.period_type === "hold") {
+      if (!row.availability_hold_id) throw new PublicAvailabilityReadError();
+      const activeHold = activeHoldById.get(row.availability_hold_id);
+      if (!activeHold) continue;
+      occupancy.push({
+        id: row.id,
+        roomId: row.room_unit_id,
+        checkIn: range.checkIn,
+        checkOut: range.checkOut,
+        status: "pre_hold",
+        expiresAt: activeHold.expires_at,
+        source: "supabase",
+      });
+      continue;
+    }
+
+    occupancy.push({
+      id: row.id,
+      roomId: row.room_unit_id,
+      checkIn: range.checkIn,
+      checkOut: range.checkOut,
+      status:
+        row.period_type === "booking"
+          ? "confirmed"
+          : row.period_type,
+      source: "supabase",
+    });
+  }
+
+  return { rooms, occupancy };
 }

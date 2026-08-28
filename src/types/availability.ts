@@ -1,4 +1,4 @@
-// Модель доступности (готовится под Stage 05 — Google Sheets / CRM).
+// Модель доступности: Supabase — операционный источник истины; mock только для явного local dev/test режима.
 
 export type RoomStatus = "active" | "maintenance" | "do_not_sell";
 
@@ -11,6 +11,9 @@ export type BookingStatus =
   | "checking_out"
   | "no_show"
   | "cancelled";
+
+// Технические блоки относятся к occupancy, а не к бизнес-графу переходов брони.
+export type OccupancyStatus = BookingStatus | "maintenance_block" | "stop_sale";
 
 export interface RoomUnit {
   id: string;
@@ -36,7 +39,7 @@ export interface OccupancyRecord {
   roomId: string;
   checkIn: string;
   checkOut: string;
-  status: BookingStatus;
+  status: OccupancyStatus;
   guestName?: string;
   guestPhone?: string;
   source?: string;
@@ -53,13 +56,15 @@ export interface OccupancyRecord {
 export const HOLD_DURATION_MINUTES = 60;
 
 // Статусы занятости, которые блокируют номер от повторного бронирования.
-export const BLOCKING_BOOKING_STATUSES: readonly BookingStatus[] = [
+export const BLOCKING_BOOKING_STATUSES: readonly OccupancyStatus[] = [
   "pre_hold",
   "waiting_prepayment",
   "paid",
   "confirmed",
   "checked_in",
   "checking_out",
+  "maintenance_block",
+  "stop_sale",
 ];
 
 // Параметры предварительной проверки наличия

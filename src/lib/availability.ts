@@ -11,7 +11,7 @@ import {
   BLOCKING_BOOKING_STATUSES,
 } from "@/types/availability";
 
-// TODO Stage 05: replace mock availability with Google Sheets API integration.
+// Mock inventory is a local development/test aid only. Non-mock availability is loaded from authoritative Supabase server-side.
 
 // Demo-данные номерного фонда (НЕ реальная доступность).
 export const mockRooms: RoomUnit[] = [

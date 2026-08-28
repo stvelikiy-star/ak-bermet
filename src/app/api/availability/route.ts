@@ -9,18 +9,12 @@ import {
   AvailabilityError,
   AVAILABILITY_MESSAGE,
 } from "@/lib/availability";
-import {
-  isGoogleSheetsEnabled,
-  isLocalMockAvailabilityAllowed,
-  getRoomsFromSheet,
-  getOccupancyFromSheet,
-} from "@/lib/google-sheets";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import {
   AvailabilityHoldRpcError,
   availabilityHoldRpcHttpStatus,
   createAvailabilityHoldRpc,
-  listActiveAvailabilityHolds,
+  loadAuthoritativeAvailability,
 } from "@/lib/supabase-admin";
 import type {
   AvailabilityQuery,
@@ -69,75 +63,36 @@ function errorStatus(code: AvailabilityErrorCode): number {
   }
 }
 
-// Загружает номера и занятость. Если реальный номерной фонд доступен, но
-// занятость по нему прочитать не удалось, НЕ считаем номера свободными —
-// иначе доступность и удержания строились бы на неполных данных (fail-open,
-// см. Codex-аудит). В этом случае бросаем явную ошибку availability_unknown.
+// Mock availability is allowed only when explicitly selected in a local
+// development/test runtime. Any non-mock runtime uses Supabase authority.
+function isExplicitLocalMockAvailabilityAllowed(): boolean {
+  const localRuntime =
+    process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  return localRuntime && process.env.AVAILABILITY_SOURCE === "mock";
+}
+
+// Production/non-mock availability is derived only from authoritative
+// Supabase room_units + occupancy_periods, with active durable holds verified
+// against their expiry. Any authority read failure fails closed.
 async function loadRoomsAndOccupancy(): Promise<{
   rooms: typeof mockRooms;
   occupancy: typeof mockOccupancy;
-  source: "sheets" | "mock";
+  source: "supabase" | "mock";
 }> {
-  if (isGoogleSheetsEnabled()) {
-    const [roomsResult, occupancyResult, holdsResult] = await Promise.allSettled([
-      getRoomsFromSheet(),
-      getOccupancyFromSheet(),
-      listActiveAvailabilityHolds(),
-    ]);
-    if (roomsResult.status === "rejected") {
-      console.error(
-        "[AVAILABILITY] Room inventory read failed:",
-        roomsResult.reason
-      );
-      throw new AvailabilityError(
-        "availability_unknown",
-        "Не удалось прочитать номерной фонд. Повторите запрос позже."
-      );
-    }
-    if (occupancyResult.status === "rejected") {
-      console.error(
-        "[AVAILABILITY] Occupancy read failed:",
-        occupancyResult.reason
-      );
-      throw new AvailabilityError(
-        "availability_unknown",
-        "Не удалось проверить занятость номеров. Повторите запрос позже."
-      );
-    }
-    if (holdsResult.status === "rejected") {
-      console.error("[AVAILABILITY] Durable holds read failed");
-      throw new AvailabilityError(
-        "availability_unknown",
-        "Не удалось проверить удержания номеров. Повторите запрос позже."
-      );
-    }
-    // Реальный номерной фонд настроен — используем его как есть, даже если
-    // лист пуст. Подмена fabricated mock-номерами здесь была бы fail-open:
-    // клиент получил бы выдуманные варианты вместо честного пустого списка.
-    return {
-      rooms: roomsResult.value,
-      occupancy: [
-        ...occupancyResult.value,
-        ...holdsResult.value.map((hold) => ({
-          id: hold.id,
-          roomId: hold.room_unit_id,
-          checkIn: hold.check_in,
-          checkOut: hold.check_out,
-          status: "pre_hold" as const,
-          expiresAt: hold.hold_expires_at ?? hold.expires_at,
-          source: "supabase",
-        })),
-      ],
-      source: "sheets",
-    };
+  if (isExplicitLocalMockAvailabilityAllowed()) {
+    return { rooms: mockRooms, occupancy: mockOccupancy, source: "mock" };
   }
-  if (!isLocalMockAvailabilityAllowed()) {
+
+  try {
+    const { rooms, occupancy } = await loadAuthoritativeAvailability();
+    return { rooms, occupancy, source: "supabase" };
+  } catch {
+    console.error("[AVAILABILITY] Authoritative Supabase read failed");
     throw new AvailabilityError(
       "availability_unknown",
-      "Источник доступности не настроен. Обратитесь к администратору."
+      "Не удалось проверить доступность номеров. Повторите запрос позже."
     );
   }
-  return { rooms: mockRooms, occupancy: mockOccupancy, source: "mock" };
 }
 
 // Предварительная проверка наличия. Финальное наличие всегда подтверждает
@@ -264,7 +219,7 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  if (source === "sheets") {
+  if (source === "supabase") {
     const staff = await getCurrentStaff();
     if (!staff) {
       return NextResponse.json(
