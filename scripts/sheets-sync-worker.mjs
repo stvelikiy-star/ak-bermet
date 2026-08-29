@@ -23,14 +23,13 @@ export const MIRROR_CONFIG = Object.freeze({
   maintenance_requests: { sheet: "Ремонт", idColumn: "B", idIndex: 1, width: 26, allowAppend: true, syncIndex: 25 },
   room_inspections: { sheet: "10_Проверки", idColumn: "B", idIndex: 1, width: 20, allowAppend: true, syncIndex: 18 },
   leads: { sheet: "07_Лиды", idColumn: "B", idIndex: 1, width: 30, allowAppend: true, syncIndex: 29 },
+  booking_payments: { sheet: "Оплаты", idColumn: "B", idIndex: 1, width: 21, allowAppend: true, syncIndex: 17 },
 });
 
 const yesNo = (value) => (value ? "Да" : "Нет");
 const cell = (value) => {
   if (value === null || value === undefined) return "";
-  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-    return JSON.stringify(value);
-  }
+  if (Array.isArray(value) || (typeof value === "object" && value !== null)) return JSON.stringify(value);
   return value;
 };
 
@@ -57,192 +56,70 @@ export function columnLetter(index) {
   return result;
 }
 
+function paymentNote(row) {
+  const notes = String(row.notes ?? "").trim();
+  const voidReason = String(row.void_reason ?? "").trim();
+  if (row.status !== "void" || !voidReason) return notes;
+  return [notes, `АННУЛИРОВАНО: ${voidReason}`].filter(Boolean).join(" | ");
+}
+
 export async function buildMirrorPatch(table, row, lookup = async () => "") {
   if (!row?.id) throw new SheetsSyncWorkerError("ENTITY_ID_REQUIRED");
 
   switch (table) {
     case "buildings":
       return { 3: row.official_unit_count, 4: row.official_bed_count, 7: yesNo(!row.deleted_at), 12: row.id };
-
     case "room_units":
-      return {
-        1: row.id,
-        4: row.room_number,
-        6: row.official_beds,
-        7: row.extra_places,
-        8: row.max_capacity,
-        11: row.sellable_status,
-        12: row.operational_status,
-        14: row.deleted_at,
-      };
-
+      return { 1: row.id, 4: row.room_number, 6: row.official_beds, 7: row.extra_places, 8: row.max_capacity, 11: row.sellable_status, 12: row.operational_status, 14: row.deleted_at };
     case "customers":
-      return {
-        0: row.id,
-        1: row.id,
-        2: row.created_at,
-        5: row.full_name,
-        6: row.phone,
-        8: row.email,
-        16: row.notes,
-        17: "SYNCED",
-        18: row.updated_at,
-        19: row.deleted_at,
-      };
-
+      return { 0: row.id, 1: row.id, 2: row.created_at, 5: row.full_name, 6: row.phone, 8: row.email, 16: row.notes, 17: "SYNCED", 18: row.updated_at, 19: row.deleted_at };
     case "bookings":
-      return {
-        0: row.booking_number || row.id,
-        1: row.id,
-        3: row.booking_number,
-        4: row.created_at,
-        5: row.source,
-        7: row.check_in,
-        8: row.check_out,
-        10: row.adults,
-        11: row.children,
-        14: row.status,
-        16: row.total_amount_kgs,
-        17: row.prepayment_required_kgs,
-        21: row.notes,
-        22: row.cancellation_reason,
-        23: row.cancelled_at,
-        26: "SYNCED",
-        27: row.updated_at,
-      };
-
+      return { 0: row.booking_number || row.id, 1: row.id, 3: row.booking_number, 4: row.created_at, 5: row.source, 7: row.check_in, 8: row.check_out, 10: row.adults, 11: row.children, 14: row.status, 16: row.total_amount_kgs, 17: row.prepayment_required_kgs, 21: row.notes, 22: row.cancellation_reason, 23: row.cancelled_at, 26: "SYNCED", 27: row.updated_at };
     case "booking_rooms":
-      return {
-        0: row.id,
-        1: row.id,
-        2: await lookup("booking_external", row.booking_id),
-        3: await lookup("room_external", row.room_unit_id),
-        4: row.check_in,
-        5: row.check_out,
-        6: row.status,
-        7: row.adults,
-        8: row.children,
-        12: row.created_at,
-        13: row.updated_at,
-        14: "SYNCED",
-      };
-
+      return { 0: row.id, 1: row.id, 2: await lookup("booking_external", row.booking_id), 3: await lookup("room_external", row.room_unit_id), 4: row.check_in, 5: row.check_out, 6: row.status, 7: row.adults, 8: row.children, 12: row.created_at, 13: row.updated_at, 14: "SYNCED" };
     case "availability_holds": {
       const { checkIn, checkOut } = parseDateRange(row.date_range);
-      return {
-        0: row.id,
-        1: row.id,
-        2: row.idempotency_key,
-        3: await lookup("room_external", row.room_unit_id),
-        5: checkIn,
-        6: checkOut,
-        7: row.created_at,
-        8: row.expires_at,
-        9: row.status,
-        12: row.held_by,
-        15: "SYNCED",
-        16: row.updated_at,
-      };
+      return { 0: row.id, 1: row.id, 2: row.idempotency_key, 3: await lookup("room_external", row.room_unit_id), 5: checkIn, 6: checkOut, 7: row.created_at, 8: row.expires_at, 9: row.status, 12: row.held_by, 15: "SYNCED", 16: row.updated_at };
     }
-
     case "cleaning_tasks":
-      return {
-        0: row.task_number || row.id,
-        1: row.id,
-        2: await lookup("room_external", row.room_unit_id),
-        3: await lookup("booking_external", row.booking_id),
-        11: row.status,
-        12: yesNo(Boolean(row.reported_problem)),
-        13: row.reported_problem,
-        16: yesNo(Boolean(row.requires_inspection)),
-        18: row.due_by,
-        19: row.created_by,
-        20: row.created_at,
-        21: row.updated_at,
-        22: "SYNCED",
-      };
-
+      return { 0: row.task_number || row.id, 1: row.id, 2: await lookup("room_external", row.room_unit_id), 3: await lookup("booking_external", row.booking_id), 11: row.status, 12: yesNo(Boolean(row.reported_problem)), 13: row.reported_problem, 16: yesNo(Boolean(row.requires_inspection)), 18: row.due_by, 19: row.created_by, 20: row.created_at, 21: row.updated_at, 22: "SYNCED" };
     case "maintenance_requests":
-      return {
-        0: row.request_number || row.id,
-        1: row.id,
-        2: await lookup("room_external", row.room_unit_id),
-        3: await lookup("cleaning_external", row.cleaning_task_id),
-        5: row.priority,
-        6: row.description,
-        7: yesNo(Boolean(row.blocks_room)),
-        8: row.resulting_operational_status,
-        11: row.diagnosed_at,
-        12: row.started_at,
-        13: row.completed_at,
-        14: row.status,
-        15: row.diagnosis,
-        22: row.reported_by,
-        23: row.created_at,
-        24: row.updated_at,
-        25: "SYNCED",
-      };
-
+      return { 0: row.request_number || row.id, 1: row.id, 2: await lookup("room_external", row.room_unit_id), 3: await lookup("cleaning_external", row.cleaning_task_id), 5: row.priority, 6: row.description, 7: yesNo(Boolean(row.blocks_room)), 8: row.resulting_operational_status, 11: row.diagnosed_at, 12: row.started_at, 13: row.completed_at, 14: row.status, 15: row.diagnosis, 22: row.reported_by, 23: row.created_at, 24: row.updated_at, 25: "SYNCED" };
     case "room_inspections": {
-      const sourceType = row.cleaning_task_id
-        ? "cleaning_task"
-        : row.maintenance_request_id
-          ? "maintenance_request"
-          : "manual";
+      const sourceType = row.cleaning_task_id ? "cleaning_task" : row.maintenance_request_id ? "maintenance_request" : "manual";
       const sourceExternal = row.cleaning_task_id
         ? await lookup("cleaning_external", row.cleaning_task_id)
         : row.maintenance_request_id
           ? await lookup("maintenance_external", row.maintenance_request_id)
           : "";
+      return { 0: row.id, 1: row.id, 2: await lookup("room_external", row.room_unit_id), 3: sourceType, 4: sourceExternal, 5: row.trigger_reason, 10: row.result, 15: row.notes, 16: row.created_at, 18: "SYNCED", 19: row.inspected_by };
+    }
+    case "leads":
+      return { 0: row.lead_number || row.id, 1: row.id, 2: row.created_at, 3: row.source, 4: row.interest, 5: row.status, 6: row.name, 7: row.phone, 8: row.check_in, 9: row.check_out, 10: row.adults, 11: row.children, 12: row.children_ages, 13: row.room_category_id, 14: row.wants_double_bed, 15: row.needs_extra_bed, 16: row.needs_wifi, 17: row.needs_lower_floor, 18: row.event_type, 19: row.guests_count, 20: row.hall_size, 21: row.spa_service, 22: row.message, 23: row.preferred_contact, 24: row.assigned_manager_id, 25: row.manager_comment, 26: row.booking_id, 27: row.updated_at, 28: row.deleted_at, 29: "SYNCED" };
+    case "booking_payments":
       return {
         0: row.id,
         1: row.id,
-        2: await lookup("room_external", row.room_unit_id),
-        3: sourceType,
-        4: sourceExternal,
-        5: row.trigger_reason,
-        10: row.result,
-        15: row.notes,
-        16: row.created_at,
-        18: "SYNCED",
-        19: row.inspected_by,
+        2: await lookup("booking_external", row.booking_id),
+        3: row.paid_at,
+        4: row.method,
+        5: row.amount_kgs,
+        6: row.currency || "KGS",
+        7: row.status === "confirmed" ? row.amount_kgs : 0,
+        8: row.status,
+        9: row.receipt_url,
+        10: yesNo(row.status === "confirmed"),
+        11: row.confirmed_by,
+        12: row.confirmed_at,
+        13: row.balance_after_kgs,
+        14: "",
+        15: "",
+        16: paymentNote(row),
+        17: "SYNCED",
+        18: row.updated_at,
+        19: row.deleted_at,
+        20: "PASS",
       };
-    }
-
-    case "leads":
-      return {
-        0: row.lead_number || row.id,
-        1: row.id,
-        2: row.created_at,
-        3: row.source,
-        4: row.interest,
-        5: row.status,
-        6: row.name,
-        7: row.phone,
-        8: row.check_in,
-        9: row.check_out,
-        10: row.adults,
-        11: row.children,
-        12: row.children_ages,
-        13: row.room_category_id,
-        14: row.wants_double_bed,
-        15: row.needs_extra_bed,
-        16: row.needs_wifi,
-        17: row.needs_lower_floor,
-        18: row.event_type,
-        19: row.guests_count,
-        20: row.hall_size,
-        21: row.spa_service,
-        22: row.message,
-        23: row.preferred_contact,
-        24: row.assigned_manager_id,
-        25: row.manager_comment,
-        26: row.booking_id,
-        27: row.updated_at,
-        28: row.deleted_at,
-        29: "SYNCED",
-      };
-
     default:
       throw new SheetsSyncWorkerError("UNSUPPORTED_ENTITY_TABLE");
   }
@@ -257,9 +134,7 @@ function requiredEnv(name) {
 export function validateMode(mode) {
   if (!["dry-run", "execute"].includes(mode)) throw new SheetsSyncWorkerError("INVALID_MODE");
   if (process.env.GOOGLE_SHEETS_ENABLED !== "true") throw new SheetsSyncWorkerError("GOOGLE_SHEETS_DISABLED");
-  if (mode === "execute" && process.env.AK_BERMET_SHEETS_MIRROR_ENABLED !== "YES") {
-    throw new SheetsSyncWorkerError("MIRROR_EXECUTION_NOT_APPROVED");
-  }
+  if (mode === "execute" && process.env.AK_BERMET_SHEETS_MIRROR_ENABLED !== "YES") throw new SheetsSyncWorkerError("MIRROR_EXECUTION_NOT_APPROVED");
 }
 
 async function makeClients() {
@@ -268,16 +143,9 @@ async function makeClients() {
   const spreadsheetId = requiredEnv("GOOGLE_SHEETS_SPREADSHEET_ID");
   const email = requiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
   const key = requiredEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { google } = await import("googleapis");
-  const auth = new google.auth.JWT({
-    email,
-    key,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
+  const auth = new google.auth.JWT({ email, key, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
   const sheets = google.sheets({ version: "v4", auth });
   return { supabase, sheets, spreadsheetId };
 }
@@ -313,11 +181,7 @@ function quotedSheet(name) {
 }
 
 async function findSheetRow(sheets, spreadsheetId, config, entityId) {
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${quotedSheet(config.sheet)}!${config.idColumn}2:${config.idColumn}`,
-    valueRenderOption: "UNFORMATTED_VALUE",
-  });
+  const response = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${quotedSheet(config.sheet)}!${config.idColumn}2:${config.idColumn}`, valueRenderOption: "UNFORMATTED_VALUE" });
   const values = response.data.values ?? [];
   const index = values.findIndex((row) => String(row?.[0] ?? "") === String(entityId));
   return index < 0 ? null : index + 2;
@@ -327,15 +191,9 @@ async function updatePatch(sheets, spreadsheetId, config, rowNumber, patch) {
   const data = Object.entries(patch)
     .map(([rawIndex, value]) => [Number(rawIndex), value])
     .filter(([index]) => Number.isInteger(index) && index >= 0 && index < config.width)
-    .map(([index, value]) => ({
-      range: `${quotedSheet(config.sheet)}!${columnLetter(index)}${rowNumber}`,
-      values: [[cell(value)]],
-    }));
+    .map(([index, value]) => ({ range: `${quotedSheet(config.sheet)}!${columnLetter(index)}${rowNumber}`, values: [[cell(value)]] }));
   if (data.length === 0) throw new SheetsSyncWorkerError("EMPTY_SHEET_PATCH");
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId,
-    requestBody: { valueInputOption: "RAW", data },
-  });
+  await sheets.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: "RAW", data } });
 }
 
 async function appendPatch(sheets, spreadsheetId, config, patch) {
@@ -345,13 +203,7 @@ async function appendPatch(sheets, spreadsheetId, config, patch) {
     if (Number.isInteger(index) && index >= 0 && index < config.width) row[index] = cell(value);
   }
   if (String(row[config.idIndex] ?? "") === "") throw new SheetsSyncWorkerError("APPEND_UUID_ANCHOR_MISSING");
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${quotedSheet(config.sheet)}!A1`,
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [row] },
-  });
+  await sheets.spreadsheets.values.append({ spreadsheetId, range: `${quotedSheet(config.sheet)}!A1`, valueInputOption: "RAW", insertDataOption: "INSERT_ROWS", requestBody: { values: [row] } });
 }
 
 async function markMissingDynamicRow(sheets, spreadsheetId, config, rowNumber) {
@@ -382,11 +234,7 @@ async function processItem(clients, item) {
     await markMissingDynamicRow(clients.sheets, clients.spreadsheetId, config, rowNumber);
     return action;
   }
-  const patch = await buildMirrorPatch(
-    item.entity_table,
-    entity,
-    (kind, id) => lookupRelation(clients.supabase, kind, id),
-  );
+  const patch = await buildMirrorPatch(item.entity_table, entity, (kind, id) => lookupRelation(clients.supabase, kind, id));
   if (action === "update") await updatePatch(clients.sheets, clients.spreadsheetId, config, rowNumber, patch);
   else await appendPatch(clients.sheets, clients.spreadsheetId, config, patch);
   return action;
@@ -397,13 +245,7 @@ function safeErrorCode(error) {
 }
 
 async function finishItem(supabase, item, success, errorCode = null, action = null) {
-  const { error } = await supabase.rpc("fn_finish_sheets_sync", {
-    p_queue_id: item.id,
-    p_success: success,
-    p_error: errorCode,
-    p_detail: { worker: "node", action },
-    p_max_attempts: 5,
-  });
+  const { error } = await supabase.rpc("fn_finish_sheets_sync", { p_queue_id: item.id, p_success: success, p_error: errorCode, p_detail: { worker: "node", action }, p_max_attempts: 5 });
   if (error) throw new SheetsSyncWorkerError("QUEUE_FINISH_FAILED");
 }
 
@@ -473,10 +315,7 @@ export async function main(argv = process.argv.slice(2)) {
   else await runDry(clients, limit);
 }
 
-const invokedDirectly = process.argv[1]
-  ? pathToFileURL(resolve(process.argv[1])).href === import.meta.url
-  : false;
-
+const invokedDirectly = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href === import.meta.url : false;
 if (invokedDirectly) {
   main().catch((error) => {
     console.error(`BLOCKED: ${safeErrorCode(error)}`);
