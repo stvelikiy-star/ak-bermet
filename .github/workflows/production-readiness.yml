@@ -47,6 +47,15 @@ jobs:
       - name: Pricing V6 tests
         run: npm run test:pricing-v6
 
+      - name: Canonical legal and public FAQ contract
+        run: npm run test:legal-contract
+
+      - name: Real AI provider fail-closed contract
+        run: npm run test:ai-provider-mode
+
+      - name: Supabase availability authority contract
+        run: npm run test:availability-authority
+
       - name: Lead durability contract
         run: npm run test:lead-durability
 
@@ -64,6 +73,9 @@ jobs:
 
       - name: Manual booking transaction contract
         run: npm run test:manual-booking
+
+      - name: Booking chessboard rules
+        run: npm run test:booking-chessboard
 
       - name: Manager live-data contract
         run: npm run test:manager-live-data
@@ -97,6 +109,11 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Repository generated-file hygiene
+        run: |
+          test -z "$(git ls-files '*.tsbuildinfo')"
+          git diff --exit-code
 
       - name: Build production container
         run: docker build --tag ak-bermet:${{ github.sha }} .
