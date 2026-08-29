@@ -1,0 +1,103 @@
+name: Sheets Mirror
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mirror mode"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - dry-run
+          - execute
+      limit:
+        description: "Queue items per run (1-100)"
+        required: true
+        default: "100"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ak-bermet-sheets-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+      GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+      GOOGLE_SHEETS_ENABLED: "true"
+      AK_BERMET_SHEETS_MIRROR_ENABLED: "YES"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify protected configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY GOOGLE_SHEETS_SPREADSHEET_ID GOOGLE_SERVICE_ACCOUNT_EMAIL GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "MISSING_SECRET_NAME: ${name}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "BLOCKED: Sheets mirror credentials are incomplete. Secret values were not printed."
+            exit 2
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve mode and limit
+        id: config
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_LIMIT: ${{ inputs.limit }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            mode="execute"
+            limit="100"
+          else
+            mode="${INPUT_MODE:-dry-run}"
+            limit="${INPUT_LIMIT:-100}"
+          fi
+          case "$mode" in dry-run|execute) ;; *) echo "INVALID_MODE"; exit 2 ;; esac
+          case "$limit" in ''|*[!0-9]*) echo "INVALID_LIMIT"; exit 2 ;; esac
+          if [ "$limit" -lt 1 ] || [ "$limit" -gt 100 ]; then echo "INVALID_LIMIT"; exit 2; fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "limit=$limit" >> "$GITHUB_OUTPUT"
+
+      - name: Run mirror
+        shell: bash
+        env:
+          MODE: ${{ steps.config.outputs.mode }}
+          LIMIT: ${{ steps.config.outputs.limit }}
+        run: |
+          set -euo pipefail
+          if [ "$MODE" = "execute" ]; then
+            node scripts/sheets-sync-worker.mjs --execute --limit="$LIMIT"
+          else
+            node scripts/sheets-sync-worker.mjs --dry-run --limit="$LIMIT"
+          fi
