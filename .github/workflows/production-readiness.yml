@@ -23,7 +23,6 @@ jobs:
       GOOGLE_SHEETS_ENABLED: "false"
       AI_PROVIDER: mock
       AI_ENABLE_REAL_CALLS: "false"
-      MANAGER_DEMO_MODE: "true"
 
     steps:
       - name: Checkout
@@ -40,6 +39,12 @@ jobs:
 
       - name: Production dependency security audit
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit --incremental false
 
       - name: Room master tests
         run: npm run test:room-master
