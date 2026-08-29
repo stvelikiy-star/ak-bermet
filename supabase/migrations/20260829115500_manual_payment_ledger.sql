@@ -219,22 +219,26 @@ begin
     raise exception 'booking_not_found' using errcode = '22023';
   end if;
 
-  update public.booking_payments
-  set status = 'void',
-      void_reason = btrim(p_reason),
-      voided_by = v_user_id,
-      voided_at = now(),
-      updated_at = now()
-  where id = v_payment.id;
-
+  -- Compute the post-void confirmed total before changing the row so the
+  -- historical payment record and Google mirror both carry the new balance.
   select coalesce(sum(bp.amount_kgs), 0)
   into v_confirmed_total
   from public.booking_payments bp
   where bp.booking_id = v_booking.id
     and bp.status = 'confirmed'
-    and bp.deleted_at is null;
+    and bp.deleted_at is null
+    and bp.id <> v_payment.id;
 
   v_balance := greatest(v_booking.total_amount_kgs - v_confirmed_total, 0);
+
+  update public.booking_payments
+  set status = 'void',
+      void_reason = btrim(p_reason),
+      voided_by = v_user_id,
+      voided_at = now(),
+      balance_after_kgs = v_balance,
+      updated_at = now()
+  where id = v_payment.id;
 
   return query
   select v_payment.id, v_booking.id, v_confirmed_total, v_balance;
