@@ -5,28 +5,44 @@ import {
   chessboardStateForDate,
   daysBetween,
   parseDateRange,
+  type ChessboardBookingService,
   type ChessboardPeriod,
   type ChessboardRoom,
   type ChessboardState,
 } from "@/lib/booking-chessboard-rules";
 
 export {
+  addDays,
   chessboardStateForDate,
   daysBetween,
+  findPeriodForDate,
   parseDateRange,
   periodOverlapsDate,
   isRoomOperationallyBlocked,
   isIsoDate,
 } from "@/lib/booking-chessboard-rules";
 export type {
+  ChessboardBookingService,
+  ChessboardBookingSummary,
   ChessboardPeriod,
   ChessboardRoom,
   ChessboardState,
 } from "@/lib/booking-chessboard-rules";
 
+export interface BookingServiceOption {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly category: string;
+  readonly pricingMode: "fixed" | "manual";
+  readonly priceKgs: number | null;
+  readonly unitLabel: string;
+}
+
 export interface BookingChessboardData {
   readonly rooms: readonly ChessboardRoom[];
   readonly periods: readonly ChessboardPeriod[];
+  readonly serviceCatalog: readonly BookingServiceOption[];
   readonly from: string;
   readonly to: string;
 }
@@ -42,10 +58,17 @@ interface RelationName {
   name?: string | null;
 }
 
+interface CustomerRelation {
+  full_name?: string | null;
+  phone?: string | null;
+}
+
 interface RoomRow {
   id: string;
   room_number: string;
   floor: number | null;
+  max_capacity: number;
+  extra_places: number;
   sellable_status: string;
   operational_status: string;
   buildings: RelationName | RelationName[] | null;
@@ -63,13 +86,22 @@ interface OccupancyRow {
 }
 
 interface BookingRelation {
+  id?: string | null;
   booking_number?: string | null;
   status?: string | null;
+  total_amount_kgs?: number | string | null;
+  prepayment_required_kgs?: number | string | null;
+  notes?: string | null;
   deleted_at?: string | null;
+  customers?: CustomerRelation | CustomerRelation[] | null;
 }
 
 interface BookingRoomRow {
   id: string;
+  booking_id: string;
+  adults: number;
+  children: number;
+  extra_beds: number;
   bookings: BookingRelation | BookingRelation[] | null;
 }
 
@@ -79,12 +111,45 @@ interface HoldRow {
   expires_at: string;
 }
 
+interface ServiceCatalogRow {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  pricing_mode: "fixed" | "manual";
+  price_kgs: number | string | null;
+  unit_label: string;
+  sort_order: number;
+}
+
+interface ServiceRelation {
+  code?: string | null;
+  unit_label?: string | null;
+}
+
+interface BookingServiceRow {
+  id: string;
+  booking_id: string;
+  service_name_snapshot: string;
+  quantity: number | string;
+  unit_price_kgs: number | string;
+  total_amount_kgs: number | string;
+  scheduled_for: string | null;
+  status: string;
+  service_catalog: ServiceRelation | ServiceRelation[] | null;
+}
+
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
 const ACTIVE_BOOKING_STATUSES = new Set(["pending_confirmation", "confirmed", "checked_in"]);
 
-function firstRelation<T>(value: T | T[] | null): T | null {
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function number(value: number | string | null | undefined): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export async function loadBookingChessboard(from: string, to: string): Promise<BookingChessboardData> {
@@ -101,11 +166,11 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
   const supabase = await createSupabaseServerClient();
   if (!supabase) throw new BookingChessboardError("CONFIGURATION");
 
-  const [roomsResult, occupancyResult] = await Promise.all([
+  const [roomsResult, occupancyResult, serviceCatalogResult] = await Promise.all([
     supabase
       .from("room_units")
       .select(
-        "id, room_number, floor, sellable_status, operational_status, buildings ( name ), room_categories ( name )",
+        "id, room_number, floor, max_capacity, extra_places, sellable_status, operational_status, buildings ( name ), room_categories ( name )",
       )
       .is("deleted_at", null),
     supabase
@@ -115,9 +180,17 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
       )
       .eq("status", "active")
       .overlaps("period", `[${from},${to})`),
+    supabase
+      .from("service_catalog")
+      .select("id, code, name, category, pricing_mode, price_kgs, unit_label, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
   ]);
 
-  if (roomsResult.error || occupancyResult.error || !roomsResult.data || !occupancyResult.data) {
+  if (
+    roomsResult.error || occupancyResult.error || serviceCatalogResult.error ||
+    !roomsResult.data || !occupancyResult.data || !serviceCatalogResult.data
+  ) {
     throw new BookingChessboardError("READ_FAILED");
   }
 
@@ -133,7 +206,9 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
     bookingRoomIds.length
       ? supabase
           .from("booking_rooms")
-          .select("id, bookings ( booking_number, status, deleted_at )")
+          .select(
+            "id, booking_id, adults, children, extra_beds, bookings ( id, booking_number, status, total_amount_kgs, prepayment_required_kgs, notes, deleted_at, customers ( full_name, phone ) )",
+          )
           .in("id", bookingRoomIds)
       : Promise.resolve({ data: [] as BookingRoomRow[], error: null }),
     holdIds.length
@@ -150,11 +225,43 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
     throw new BookingChessboardError("READ_FAILED");
   }
 
-  const bookingByRoomRow = new Map<string, BookingRelation>();
-  for (const row of bookingRoomsResult.data as BookingRoomRow[]) {
-    const booking = firstRelation(row.bookings);
-    if (booking) bookingByRoomRow.set(row.id, booking);
+  const bookingRoomRows = bookingRoomsResult.data as BookingRoomRow[];
+  const bookingIds = [...new Set(bookingRoomRows.map((row) => row.booking_id).filter(Boolean))];
+  const bookingServicesResult = bookingIds.length
+    ? await supabase
+        .from("booking_services")
+        .select(
+          "id, booking_id, service_name_snapshot, quantity, unit_price_kgs, total_amount_kgs, scheduled_for, status, service_catalog ( code, unit_label )",
+        )
+        .in("booking_id", bookingIds)
+        .neq("status", "cancelled")
+        .order("created_at", { ascending: true })
+    : { data: [] as BookingServiceRow[], error: null };
+
+  if (bookingServicesResult.error || !bookingServicesResult.data) {
+    throw new BookingChessboardError("READ_FAILED");
   }
+
+  const servicesByBooking = new Map<string, ChessboardBookingService[]>();
+  for (const row of bookingServicesResult.data as BookingServiceRow[]) {
+    const relation = firstRelation(row.service_catalog);
+    const current = servicesByBooking.get(row.booking_id) ?? [];
+    current.push({
+      id: row.id,
+      code: relation?.code ?? "OTHER",
+      name: row.service_name_snapshot,
+      quantity: number(row.quantity),
+      unitPriceKgs: number(row.unit_price_kgs),
+      totalAmountKgs: number(row.total_amount_kgs),
+      unitLabel: relation?.unit_label ?? "услуга",
+      scheduledFor: row.scheduled_for,
+      status: row.status,
+    });
+    servicesByBooking.set(row.booking_id, current);
+  }
+
+  const bookingByRoomRow = new Map<string, BookingRoomRow>();
+  for (const row of bookingRoomRows) bookingByRoomRow.set(row.id, row);
   const activeHoldIds = new Set((holdsResult.data as HoldRow[]).map((row) => row.id));
 
   const rooms: ChessboardRoom[] = (roomsResult.data as RoomRow[])
@@ -166,8 +273,14 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
       category: firstRelation(row.room_categories)?.name ?? "Без категории",
       sellableStatus: row.sellable_status,
       operationalStatus: row.operational_status,
+      maxCapacity: row.max_capacity,
+      extraPlaces: row.extra_places,
     }))
-    .sort((a, b) => a.building.localeCompare(b.building, "ru") || a.roomNumber.localeCompare(b.roomNumber, "ru", { numeric: true }));
+    .sort(
+      (a, b) =>
+        a.building.localeCompare(b.building, "ru") ||
+        a.roomNumber.localeCompare(b.roomNumber, "ru", { numeric: true }),
+    );
 
   const periods: ChessboardPeriod[] = [];
   for (const row of rawOccupancy) {
@@ -176,16 +289,37 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
 
     if (row.period_type === "booking") {
       if (!row.booking_room_id) continue;
-      const booking = bookingByRoomRow.get(row.booking_room_id);
-      if (!booking || booking.deleted_at || !booking.status || !ACTIVE_BOOKING_STATUSES.has(booking.status)) continue;
+      const bookingRoom = bookingByRoomRow.get(row.booking_room_id);
+      const booking = firstRelation(bookingRoom?.bookings);
+      if (
+        !bookingRoom || !booking || booking.deleted_at || !booking.status ||
+        !ACTIVE_BOOKING_STATUSES.has(booking.status) || !booking.id
+      ) continue;
+      const customer = firstRelation(booking.customers);
+      const guestName = customer?.full_name?.trim() || booking.booking_number || "Гость";
       periods.push({
         id: row.id,
         roomId: row.room_unit_id,
         start: range.start,
         end: range.end,
         state: "booking",
-        label: booking.booking_number ? `Бронь ${booking.booking_number}` : "Бронь",
+        label: `${guestName}${booking.booking_number ? ` · ${booking.booking_number}` : ""}`,
         sourceId: row.booking_room_id,
+        booking: {
+          bookingId: booking.id,
+          bookingRoomId: bookingRoom.id,
+          bookingNumber: booking.booking_number ?? "",
+          status: booking.status,
+          guestName,
+          guestPhone: customer?.phone ?? "",
+          adults: bookingRoom.adults,
+          children: bookingRoom.children,
+          extraBeds: bookingRoom.extra_beds,
+          totalAmountKgs: number(booking.total_amount_kgs),
+          prepaymentRequiredKgs: number(booking.prepayment_required_kgs),
+          notes: booking.notes ?? null,
+          services: servicesByBooking.get(booking.id) ?? [],
+        },
       });
       continue;
     }
@@ -215,5 +349,15 @@ export async function loadBookingChessboard(from: string, to: string): Promise<B
     });
   }
 
-  return { rooms, periods, from, to };
+  const serviceCatalog: BookingServiceOption[] = (serviceCatalogResult.data as ServiceCatalogRow[]).map((row) => ({
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    category: row.category,
+    pricingMode: row.pricing_mode,
+    priceKgs: row.price_kgs === null ? null : number(row.price_kgs),
+    unitLabel: row.unit_label,
+  }));
+
+  return { rooms, periods, serviceCatalog, from, to };
 }
