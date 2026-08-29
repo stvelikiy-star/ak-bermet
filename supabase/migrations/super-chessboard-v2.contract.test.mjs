@@ -18,6 +18,14 @@ const board = fs.readFileSync(
   new URL("../../src/components/manager/SuperChessboard.tsx", import.meta.url),
   "utf8",
 );
+const sharedChessboard = fs.readFileSync(
+  new URL("../../src/lib/booking-chessboard.ts", import.meta.url),
+  "utf8",
+);
+const serverChessboard = fs.readFileSync(
+  new URL("../../src/lib/booking-chessboard-server.ts", import.meta.url),
+  "utf8",
+);
 
 const sql = migration.replace(/\s+/g, " ").toLowerCase();
 
@@ -84,4 +92,12 @@ test("manager board exposes direct booking, guest card, services and guarded dra
   assert.match(board, /Переместить \/ изменить даты/);
   assert.match(board, /1\. Проверить/);
   assert.match(board, /2\. Подтвердить перенос/);
+});
+
+test("client chessboard cannot pull server-only Supabase or next/headers into its bundle", () => {
+  assert.match(board, /from "@\/lib\/booking-chessboard"/);
+  assert.doesNotMatch(sharedChessboard, /current-staff|server-client|next\/headers/);
+  assert.match(serverChessboard, /from "@\/lib\/auth\/current-staff"/);
+  assert.match(serverChessboard, /from "@\/lib\/supabase\/server-client"/);
+  assert.match(serverChessboard, /export async function loadBookingChessboard/);
 });
