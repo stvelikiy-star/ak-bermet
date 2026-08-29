@@ -4,9 +4,9 @@ import {
   BookingChessboardError,
   addDays,
   daysBetween,
-  loadBookingChessboard,
   type BookingChessboardData,
 } from "@/lib/booking-chessboard";
+import { loadBookingChessboard } from "@/lib/booking-chessboard-server";
 
 export const dynamic = "force-dynamic";
 
