@@ -23,7 +23,19 @@ export const MIRROR_CONFIG = Object.freeze({
   maintenance_requests: { sheet: "Ремонт", idColumn: "B", idIndex: 1, width: 26, allowAppend: true, syncIndex: 25 },
   room_inspections: { sheet: "10_Проверки", idColumn: "B", idIndex: 1, width: 20, allowAppend: true, syncIndex: 18 },
   leads: { sheet: "07_Лиды", idColumn: "B", idIndex: 1, width: 30, allowAppend: true, syncIndex: 29 },
-  booking_payments: { sheet: "Оплаты", idColumn: "B", idIndex: 1, width: 21, allowAppend: true, syncIndex: 17 },
+  booking_payments: {
+    sheet: "Оплаты",
+    idColumn: "B",
+    idIndex: 1,
+    width: 21,
+    allowAppend: true,
+    syncIndex: 17,
+    preparedRows: {
+      range: "B2:U1000",
+      idOffset: 0,
+      requiredFormulaOffsets: [12, 19],
+    },
+  },
 });
 
 const yesNo = (value) => (value ? "Да" : "Нет");
@@ -54,6 +66,18 @@ export function columnLetter(index) {
     n = Math.floor((n - 1) / 26);
   }
   return result;
+}
+
+export function findPreparedRow(values, preparedRows) {
+  if (!preparedRows) throw new SheetsSyncWorkerError("PREPARED_ROW_CONFIG_REQUIRED");
+  const idOffset = preparedRows.idOffset;
+  const formulaOffsets = preparedRows.requiredFormulaOffsets ?? [];
+  const index = (values ?? []).findIndex((row) => {
+    const idBlank = String(row?.[idOffset] ?? "").trim() === "";
+    const formulasPresent = formulaOffsets.every((offset) => String(row?.[offset] ?? "").startsWith("="));
+    return idBlank && formulasPresent;
+  });
+  return index < 0 ? null : index + 2;
 }
 
 function paymentNote(row) {
@@ -111,14 +135,10 @@ export async function buildMirrorPatch(table, row, lookup = async () => "") {
         10: yesNo(row.status === "confirmed"),
         11: row.confirmed_by,
         12: row.confirmed_at,
-        13: row.balance_after_kgs,
-        14: "",
-        15: "",
         16: paymentNote(row),
         17: "SYNCED",
         18: row.updated_at,
         19: row.deleted_at,
-        20: "PASS",
       };
     default:
       throw new SheetsSyncWorkerError("UNSUPPORTED_ENTITY_TABLE");
@@ -187,6 +207,16 @@ async function findSheetRow(sheets, spreadsheetId, config, entityId) {
   return index < 0 ? null : index + 2;
 }
 
+async function findPreparedSheetRow(sheets, spreadsheetId, config) {
+  if (!config.preparedRows) return null;
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${quotedSheet(config.sheet)}!${config.preparedRows.range}`,
+    valueRenderOption: "FORMULA",
+  });
+  return findPreparedRow(response.data.values ?? [], config.preparedRows);
+}
+
 async function updatePatch(sheets, spreadsheetId, config, rowNumber, patch) {
   const data = Object.entries(patch)
     .map(([rawIndex, value]) => [Number(rawIndex), value])
@@ -223,6 +253,11 @@ async function inspectItem(clients, item) {
   }
   if (rowNumber) return { config, entity, rowNumber, action: "update" };
   if (!config.allowAppend) throw new SheetsSyncWorkerError("SYNC_MAPPING_REQUIRED");
+  if (config.preparedRows) {
+    const preparedRowNumber = await findPreparedSheetRow(clients.sheets, clients.spreadsheetId, config);
+    if (!preparedRowNumber) throw new SheetsSyncWorkerError("PREPARED_SHEET_ROW_REQUIRED");
+    return { config, entity, rowNumber: preparedRowNumber, action: "fill_prepared" };
+  }
   return { config, entity, rowNumber: null, action: "append" };
 }
 
@@ -235,7 +270,7 @@ async function processItem(clients, item) {
     return action;
   }
   const patch = await buildMirrorPatch(item.entity_table, entity, (kind, id) => lookupRelation(clients.supabase, kind, id));
-  if (action === "update") await updatePatch(clients.sheets, clients.spreadsheetId, config, rowNumber, patch);
+  if (action === "update" || action === "fill_prepared") await updatePatch(clients.sheets, clients.spreadsheetId, config, rowNumber, patch);
   else await appendPatch(clients.sheets, clients.spreadsheetId, config, patch);
   return action;
 }
