@@ -151,7 +151,7 @@ begin
   ) values (
     v_key, v_locale, v_value, 1, v_user_id, now(), now()
   )
-  on conflict (content_key, locale) do update
+  on conflict on constraint site_content_drafts_pkey do update
     set draft_value = excluded.draft_value,
         version = public.site_content_drafts.version + 1,
         updated_by = v_user_id,
@@ -208,7 +208,7 @@ begin
   ) values (
     v_key, v_locale, v_draft.draft_value, v_draft.version, v_user_id, v_published_at, v_published_at
   )
-  on conflict (content_key, locale) do update
+  on conflict on constraint site_content_public_pkey do update
     set published_value = excluded.published_value,
         version = excluded.version,
         published_by = excluded.published_by,
@@ -260,7 +260,7 @@ begin
   ) values (
     v_history.content_key, v_history.locale, v_history.value, 1, v_user_id, now(), now()
   )
-  on conflict (content_key, locale) do update
+  on conflict on constraint site_content_drafts_pkey do update
     set draft_value = excluded.draft_value,
         version = public.site_content_drafts.version + 1,
         updated_by = v_user_id,
