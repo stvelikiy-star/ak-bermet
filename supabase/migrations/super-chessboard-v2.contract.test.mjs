@@ -6,6 +6,14 @@ const migration = fs.readFileSync(
   new URL("./20260829102000_super_chessboard_v2.sql", import.meta.url),
   "utf8",
 );
+const aclHardening = fs.readFileSync(
+  new URL("./20260829110500_super_chessboard_rpc_acl_hardening.sql", import.meta.url),
+  "utf8",
+);
+const moveRepair = fs.readFileSync(
+  new URL("./20260829113000_super_chessboard_move_rpc_fix.sql", import.meta.url),
+  "utf8",
+);
 const placementRoute = fs.readFileSync(
   new URL("../../src/app/api/manager/bookings/placement/route.ts", import.meta.url),
   "utf8",
@@ -28,6 +36,8 @@ const serverChessboard = fs.readFileSync(
 );
 
 const sql = migration.replace(/\s+/g, " ").toLowerCase();
+const aclSql = aclHardening.replace(/\s+/g, " ").toLowerCase();
+const repairSql = moveRepair.replace(/\s+/g, " ").toLowerCase();
 
 test("room move is role-gated, audited and delegates collision authority to occupancy constraint", () => {
   assert.match(sql, /create or replace function public\.fn_move_booking_room/);
@@ -48,6 +58,24 @@ test("room move rejects unsafe room state, capacity and post-checkin mutation", 
   assert.match(sql, /maintenance_in_progress/);
   assert.match(sql, /room_capacity_exceeded/);
   assert.match(sql, /extra_bed_capacity_exceeded/);
+});
+
+test("live-UAT repair qualifies booking_rooms columns and preserves guarded RPC grants", () => {
+  assert.match(repairSql, /create or replace function public\.fn_move_booking_room/);
+  assert.match(repairSql, /from public\.booking_rooms br_active where br_active\.booking_id = v_booking\.id and br_active\.status = 'active'/);
+  assert.doesNotMatch(repairSql, /from public\.booking_rooms where booking_id = v_booking\.id/);
+  assert.match(repairSql, /revoke execute on function public\.fn_move_booking_room[\s\S]*from anon/);
+  assert.match(repairSql, /grant execute on function public\.fn_move_booking_room[\s\S]*to authenticated/);
+});
+
+test("all SUPER chessboard write RPCs explicitly deny anon execution", () => {
+  for (const fn of [
+    "fn_move_booking_room",
+    "fn_add_booking_service",
+    "fn_set_booking_service_status",
+  ]) {
+    assert.match(aclSql, new RegExp(`revoke execute on function public\\.${fn}[\\s\\S]*from anon`));
+  }
 });
 
 test("universal service catalog keeps unknown-price services manual and approved prices fixed", () => {
