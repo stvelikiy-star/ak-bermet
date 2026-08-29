@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
 const ACTIVE_BOOKING_STATUSES = new Set(["pending_confirmation", "confirmed", "checked_in"]);
+const PAGE_SIZE = 1000;
 
 interface LeadRow { source: string; interest: string; status: string; booking_id: string | null }
 interface BookingRow { id: string; status: string; check_in: string; check_out: string; total_amount_kgs: number | string }
@@ -74,41 +75,90 @@ export default async function ManagerReportsPage() {
   const allowed = hasAnyRole(staff, [...MANAGER_ROLES]);
   const supabase = allowed ? await createSupabaseServerClient() : null;
 
-  let leads: LeadRow[] = [];
-  let bookings: BookingRow[] = [];
-  let payments: PaymentRow[] = [];
-  let rooms: RoomRow[] = [];
+  const leads: LeadRow[] = [];
+  const bookings: BookingRow[] = [];
+  const payments: PaymentRow[] = [];
+  const rooms: RoomRow[] = [];
   let occupancy: OccupancyRow[] = [];
   let readError = false;
   const today = bishkekDate();
   const tomorrow = bishkekDate(1);
 
   if (supabase) {
-    const [leadsResult, bookingsResult, paymentsResult, roomsResult, occupancyResult] = await Promise.all([
-      supabase.from("leads").select("source, interest, status, booking_id").is("deleted_at", null).limit(5000),
-      supabase.from("bookings").select("id, status, check_in, check_out, total_amount_kgs").is("deleted_at", null).limit(5000),
-      supabase.from("booking_payments").select("booking_id, amount_kgs, status").is("deleted_at", null).limit(10000),
-      supabase.from("room_units").select("id, sellable_status, operational_status").is("deleted_at", null).limit(1000),
-      supabase.from("occupancy_periods").select("room_unit_id, period_type, status").eq("status", "active").overlaps("period", `[${today},${tomorrow})`).limit(1000),
-    ]);
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("source, interest, status, booking_id")
+        .is("deleted_at", null)
+        .range(from, from + PAGE_SIZE - 1);
+      if (error || !data) { readError = true; break; }
+      const page = data as LeadRow[];
+      leads.push(...page);
+      if (page.length < PAGE_SIZE) break;
+    }
 
-    const results = [leadsResult, bookingsResult, paymentsResult, roomsResult, occupancyResult];
-    if (results.some((result) => result.error || !result.data)) {
-      readError = true;
-    } else {
-      leads = leadsResult.data as LeadRow[];
-      bookings = bookingsResult.data as BookingRow[];
-      payments = paymentsResult.data as PaymentRow[];
-      rooms = roomsResult.data as RoomRow[];
-      occupancy = occupancyResult.data as OccupancyRow[];
+    if (!readError) {
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("bookings")
+          .select("id, status, check_in, check_out, total_amount_kgs")
+          .is("deleted_at", null)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error || !data) { readError = true; break; }
+        const page = data as BookingRow[];
+        bookings.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
+    }
+
+    if (!readError) {
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("booking_payments")
+          .select("booking_id, amount_kgs, status")
+          .is("deleted_at", null)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error || !data) { readError = true; break; }
+        const page = data as PaymentRow[];
+        payments.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
+    }
+
+    if (!readError) {
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("room_units")
+          .select("id, sellable_status, operational_status")
+          .is("deleted_at", null)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error || !data) { readError = true; break; }
+        const page = data as RoomRow[];
+        rooms.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
+    }
+
+    if (!readError) {
+      const { data, error } = await supabase
+        .from("occupancy_periods")
+        .select("room_unit_id, period_type, status")
+        .eq("status", "active")
+        .overlaps("period", `[${today},${tomorrow})`)
+        .range(0, PAGE_SIZE - 1);
+      if (error || !data) readError = true;
+      else occupancy = data as OccupancyRow[];
     }
   }
 
   const activeBookings = bookings.filter((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status));
+  const activeBookingIds = new Set(activeBookings.map((booking) => booking.id));
   const confirmedPayments = payments.filter((payment) => payment.status === "confirmed");
+  const activeConfirmedPayments = confirmedPayments.filter((payment) => activeBookingIds.has(payment.booking_id));
   const bookedTotal = activeBookings.reduce((sum, booking) => sum + Number(booking.total_amount_kgs || 0), 0);
   const paidTotal = confirmedPayments.reduce((sum, payment) => sum + Number(payment.amount_kgs || 0), 0);
-  const operationalOutstanding = Math.max(bookedTotal - paidTotal, 0);
+  const activePaidTotal = activeConfirmedPayments.reduce((sum, payment) => sum + Number(payment.amount_kgs || 0), 0);
+  const operationalOutstanding = Math.max(bookedTotal - activePaidTotal, 0);
   const convertedLeads = leads.filter((lead) => Boolean(lead.booking_id)).length;
   const conversion = leads.length > 0 ? (convertedLeads / leads.length) * 100 : 0;
   const arrivalsToday = bookings.filter((booking) => booking.check_in === today && !["cancelled", "no_show"].includes(booking.status)).length;
@@ -142,8 +192,8 @@ export default async function ManagerReportsPage() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Заявки</p><p className="mt-1 font-display text-3xl font-semibold text-emerald-deep">{leads.length}</p><p className="mt-1 text-xs text-muted">Конверсия в бронь: {conversion.toFixed(1)}%</p></div>
               <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Активные брони</p><p className="mt-1 font-display text-3xl font-semibold text-emerald-deep">{activeBookings.length}</p><p className="mt-1 text-xs text-muted">На {money(bookedTotal)}</p></div>
-              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Зафиксировано оплат</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(paidTotal)}</p><p className="mt-1 text-xs text-muted">Только подтверждённые менеджерами записи</p></div>
-              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Операционный остаток</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(operationalOutstanding)}</p><p className="mt-1 text-xs text-muted">Не бухгалтерская/банковская сверка</p></div>
+              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Зафиксировано оплат</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(paidTotal)}</p><p className="mt-1 text-xs text-muted">Вся история подтверждённых менеджерами записей</p></div>
+              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Операционный остаток</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(operationalOutstanding)}</p><p className="mt-1 text-xs text-muted">Только по активным броням; не банковская сверка</p></div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
