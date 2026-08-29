@@ -10,12 +10,12 @@ create table if not exists public.booking_payments (
   currency text not null default 'KGS',
   status text not null default 'confirmed',
   receipt_url text,
-  confirmed_by uuid not null,
+  confirmed_by uuid not null references public.profiles(id) on delete restrict,
   confirmed_at timestamptz not null default now(),
   balance_after_kgs numeric(14,2) not null,
   notes text,
   void_reason text,
-  voided_by uuid,
+  voided_by uuid references public.profiles(id) on delete restrict,
   voided_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -38,6 +38,12 @@ create index if not exists booking_payments_booking_idx
 create index if not exists booking_payments_paid_at_idx
   on public.booking_payments (paid_at desc)
   where deleted_at is null;
+create index if not exists booking_payments_confirmed_by_idx
+  on public.booking_payments (confirmed_by)
+  where deleted_at is null;
+create index if not exists booking_payments_voided_by_idx
+  on public.booking_payments (voided_by)
+  where voided_by is not null and deleted_at is null;
 
 alter table public.booking_payments enable row level security;
 revoke all on public.booking_payments from anon;
