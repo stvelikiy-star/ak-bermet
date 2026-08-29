@@ -28,10 +28,13 @@ test("manual payment writes only through guarded RPCs and anon cannot execute th
   assert.doesNotMatch(api, /\.from\("booking_payments"\)\.delete/);
 });
 
-test("void preserves audit history instead of deleting payment records", () => {
+test("void preserves audit history and recomputes post-void balance", () => {
+  assert.match(sql, /and bp\.id <> v_payment\.id/);
+  assert.match(sql, /v_balance := greatest\(v_booking\.total_amount_kgs - v_confirmed_total, 0\)/);
   assert.match(sql, /set status = 'void'/);
   assert.match(sql, /void_reason = btrim\(p_reason\)/);
   assert.match(sql, /voided_by = v_user_id/);
+  assert.match(sql, /balance_after_kgs = v_balance/);
   assert.doesNotMatch(sql, /delete from public\.booking_payments/);
 });
 
