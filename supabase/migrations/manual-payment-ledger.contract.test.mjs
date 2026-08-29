@@ -20,6 +20,14 @@ test("manual payment ledger is role-gated and has no acquiring behavior", () => 
   assert.match(form, /никаких списаний или интернет-эквайринга здесь нет/);
 });
 
+test("payment ledger anchors booking and staff audit identities with foreign keys", () => {
+  assert.match(sql, /booking_id uuid not null references public\.bookings\(id\) on delete restrict/);
+  assert.match(sql, /confirmed_by uuid not null references public\.profiles\(id\) on delete restrict/);
+  assert.match(sql, /voided_by uuid references public\.profiles\(id\) on delete restrict/);
+  assert.match(sql, /booking_payments_confirmed_by_idx/);
+  assert.match(sql, /booking_payments_voided_by_idx/);
+});
+
 test("manual payment writes only through guarded RPCs and anon cannot execute them", () => {
   assert.match(sql, /revoke execute on function public\.fn_record_manual_payment[\s\S]*from anon/);
   assert.match(sql, /revoke execute on function public\.fn_void_manual_payment[\s\S]*from anon/);
