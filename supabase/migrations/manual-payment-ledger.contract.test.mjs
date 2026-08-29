@@ -7,6 +7,7 @@ const api = fs.readFileSync(new URL("../../src/app/api/manager/payments/route.ts
 const page = fs.readFileSync(new URL("../../src/app/manager/payments/page.tsx", import.meta.url), "utf8");
 const form = fs.readFileSync(new URL("../../src/components/manager/ManualPaymentForm.tsx", import.meta.url), "utf8");
 const sql = migration.replace(/\s+/g, " ").toLowerCase();
+const executableSql = migration.replace(/--.*$/gm, "");
 
 test("manual payment ledger is role-gated and has no acquiring behavior", () => {
   assert.match(sql, /create table if not exists public\.booking_payments/);
@@ -15,7 +16,7 @@ test("manual payment ledger is role-gated and has no acquiring behavior", () => 
   for (const role of ["owner", "administrator", "manager"]) {
     assert.match(sql, new RegExp(`public\\.has_role\\('${role}'\\)`));
   }
-  assert.doesNotMatch(migration, /stripe|cloudpayments|visa|mastercard|acquir/i);
+  assert.doesNotMatch(executableSql, /stripe|cloudpayments|visa|mastercard|acquir/i);
   assert.match(form, /никаких списаний или интернет-эквайринга здесь нет/);
 });
 
