@@ -9,6 +9,9 @@
   "scripts": {
     "test:room-master": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-room-master-tests src/data/room-master-v6.ts src/data/room-master-v6.test.ts && node --test /tmp/ak-bermet-room-master-tests/data/room-master-v6.test.js",
     "test:pricing-v6": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-pricing-v6-tests src/data/room-master-v6.ts src/data/room-master-v6-confirmed.ts src/data/pricing-v6.ts src/data/pricing-v6.test.ts && node --test /tmp/ak-bermet-pricing-v6-tests/data/pricing-v6.test.js",
+    "test:legal-contract": "node --test src/data/legal.contract.test.mjs",
+    "test:ai-provider-mode": "node --test src/lib/ai/providers/provider-mode.contract.test.mjs",
+    "test:availability-authority": "node --test src/app/api/availability/route.contract.test.mjs",
     "test:lead-durability": "node --test src/app/api/leads/route.contract.test.mjs",
     "test:leads-sheets-outbox": "node --test supabase/migrations/leads-sheets-outbox.contract.test.mjs",
     "test:room-public-catalog": "node --test src/data/room-public-catalog-v6.contract.test.mjs",

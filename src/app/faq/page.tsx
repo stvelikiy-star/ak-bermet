@@ -3,7 +3,7 @@ import Container from "@/components/ui/Container";
 import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
 import FaqAccordion from "@/components/ui/FaqAccordion";
-import { allFaqs } from "@/data/faq";
+import { allFaqs, faqAnswer } from "@/data/faq";
 import { WA } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
@@ -31,7 +31,10 @@ export default async function FaqPage() {
       <section className="bg-cream py-16 sm:py-24">
         <Container>
           <FaqAccordion
-            items={allFaqs.map((f) => ({ q: t(f.q, locale), a: t(f.a, locale) }))}
+            items={allFaqs.map((faq) => ({
+              q: t(faq.q, locale),
+              a: faq.localizedAnswer ? faqAnswer(faq, locale) : t(faq.a, locale),
+            }))}
           />
         </Container>
       </section>

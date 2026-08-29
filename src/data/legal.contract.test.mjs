@@ -3,6 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const legal = await readFile(new URL("./legal.ts", import.meta.url), "utf8");
+const faq = await readFile(new URL("./faq.ts", import.meta.url), "utf8");
+const faqSection = await readFile(
+  new URL("../components/sections/FAQSection.tsx", import.meta.url),
+  "utf8"
+);
+const faqPage = await readFile(
+  new URL("../app/faq/page.tsx", import.meta.url),
+  "utf8"
+);
 const knowledge = await readFile(
   new URL("../lib/ai/knowledge-base.ts", import.meta.url),
   "utf8"
@@ -12,9 +21,7 @@ const settings = await readFile(
   "utf8"
 );
 
-const declaredScope = `${legal}
-${knowledge}
-${settings}`;
+const declaredScope = `${legal}\n${faq}\n${faqSection}\n${faqPage}\n${knowledge}\n${settings}`;
 
 const forbiddenCancellationText = [
   "За 14 и более дней до заезда",
@@ -23,11 +30,18 @@ const forbiddenCancellationText = [
   "Удерживается стоимость одних суток",
   "14+ дн. — 100%",
   "7–14 дн. — 50%",
+  "за 14 и более дней возвращается 100%",
+  "за 7–14 дней возвращается 50%",
+  "удерживается стоимость одних суток",
 ];
 
-test("declared scope contains no invented legacy cancellation tiers", () => {
+test("public and operational scope contains no invented legacy cancellation tiers", () => {
   for (const text of forbiddenCancellationText) {
-    assert.equal(declaredScope.includes(text), false, `legacy rule remains: ${text}`);
+    assert.equal(
+      declaredScope.toLowerCase().includes(text.toLowerCase()),
+      false,
+      `legacy rule remains: ${text}`
+    );
   }
 });
 
@@ -42,6 +56,16 @@ test("LEGAL carries only the owner-approved cancellation meaning", () => {
   assert.match(legal, /result: "Предоплата не возвращается"/);
   assert.match(legal, /term: "Неявка \(no-show\)"/);
   assert.match(legal, /note: "неявка считается невозвратной"/);
+});
+
+test("public FAQ carries the same approved cancellation meaning", () => {
+  assert.match(faq, /При отмене за 7 и более дней до заезда возврат предоплаты возможен/);
+  assert.match(faq, /с учётом применимой комиссии и процедуры через администратора/);
+  assert.match(faq, /При отмене менее чем за 7 дней предоплата не возвращается/);
+  assert.match(faq, /При неявке \(no-show\) предоплата не возвращается/);
+  assert.match(faq, /localizedAnswer:/);
+  assert.match(faqSection, /faq\.localizedAnswer \? faqAnswer\(faq, locale\)/);
+  assert.match(faqPage, /faq\.localizedAnswer \? faqAnswer\(faq, locale\)/);
 });
 
 test("approved prepayment and check-in/out rules remain unchanged", () => {

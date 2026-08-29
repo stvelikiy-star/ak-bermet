@@ -11,6 +11,7 @@ dist/
 !.env.example
 .env.local
 # Generated files
+*.tsbuildinfo
 # Local AI tool state
 # Local secrets and environment files
 staff-auth-manifest*.json
