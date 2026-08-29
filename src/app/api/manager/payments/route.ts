@@ -35,6 +35,16 @@ function isIsoTimestamp(value: string): boolean {
   return Number.isFinite(parsed);
 }
 
+function isHttpUrl(value: string): boolean {
+  if (!value) return true;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function parsePayload(value: unknown): PaymentPayload | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
@@ -51,12 +61,13 @@ function parsePayload(value: unknown): PaymentPayload | null {
   const bookingId = typeof input.bookingId === "string" ? input.bookingId.trim() : "";
   const paidAt = typeof input.paidAt === "string" ? input.paidAt.trim() : "";
   const method = typeof input.method === "string" ? input.method.trim() : "";
-  const amountKgs = Number(input.amountKgs);
+  const amountKgs = typeof input.amountKgs === "number" ? input.amountKgs : Number.NaN;
   const receiptUrl = typeof input.receiptUrl === "string" ? input.receiptUrl.trim() : "";
   const notes = typeof input.notes === "string" ? input.notes.trim() : "";
 
   if (!isUuid(bookingId) || !isIsoTimestamp(paidAt) || !method) return null;
   if (!Number.isFinite(amountKgs) || amountKgs <= 0) return null;
+  if (!isHttpUrl(receiptUrl)) return null;
   if (method.length > 120 || receiptUrl.length > 2000 || notes.length > 4000) return null;
 
   return { action, bookingId, paidAt, method, amountKgs, receiptUrl, notes };
