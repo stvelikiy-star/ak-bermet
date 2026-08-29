@@ -76,12 +76,12 @@ async function loadProvider({
     );
 
   const encoded = Buffer.from(executable, "utf8").toString("base64");
-  const module = await import(
+  const providerModule = await import(
     `data:text/javascript;base64,${encoded}#${moduleSerial++}`
   );
 
   return {
-    module,
+    module: providerModule,
     calls: () => ({ mock: mockCalls, openai: openaiCalls }),
     restore() {
       restoreEnvironment(snapshot);
