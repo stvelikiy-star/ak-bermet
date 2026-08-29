@@ -7,6 +7,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 export const dynamic = "force-dynamic";
 
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
+const ACTIVE_BOOKING_STATUSES = new Set(["pending_confirmation", "confirmed", "checked_in"]);
+const PAGE_SIZE = 1000;
 
 interface CustomerRelation { full_name?: string | null; phone?: string | null }
 interface BookingRow {
@@ -64,35 +66,41 @@ export default async function ManagerPaymentsPage() {
   const allowed = hasAnyRole(staff, [...MANAGER_ROLES]);
   const supabase = allowed ? await createSupabaseServerClient() : null;
 
-  let bookings: BookingRow[] = [];
-  let payments: PaymentRow[] = [];
+  const bookings: BookingRow[] = [];
+  const payments: PaymentRow[] = [];
   let readError = false;
 
   if (supabase) {
-    const [bookingsResult, paymentsResult] = await Promise.all([
-      supabase
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const { data, error } = await supabase
         .from("bookings")
         .select("id, booking_number, status, total_amount_kgs, customers ( full_name, phone )")
         .is("deleted_at", null)
-        .not("status", "in", '(cancelled,no_show,checked_out)')
         .order("created_at", { ascending: false })
-        .limit(300),
-      supabase
-        .from("booking_payments")
-        .select("id, booking_id, paid_at, method, amount_kgs, currency, status, receipt_url, confirmed_by, confirmed_at, balance_after_kgs, notes, void_reason, voided_at, created_at")
-        .is("deleted_at", null)
-        .order("paid_at", { ascending: false })
-        .limit(500),
-    ]);
+        .range(from, from + PAGE_SIZE - 1);
+      if (error || !data) { readError = true; break; }
+      const page = data as BookingRow[];
+      bookings.push(...page);
+      if (page.length < PAGE_SIZE) break;
+    }
 
-    if (bookingsResult.error || paymentsResult.error || !bookingsResult.data || !paymentsResult.data) {
-      readError = true;
-    } else {
-      bookings = bookingsResult.data as BookingRow[];
-      payments = paymentsResult.data as PaymentRow[];
+    if (!readError) {
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("booking_payments")
+          .select("id, booking_id, paid_at, method, amount_kgs, currency, status, receipt_url, confirmed_by, confirmed_at, balance_after_kgs, notes, void_reason, voided_at, created_at")
+          .is("deleted_at", null)
+          .order("paid_at", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error || !data) { readError = true; break; }
+        const page = data as PaymentRow[];
+        payments.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
     }
   }
 
+  const activeBookings = bookings.filter((booking) => ACTIVE_BOOKING_STATUSES.has(booking.status));
   const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
   const paidByBooking = new Map<string, number>();
   for (const payment of payments) {
@@ -100,7 +108,7 @@ export default async function ManagerPaymentsPage() {
     paidByBooking.set(payment.booking_id, (paidByBooking.get(payment.booking_id) ?? 0) + Number(payment.amount_kgs || 0));
   }
 
-  const bookingOptions: ManualPaymentBookingOption[] = bookings.map((booking) => ({
+  const bookingOptions: ManualPaymentBookingOption[] = activeBookings.map((booking) => ({
     id: booking.id,
     number: booking.booking_number,
     guest: first(booking.customers)?.full_name ?? "Без имени",
@@ -110,8 +118,12 @@ export default async function ManagerPaymentsPage() {
 
   const confirmedPayments = payments.filter((payment) => payment.status === "confirmed");
   const confirmedTotal = confirmedPayments.reduce((sum, payment) => sum + Number(payment.amount_kgs || 0), 0);
-  const activeBookedTotal = bookings.reduce((sum, booking) => sum + Number(booking.total_amount_kgs || 0), 0);
-  const operationalOutstanding = Math.max(activeBookedTotal - confirmedTotal, 0);
+  const activeBookedTotal = activeBookings.reduce((sum, booking) => sum + Number(booking.total_amount_kgs || 0), 0);
+  const activeBookingIds = new Set(activeBookings.map((booking) => booking.id));
+  const activePaidTotal = confirmedPayments
+    .filter((payment) => activeBookingIds.has(payment.booking_id))
+    .reduce((sum, payment) => sum + Number(payment.amount_kgs || 0), 0);
+  const operationalOutstanding = Math.max(activeBookedTotal - activePaidTotal, 0);
 
   return (
     <>
@@ -131,8 +143,8 @@ export default async function ManagerPaymentsPage() {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Активные брони</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(activeBookedTotal)}</p></div>
-              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Фактически зафиксировано</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(confirmedTotal)}</p></div>
-              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Операционный остаток</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(operationalOutstanding)}</p><p className="mt-1 text-[11px] text-muted">По сумме активных броней, не банковская сверка.</p></div>
+              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Фактически зафиксировано</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(confirmedTotal)}</p><p className="mt-1 text-[11px] text-muted">По всей истории журнала, включая завершённые брони.</p></div>
+              <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><p className="text-sm text-muted">Операционный остаток активных броней</p><p className="mt-1 font-display text-2xl font-semibold text-emerald-deep">{money(operationalOutstanding)}</p><p className="mt-1 text-[11px] text-muted">Не банковская сверка.</p></div>
             </div>
 
             {bookingOptions.length > 0 ? (
@@ -144,7 +156,7 @@ export default async function ManagerPaymentsPage() {
             <section className="rounded-xl border border-gold/15 bg-white shadow-soft">
               <div className="border-b border-gold/10 p-4">
                 <h2 className="font-display text-lg font-semibold text-emerald-deep">Журнал оплат</h2>
-                <p className="mt-1 text-xs text-muted">Записи не удаляются молча. Ошибочная запись аннулируется с обязательной причиной и остаётся в истории.</p>
+                <p className="mt-1 text-xs text-muted">История сохраняется и после выезда/отмены брони. Ошибочная запись аннулируется с обязательной причиной и остаётся в журнале.</p>
               </div>
 
               {payments.length === 0 ? (
