@@ -79,6 +79,9 @@ jobs:
       - name: Manual booking transaction contract
         run: npm run test:manual-booking
 
+      - name: Manual payment ledger contract
+        run: npm run test:manual-payments
+
       - name: Booking chessboard rules
         run: npm run test:booking-chessboard
 

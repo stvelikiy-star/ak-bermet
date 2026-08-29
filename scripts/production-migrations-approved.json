@@ -34,6 +34,7 @@
     "20260825201822_harden_staff_rpc_role_checks.sql",
     "20260829102000_super_chessboard_v2.sql",
     "20260829110500_super_chessboard_rpc_acl_hardening.sql",
-    "20260829113000_super_chessboard_move_rpc_fix.sql"
+    "20260829113000_super_chessboard_move_rpc_fix.sql",
+    "20260829115500_manual_payment_ledger.sql"
   ]
 }

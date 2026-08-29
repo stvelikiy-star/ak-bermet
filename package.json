@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "AK BERMET — SPA & Wellness resort website",
-  "engines": {
-    "node": ">=22.0.0"
-  },
+  "engines": { "node": ">=22.0.0" },
   "scripts": {
     "test:room-master": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-room-master-tests src/data/room-master-v6.ts src/data/room-master-v6.test.ts && node --test /tmp/ak-bermet-room-master-tests/data/room-master-v6.test.js",
     "test:pricing-v6": "tsc --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir src --outDir /tmp/ak-bermet-pricing-v6-tests src/data/room-master-v6.ts src/data/room-master-v6-confirmed.ts src/data/pricing-v6.ts src/data/pricing-v6.test.ts && node --test /tmp/ak-bermet-pricing-v6-tests/data/pricing-v6.test.js",
@@ -18,10 +16,11 @@
     "test:backup-contract": "node --test supabase/migrations/ak-bermet-production-backup.contract.test.mjs",
     "test:supabase-security-contract": "node --test supabase/migrations/security-definer-execute.contract.test.mjs",
     "test:manual-booking": "node --test supabase/migrations/manual-booking-transaction.contract.test.mjs src/app/api/manager/bookings/route.contract.test.mjs",
+    "test:manual-payments": "node --test supabase/migrations/manual-payment-ledger.contract.test.mjs",
     "test:manager-live-data": "node --test src/app/manager/manager-live-data.contract.test.mjs",
     "test:staff-auth-provisioner": "node --test scripts/staff-auth-provisioner.contract.test.mjs",
     "test:sheets-sync-outbox": "node --test supabase/migrations/sheets-sync-outbox.contract.test.mjs",
-    "test:sheets-sync-worker": "node --test scripts/sheets-sync-worker.contract.test.mjs",
+    "test:sheets-sync-worker": "node --test scripts/sheets-sync-worker.contract.test.mjs scripts/sheets-mirror-workflow.contract.test.mjs",
     "test:production-preflight": "node --test scripts/production-preflight.contract.test.mjs",
     "test:local-auth-preflight": "node --test scripts/local-auth-preflight.contract.test.mjs",
     "preflight:production": "node scripts/production-preflight.mjs --production-env",
@@ -59,10 +58,5 @@
     "tailwindcss": "^3.4.6",
     "typescript": "^5.5.3"
   },
-  "overrides": {
-    "postcss": "$postcss",
-    "nanoid": "3.3.18",
-    "brace-expansion": "2.1.4",
-    "sharp": "0.35.3"
-  }
+  "overrides": { "postcss": "$postcss", "nanoid": "3.3.18", "brace-expansion": "2.1.4", "sharp": "0.35.3" }
 }
