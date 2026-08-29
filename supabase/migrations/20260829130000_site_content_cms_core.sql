@@ -74,14 +74,16 @@ alter table public.site_content_drafts enable row level security;
 alter table public.site_content_public enable row level security;
 alter table public.site_content_history enable row level security;
 
-revoke all on public.site_content_drafts from anon;
-revoke all on public.site_content_history from anon;
-revoke insert, update, delete on public.site_content_drafts from authenticated;
-revoke insert, update, delete on public.site_content_public from anon, authenticated;
-revoke insert, update, delete on public.site_content_history from authenticated;
+-- Explicit ACL lockdown: Supabase projects may have default privileges for API roles.
+-- Staff can read drafts/history through RLS. Public callers get only published text metadata,
+-- never staff UUIDs (published_by) or internal updated_at.
+revoke all on public.site_content_drafts from anon, authenticated;
+revoke all on public.site_content_history from anon, authenticated;
+revoke all on public.site_content_public from anon, authenticated;
 grant select on public.site_content_drafts to authenticated;
 grant select on public.site_content_history to authenticated;
-grant select on public.site_content_public to anon, authenticated;
+grant select (content_key, locale, published_value, version, published_at)
+  on public.site_content_public to anon, authenticated;
 
 drop policy if exists site_content_drafts_staff_read on public.site_content_drafts;
 create policy site_content_drafts_staff_read
