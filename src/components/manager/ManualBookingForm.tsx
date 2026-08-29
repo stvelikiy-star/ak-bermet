@@ -10,6 +10,16 @@ export interface ManualBookingRoomOption {
   extraPlaces: number;
 }
 
+interface ManualBookingFormProps {
+  rooms: readonly ManualBookingRoomOption[];
+  initialRoomId?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+  embedded?: boolean;
+  title?: string;
+  onCreated?: () => void;
+}
+
 const SOURCE_OPTIONS = [
   ["manual", "Вручную"],
   ["phone", "Телефон"],
@@ -41,11 +51,22 @@ function money(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(value);
 }
 
-export default function ManualBookingForm({ rooms }: { rooms: readonly ManualBookingRoomOption[] }) {
+export default function ManualBookingForm({
+  rooms,
+  initialRoomId,
+  initialCheckIn,
+  initialCheckOut,
+  embedded = false,
+  title = "Новая бронь",
+  onCreated,
+}: ManualBookingFormProps) {
   const router = useRouter();
+  const defaultRoomId = initialRoomId && rooms.some((room) => room.id === initialRoomId)
+    ? initialRoomId
+    : rooms[0]?.id ?? "";
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const [roomId, setRoomId] = useState(rooms[0]?.id ?? "");
+  const [roomId, setRoomId] = useState(defaultRoomId);
   const [total, setTotal] = useState("0");
 
   const selectedRoom = useMemo(() => rooms.find((room) => room.id === roomId) ?? null, [roomId, rooms]);
@@ -92,9 +113,10 @@ export default function ManualBookingForm({ rooms }: { rooms: readonly ManualBoo
         text: result.booking?.number ? `Бронь ${result.booking.number} создана.` : "Бронь создана.",
       });
       event.currentTarget.reset();
-      setRoomId(rooms[0]?.id ?? "");
+      setRoomId(defaultRoomId);
       setTotal("0");
       router.refresh();
+      onCreated?.();
     } catch {
       setMessage({ kind: "error", text: "Связь с CRM прервана. Повторите действие после проверки соединения." });
     } finally {
@@ -103,9 +125,12 @@ export default function ManualBookingForm({ rooms }: { rooms: readonly ManualBoo
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-xl border border-gold/15 bg-white p-5 shadow-soft">
+    <form
+      onSubmit={submit}
+      className={embedded ? "space-y-4" : "space-y-4 rounded-xl border border-gold/15 bg-white p-5 shadow-soft"}
+    >
       <div>
-        <h2 className="font-display text-lg font-semibold text-emerald-deep">Новая бронь</h2>
+        <h2 className="font-display text-lg font-semibold text-emerald-deep">{title}</h2>
         <p className="mt-1 text-xs text-muted">
           Бронь создаётся одной транзакцией. При пересечении с бронью, удержанием или тех.блоком ничего не сохраняется.
         </p>
@@ -138,11 +163,11 @@ export default function ManualBookingForm({ rooms }: { rooms: readonly ManualBoo
         </label>
         <label className="text-xs font-medium text-muted">
           Заезд
-          <input name="checkIn" type="date" required className="mt-1 w-full rounded-lg border border-gold/20 px-3 py-2 text-sm text-emerald-deep" />
+          <input name="checkIn" type="date" required defaultValue={initialCheckIn} className="mt-1 w-full rounded-lg border border-gold/20 px-3 py-2 text-sm text-emerald-deep" />
         </label>
         <label className="text-xs font-medium text-muted">
           Выезд
-          <input name="checkOut" type="date" required className="mt-1 w-full rounded-lg border border-gold/20 px-3 py-2 text-sm text-emerald-deep" />
+          <input name="checkOut" type="date" required defaultValue={initialCheckOut} className="mt-1 w-full rounded-lg border border-gold/20 px-3 py-2 text-sm text-emerald-deep" />
         </label>
       </div>
 
