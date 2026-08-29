@@ -82,6 +82,9 @@ jobs:
       - name: Manual payment ledger contract
         run: npm run test:manual-payments
 
+      - name: Site content CMS contract
+        run: npm run test:site-content-cms
+
       - name: Booking chessboard rules
         run: npm run test:booking-chessboard
 
