@@ -12,18 +12,9 @@ const files = [
 const contents = Object.fromEntries(
   files.map((path) => [path, fs.readFileSync(new URL(path, import.meta.url), "utf8")]),
 );
-const availabilityPage = fs.readFileSync(
-  new URL("./availability/page.tsx", import.meta.url),
-  "utf8",
-);
-const chessboardShared = fs.readFileSync(
-  new URL("../../lib/booking-chessboard.ts", import.meta.url),
-  "utf8",
-);
-const chessboardLoader = fs.readFileSync(
-  new URL("../../lib/booking-chessboard-server.ts", import.meta.url),
-  "utf8",
-);
+const availabilityPage = fs.readFileSync(new URL("./availability/page.tsx", import.meta.url), "utf8");
+const chessboardShared = fs.readFileSync(new URL("../../lib/booking-chessboard.ts", import.meta.url), "utf8");
+const chessboardLoader = fs.readFileSync(new URL("../../lib/booking-chessboard-server.ts", import.meta.url), "utf8");
 
 test("manager operational pages do not import demo manager-mock data", () => {
   for (const [path, source] of Object.entries(contents)) {
@@ -48,19 +39,27 @@ test("room registry is backed by authoritative room_units", () => {
   assert.match(source, /operational_status/);
 });
 
-test("payments page never fabricates payment facts when no payment ledger exists", () => {
+test("payments page uses the real manual ledger and never pretends to process money", () => {
   const source = contents["./payments/page.tsx"];
   assert.match(source, /\.from\("bookings"\)/);
-  assert.match(source, /предоплата 20%/i);
-  assert.match(source, /Не хранится/);
-  assert.match(source, /не выдумываются/);
+  assert.match(source, /\.from\("booking_payments"\)/);
+  assert.match(source, /ManualPaymentForm/);
+  assert.match(source, /Фактически зафиксировано/);
+  assert.match(source, /Интернет-эквайринга и автоматического списания нет/);
+  assert.match(source, /не банковская/i);
 });
 
-test("reports are computed from Supabase leads and bookings", () => {
+test("analytics is computed from CRM bookings payments rooms and occupancy in Supabase", () => {
   const source = contents["./reports/page.tsx"];
   assert.match(source, /\.from\("leads"\)/);
   assert.match(source, /\.from\("bookings"\)/);
-  assert.match(source, /Не равно фактически оплаченному/);
+  assert.match(source, /\.from\("booking_payments"\)/);
+  assert.match(source, /\.from\("room_units"\)/);
+  assert.match(source, /\.from\("occupancy_periods"\)/);
+  assert.match(source, /Конверсия в бронь/);
+  assert.match(source, /Заезды сегодня/);
+  assert.match(source, /Готово к продаже/);
+  assert.match(source, /не банковская/i);
 });
 
 test("booking chessboard reads authoritative Supabase inventory without mock fallback", () => {
