@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const migration = fs.readFileSync(new URL("./20260829130000_site_content_cms_core.sql", import.meta.url), "utf8");
+const runtimeFix = fs.readFileSync(new URL("./20260829133000_site_content_cms_rpc_runtime_fix.sql", import.meta.url), "utf8");
 const registry = fs.readFileSync(new URL("../../src/lib/site-content.ts", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../../src/app/api/manager/content/route.ts", import.meta.url), "utf8");
 const page = fs.readFileSync(new URL("../../src/app/manager/content/page.tsx", import.meta.url), "utf8");
@@ -11,6 +12,7 @@ const hero = fs.readFileSync(new URL("../../src/components/sections/HeroSection.
 const contacts = fs.readFileSync(new URL("../../src/components/sections/ContactsSection.tsx", import.meta.url), "utf8");
 const sidebar = fs.readFileSync(new URL("../../src/components/manager/ManagerSidebar.tsx", import.meta.url), "utf8");
 const sql = migration.replace(/\s+/g, " ").toLowerCase();
+const fixSql = runtimeFix.replace(/\s+/g, " ").toLowerCase();
 
 test("CMS physically separates private drafts/history from public published content", () => {
   assert.match(sql, /create table if not exists public\.site_content_drafts/);
@@ -41,6 +43,19 @@ test("CMS writes are RPC-only, owner/admin gated and anonymous execution is revo
   }
   assert.match(sql, /public\.has_role\('owner'\) or public\.has_role\('administrator'\)/);
   assert.doesNotMatch(api, /\.from\("site_content_(drafts|public|history)"\)\.(insert|update|delete)/);
+});
+
+test("CMS upserts target named constraints to avoid PL/pgSQL RETURNS TABLE ambiguity", () => {
+  assert.match(sql, /on conflict on constraint site_content_drafts_pkey do update/);
+  assert.match(sql, /on conflict on constraint site_content_public_pkey do update/);
+  assert.doesNotMatch(sql, /on conflict \(content_key, locale\) do update/);
+
+  assert.match(fixSql, /create or replace function public\.fn_save_site_content_draft/);
+  assert.match(fixSql, /create or replace function public\.fn_publish_site_content/);
+  assert.match(fixSql, /create or replace function public\.fn_restore_site_content_draft/);
+  assert.match(fixSql, /on conflict on constraint site_content_drafts_pkey do update/);
+  assert.match(fixSql, /on conflict on constraint site_content_public_pkey do update/);
+  assert.doesNotMatch(fixSql, /on conflict \(content_key, locale\) do update/);
 });
 
 test("publish, unpublish and restore preserve explicit version history", () => {
