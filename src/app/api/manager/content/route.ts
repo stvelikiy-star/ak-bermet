@@ -13,7 +13,8 @@ type Action = "save" | "publish" | "unpublish" | "restore";
 
 type Payload =
   | { action: "save"; contentKey: string; locale: string; value: string }
-  | { action: "publish" | "unpublish"; contentKey: string; locale: string }
+  | { action: "publish"; contentKey: string; locale: string }
+  | { action: "unpublish"; contentKey: string; locale: string }
   | { action: "restore"; historyId: string };
 
 function isUuid(value: string): boolean {
