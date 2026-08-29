@@ -60,9 +60,10 @@ test("universal service catalog keeps unknown-price services manual and approved
   assert.match(sql, /create table if not exists public\.booking_services/);
 });
 
-test("placement API always previews against authoritative occupancy and commits through RPC", () => {
-  assert.match(placementRoute, /mode:\s*"preview"/);
-  assert.match(placementRoute, /mode:\s*"commit"/);
+test("placement API validates preview/commit modes, previews authoritative occupancy and commits through RPC", () => {
+  assert.match(placementRoute, /type PlacementMode = "preview" \| "commit"/);
+  assert.match(placementRoute, /input\.mode === "preview" \|\| input\.mode === "commit"/);
+  assert.match(placementRoute, /if \(payload\.mode === "commit"\)/);
   assert.match(placementRoute, /\.from\("occupancy_periods"\)/);
   assert.match(placementRoute, /\.overlaps\("period"/);
   assert.match(placementRoute, /supabase\.rpc\("fn_move_booking_room"/);
