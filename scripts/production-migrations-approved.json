@@ -31,6 +31,7 @@
     "20260825191134_optimize_rls_auth_initplans.sql",
     "20260825191341_consolidate_operational_select_policies.sql",
     "20260825191549_split_admin_write_policies.sql",
-    "20260825201822_harden_staff_rpc_role_checks.sql"
+    "20260825201822_harden_staff_rpc_role_checks.sql",
+    "20260829102000_super_chessboard_v2.sql"
   ]
 }
