@@ -24,6 +24,7 @@ const NAV = [
   { href: "/manager/inspections", label: "Проверки", icon: IconEye },
   { href: "/manager/payments", label: "Оплаты", icon: IconGift },
   { href: "/manager/reports", label: "Отчёты", icon: IconWaves },
+  { href: "/manager/content", label: "Сайт / контент", icon: IconEye },
   { href: "/manager/settings", label: "Настройки", icon: IconShield },
 ];
 
