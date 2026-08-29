@@ -16,8 +16,12 @@ const availabilityPage = fs.readFileSync(
   new URL("./availability/page.tsx", import.meta.url),
   "utf8",
 );
-const chessboardLoader = fs.readFileSync(
+const chessboardShared = fs.readFileSync(
   new URL("../../lib/booking-chessboard.ts", import.meta.url),
+  "utf8",
+);
+const chessboardLoader = fs.readFileSync(
+  new URL("../../lib/booking-chessboard-server.ts", import.meta.url),
   "utf8",
 );
 
@@ -61,6 +65,7 @@ test("reports are computed from Supabase leads and bookings", () => {
 
 test("booking chessboard reads authoritative Supabase inventory without mock fallback", () => {
   assert.match(availabilityPage, /loadBookingChessboard/);
+  assert.match(availabilityPage, /booking-chessboard-server/);
   assert.doesNotMatch(availabilityPage, /manager-mock|mockRooms|mockOccupancy/);
   assert.match(chessboardLoader, /\.from\("room_units"\)/);
   assert.match(chessboardLoader, /\.from\("occupancy_periods"\)/);
@@ -68,4 +73,5 @@ test("booking chessboard reads authoritative Supabase inventory without mock fal
   assert.match(chessboardLoader, /getCurrentStaff/);
   assert.match(chessboardLoader, /BookingChessboardError\("READ_FAILED"\)/);
   assert.doesNotMatch(chessboardLoader, /manager-mock|mockRooms|mockOccupancy/);
+  assert.doesNotMatch(chessboardShared, /getCurrentStaff|server-client|next\/headers/);
 });
