@@ -10,9 +10,11 @@ test("Sheets mirror runs on schedule with single non-cancelling concurrency grou
   assert.match(workflow, /cancel-in-progress: false/);
 });
 
-test("scheduled run executes one-way worker and manual dispatch defaults to dry-run", () => {
+test("scheduled mirror stays dry-run until protected cutover approval", () => {
   assert.match(workflow, /default: "dry-run"/);
-  assert.match(workflow, /if \[ "\$EVENT_NAME" = "schedule" \]; then[\s\S]*mode="execute"/);
+  assert.match(workflow, /MIRROR_APPROVAL: \$\{\{ secrets\.AK_BERMET_SHEETS_MIRROR_ENABLED \}\}/);
+  assert.match(workflow, /if \[ "\$EVENT_NAME" = "schedule" \]; then[\s\S]*MIRROR_APPROVAL[\s\S]*mode="execute"[\s\S]*mode="dry-run"/);
+  assert.match(workflow, /MIRROR_EXECUTION_NOT_APPROVED/);
   assert.match(workflow, /node scripts\/sheets-sync-worker\.mjs --execute/);
   assert.match(workflow, /node scripts\/sheets-sync-worker\.mjs --dry-run/);
 });
@@ -24,6 +26,7 @@ test("workflow fails closed on missing protected configuration and never echoes 
     "GOOGLE_SHEETS_SPREADSHEET_ID",
     "GOOGLE_SERVICE_ACCOUNT_EMAIL",
     "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
+    "AK_BERMET_SHEETS_MIRROR_ENABLED",
   ]) {
     const expected = name + ": " + "${{ secrets." + name + " }}";
     assert.ok(workflow.includes(expected), `missing protected workflow input ${name}`);
