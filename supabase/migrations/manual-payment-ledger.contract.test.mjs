@@ -28,6 +28,12 @@ test("payment ledger anchors booking and staff audit identities with foreign key
   assert.match(sql, /booking_payments_voided_by_idx/);
 });
 
+test("payment API accepts only numeric amount and http(s) receipt URLs", () => {
+  assert.match(api, /typeof input\.amountKgs === "number" \? input\.amountKgs : Number\.NaN/);
+  assert.match(api, /parsed\.protocol === "http:" \|\| parsed\.protocol === "https:"/);
+  assert.match(api, /if \(!isHttpUrl\(receiptUrl\)\) return null/);
+});
+
 test("manual payment writes only through guarded RPCs and anon cannot execute them", () => {
   assert.match(sql, /revoke execute on function public\.fn_record_manual_payment[\s\S]*from anon/);
   assert.match(sql, /revoke execute on function public\.fn_void_manual_payment[\s\S]*from anon/);
