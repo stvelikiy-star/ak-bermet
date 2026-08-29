@@ -36,7 +36,7 @@ jobs:
       GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
       GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
       GOOGLE_SHEETS_ENABLED: "true"
-      AK_BERMET_SHEETS_MIRROR_ENABLED: "YES"
+      AK_BERMET_SHEETS_MIRROR_ENABLED: ${{ secrets.AK_BERMET_SHEETS_MIRROR_ENABLED }}
 
     steps:
       - name: Checkout
@@ -74,10 +74,15 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_MODE: ${{ inputs.mode }}
           INPUT_LIMIT: ${{ inputs.limit }}
+          MIRROR_APPROVAL: ${{ secrets.AK_BERMET_SHEETS_MIRROR_ENABLED }}
         run: |
           set -euo pipefail
           if [ "$EVENT_NAME" = "schedule" ]; then
-            mode="execute"
+            if [ "${MIRROR_APPROVAL:-}" = "YES" ]; then
+              mode="execute"
+            else
+              mode="dry-run"
+            fi
             limit="100"
           else
             mode="${INPUT_MODE:-dry-run}"
@@ -86,6 +91,10 @@ jobs:
           case "$mode" in dry-run|execute) ;; *) echo "INVALID_MODE"; exit 2 ;; esac
           case "$limit" in ''|*[!0-9]*) echo "INVALID_LIMIT"; exit 2 ;; esac
           if [ "$limit" -lt 1 ] || [ "$limit" -gt 100 ]; then echo "INVALID_LIMIT"; exit 2; fi
+          if [ "$mode" = "execute" ] && [ "${MIRROR_APPROVAL:-}" != "YES" ]; then
+            echo "BLOCKED: MIRROR_EXECUTION_NOT_APPROVED"
+            exit 2
+          fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "limit=$limit" >> "$GITHUB_OUTPUT"
 
