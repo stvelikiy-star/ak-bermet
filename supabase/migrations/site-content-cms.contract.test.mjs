@@ -19,11 +19,14 @@ test("CMS physically separates private drafts/history from public published cont
   assert.match(sql, /alter table public\.site_content_drafts enable row level security/);
   assert.match(sql, /alter table public\.site_content_public enable row level security/);
   assert.match(sql, /alter table public\.site_content_history enable row level security/);
-  assert.match(sql, /revoke all on public\.site_content_drafts from anon/);
-  assert.match(sql, /revoke all on public\.site_content_history from anon/);
-  assert.match(sql, /grant select on public\.site_content_public to anon, authenticated/);
-  assert.doesNotMatch(sql, /grant select on public\.site_content_drafts to anon/);
-  assert.doesNotMatch(sql, /grant select on public\.site_content_history to anon/);
+  assert.match(sql, /revoke all on public\.site_content_drafts from anon, authenticated/);
+  assert.match(sql, /revoke all on public\.site_content_history from anon, authenticated/);
+  assert.match(sql, /revoke all on public\.site_content_public from anon, authenticated/);
+  assert.match(sql, /grant select on public\.site_content_drafts to authenticated/);
+  assert.match(sql, /grant select on public\.site_content_history to authenticated/);
+  assert.match(sql, /grant select \(content_key, locale, published_value, version, published_at\) on public\.site_content_public to anon, authenticated/);
+  assert.doesNotMatch(sql, /grant select \([^)]*published_by/);
+  assert.doesNotMatch(sql, /grant select \([^)]*updated_at/);
 });
 
 test("CMS writes are RPC-only, owner/admin gated and anonymous execution is revoked", () => {
@@ -37,9 +40,6 @@ test("CMS writes are RPC-only, owner/admin gated and anonymous execution is revo
     assert.match(sql, new RegExp(`revoke execute on function public\\.${fn}[\\s\\S]*from anon`));
   }
   assert.match(sql, /public\.has_role\('owner'\) or public\.has_role\('administrator'\)/);
-  assert.match(sql, /revoke insert, update, delete on public\.site_content_drafts from authenticated/);
-  assert.match(sql, /revoke insert, update, delete on public\.site_content_public from anon, authenticated/);
-  assert.match(sql, /revoke insert, update, delete on public\.site_content_history from authenticated/);
   assert.doesNotMatch(api, /\.from\("site_content_(drafts|public|history)"\)\.(insert|update|delete)/);
 });
 
