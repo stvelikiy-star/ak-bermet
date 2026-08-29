@@ -82,6 +82,9 @@ jobs:
       - name: Booking chessboard rules
         run: npm run test:booking-chessboard
 
+      - name: Super chessboard V2 contract
+        run: npm run test:super-chessboard
+
       - name: Manager live-data contract
         run: npm run test:manager-live-data
 

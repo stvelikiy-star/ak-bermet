@@ -8,6 +8,36 @@ export interface ChessboardRoom {
   readonly category: string;
   readonly sellableStatus: string;
   readonly operationalStatus: string;
+  readonly maxCapacity?: number;
+  readonly extraPlaces?: number;
+}
+
+export interface ChessboardBookingService {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly quantity: number;
+  readonly unitPriceKgs: number;
+  readonly totalAmountKgs: number;
+  readonly unitLabel: string;
+  readonly scheduledFor: string | null;
+  readonly status: string;
+}
+
+export interface ChessboardBookingSummary {
+  readonly bookingId: string;
+  readonly bookingRoomId: string;
+  readonly bookingNumber: string;
+  readonly status: string;
+  readonly guestName: string;
+  readonly guestPhone: string;
+  readonly adults: number;
+  readonly children: number;
+  readonly extraBeds: number;
+  readonly totalAmountKgs: number;
+  readonly prepaymentRequiredKgs: number;
+  readonly notes: string | null;
+  readonly services?: readonly ChessboardBookingService[];
 }
 
 export interface ChessboardPeriod {
@@ -18,6 +48,7 @@ export interface ChessboardPeriod {
   readonly state: Exclude<ChessboardState, "free">;
   readonly label: string;
   readonly sourceId: string | null;
+  readonly booking?: ChessboardBookingSummary;
 }
 
 const OPERATIONALLY_BLOCKED = new Set([
@@ -58,6 +89,13 @@ export function daysBetween(from: string, to: string): number {
   );
 }
 
+export function addDays(date: string, amount: number): string {
+  if (!isIsoDate(date) || !Number.isInteger(amount)) return "";
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + amount);
+  return value.toISOString().slice(0, 10);
+}
+
 export function isRoomOperationallyBlocked(
   room: Pick<ChessboardRoom, "sellableStatus" | "operationalStatus">,
 ): boolean {
@@ -74,6 +112,19 @@ export function periodOverlapsDate(
   return period.start <= date && date < period.end;
 }
 
+export function findPeriodForDate(
+  roomId: string,
+  periods: readonly ChessboardPeriod[],
+  date: string,
+): ChessboardPeriod | null {
+  return (
+    periods.find(
+      (period) =>
+        period.roomId === roomId && periodOverlapsDate(period, date),
+    ) ?? null
+  );
+}
+
 export function chessboardStateForDate(
   room: ChessboardRoom,
   periods: readonly ChessboardPeriod[],
@@ -83,10 +134,7 @@ export function chessboardStateForDate(
     return { state: "blocked", label: "Технически заблокирован" };
   }
 
-  const active = periods.find(
-    (period) =>
-      period.roomId === room.id && periodOverlapsDate(period, date),
-  );
+  const active = findPeriodForDate(room.id, periods, date);
   if (!active) return { state: "free", label: "Свободно" };
   return { state: active.state, label: active.label };
 }
