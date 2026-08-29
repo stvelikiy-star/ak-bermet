@@ -9,6 +9,7 @@ import {
   buildMirrorPatch,
   columnLetter,
   extractRoomExternalId,
+  findPreparedRow,
   parseDateRange,
 } from "./sheets-sync-worker.mjs";
 
@@ -50,6 +51,11 @@ test("mirror allowlist uses dedicated Supabase UUID columns and never appends in
   assert.equal(MIRROR_CONFIG.booking_payments.idIndex, 1);
   assert.equal(MIRROR_CONFIG.booking_payments.width, 21);
   assert.equal(MIRROR_CONFIG.booking_payments.syncIndex, 17);
+  assert.deepEqual(MIRROR_CONFIG.booking_payments.preparedRows, {
+    range: "B2:U1000",
+    idOffset: 0,
+    requiredFormulaOffsets: [12, 19],
+  });
 
   for (const [table, config] of Object.entries(MIRROR_CONFIG)) {
     assert.ok(config.idColumn, `${table} must have a dedicated UUID lookup column`);
@@ -74,6 +80,18 @@ test("column conversion supports UUID anchors beyond Z", () => {
   assert.equal(columnLetter(25), "Z");
   assert.equal(columnLetter(26), "AA");
   assert.equal(columnLetter(29), "AD");
+});
+
+test("prepared payment row requires blank B plus intact N and U formulas", () => {
+  const config = MIRROR_CONFIG.booking_payments.preparedRows;
+  const rows = [
+    ["existing-id", "", "", "", "", "", "", "", "", "", "", "", "=N2", "", "", "", "", "", "", "=U2"],
+    ["", "", "", "", "", "", "", "", "", "", "", "", "=N3", "", "", "", "", "", "", "=U3"],
+  ];
+  assert.equal(findPreparedRow(rows, config), 3);
+
+  const broken = [["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "=U2"]];
+  assert.equal(findPreparedRow(broken, config), null);
 });
 
 test("room mirror updates only DB-owned operational cells and preserves owner/source columns", async () => {
@@ -120,7 +138,7 @@ test("lead mirror matches the dedicated 30-column contract without inventing a s
   assert.equal(Object.keys(patch).every((index) => Number(index) >= 0 && Number(index) < 30), true);
 });
 
-test("payment mirror matches existing Оплаты columns and does not invent refunds", async () => {
+test("payment mirror matches existing Оплаты columns while preserving formulas and refund columns", async () => {
   const seen = [];
   const patch = await buildMirrorPatch(
     "booking_payments",
@@ -139,10 +157,10 @@ test("payment mirror matches existing Оплаты columns and does not invent r
   assert.equal(patch[7], 5000);
   assert.equal(patch[8], "confirmed");
   assert.equal(patch[10], "Да");
-  assert.equal(patch[14], "");
-  assert.equal(patch[15], "");
   assert.equal(patch[17], "SYNCED");
-  assert.equal(patch[20], "PASS");
+  for (const protectedIndex of [13, 14, 15, 20]) {
+    assert.equal(Object.hasOwn(patch, protectedIndex), false, `protected payment column ${protectedIndex}`);
+  }
 });
 
 test("voided payment is mirrored as zero confirmed amount with audit reason", async () => {
@@ -154,6 +172,8 @@ test("voided payment is mirrored as zero confirmed amount with audit reason", as
   assert.equal(patch[7], 0);
   assert.equal(patch[10], "Нет");
   assert.match(patch[16], /АННУЛИРОВАНО: ошибка суммы/);
+  assert.equal(Object.hasOwn(patch, 13), false);
+  assert.equal(Object.hasOwn(patch, 20), false);
 });
 
 test("relationship fields are resolved without overwriting unrelated business columns", async () => {
@@ -194,4 +214,6 @@ test("worker source has no reverse Sheets-to-Supabase write contract", () => {
   assert.match(source, /fn_finish_sheets_sync/);
   assert.match(source, /MIRROR_EXECUTION_NOT_APPROVED/);
   assert.match(source, /SYNC_MAPPING_REQUIRED/);
+  assert.match(source, /PREPARED_SHEET_ROW_REQUIRED/);
+  assert.match(source, /fill_prepared/);
 });
