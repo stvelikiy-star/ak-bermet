@@ -87,6 +87,13 @@ test("manager CMS is read-only for manager and editable only by owner/admin", ()
   assert.match(sidebar, /\/manager\/content/);
 });
 
+test("editor cannot publish or restore over unsaved local text", () => {
+  assert.match(editor, /const hasUnsavedChanges = value !== savedDraftValue/);
+  assert.match(editor, /!draft\.draft_value\.trim\(\) \|\| hasUnsavedChanges/);
+  assert.match(editor, /Boolean\(busy\) \|\| hasUnsavedChanges/);
+  assert.match(editor, /Сначала сохраните черновик перед публикацией или восстановлением версии/);
+});
+
 test("manager API only accepts registered CMS keys and supported actions", () => {
   assert.match(api, /const ALLOWED_KEYS = new Set\(SITE_CONTENT_KEYS\)/);
   assert.match(api, /const ALLOWED_LOCALES = new Set\(\["ru", "kg", "en", "kz"\]\)/);
