@@ -1,4 +1,15 @@
-export type Faq = { q: string; a: string };
+import type { Locale } from "@/i18n/locale";
+
+export type Faq = {
+  q: string;
+  a: string;
+  localizedAnswer?: Partial<Record<Exclude<Locale, "ru">, string>>;
+};
+
+export function faqAnswer(faq: Faq, locale: Locale): string {
+  if (locale === "ru") return faq.a;
+  return faq.localizedAnswer?.[locale] ?? faq.a;
+}
 
 export const faqs: Faq[] = [
   {
@@ -11,7 +22,12 @@ export const faqs: Faq[] = [
   },
   {
     q: "Какие правила отмены брони?",
-    a: "При отмене за 14 и более дней возвращается 100% предоплаты за минусом комиссии перевода. При отмене за 7–14 дней возвращается 50%. При отмене менее чем за 7 дней удерживается стоимость одних суток забронированных номеров.",
+    a: "При отмене за 7 и более дней до заезда возврат предоплаты возможен с учётом применимой комиссии и процедуры через администратора. При отмене менее чем за 7 дней предоплата не возвращается. При неявке (no-show) предоплата не возвращается.",
+    localizedAnswer: {
+      kg: "Келүүгө 7 же андан көп күн калганда жокко чыгарылса, алдын ала төлөм колдонулуучу комиссияны жана администратор аркылуу жүргүзүлүүчү тартипти эске алуу менен кайтарылышы мүмкүн. Келүүгө 7 күндөн аз калганда жокко чыгарылса, алдын ала төлөм кайтарылбайт. Келбей калганда (no-show) алдын ала төлөм кайтарылбайт.",
+      en: "For cancellations 7 or more days before arrival, the prepayment may be refundable subject to the applicable fee and the administrator process. For cancellations less than 7 days before arrival, the prepayment is non-refundable. In case of no-show, the prepayment is non-refundable.",
+      kz: "Келуге 7 немесе одан көп күн қалғанда броньнан бас тартылса, алдын ала төлем қолданылатын комиссияны және әкімші арқылы рәсімдеу тәртібін ескере отырып қайтарылуы мүмкін. Келуге 7 күннен аз қалғанда бас тартылса, алдын ала төлем қайтарылмайды. Қонақ келмеген жағдайда (no-show) алдын ала төлем қайтарылмайды.",
+    },
   },
   {
     q: "Что входит в проживание?",
