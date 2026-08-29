@@ -18,6 +18,7 @@ const source = readFileSync(workerPath, "utf8");
 test("mirror allowlist uses dedicated Supabase UUID columns and never appends inventory", () => {
   assert.deepEqual(Object.keys(MIRROR_CONFIG).sort(), [
     "availability_holds",
+    "booking_payments",
     "booking_rooms",
     "bookings",
     "buildings",
@@ -44,6 +45,12 @@ test("mirror allowlist uses dedicated Supabase UUID columns and never appends in
   assert.equal(MIRROR_CONFIG.leads.idIndex, 1);
   assert.equal(MIRROR_CONFIG.leads.syncIndex, 29);
 
+  assert.equal(MIRROR_CONFIG.booking_payments.sheet, "Оплаты");
+  assert.equal(MIRROR_CONFIG.booking_payments.idColumn, "B");
+  assert.equal(MIRROR_CONFIG.booking_payments.idIndex, 1);
+  assert.equal(MIRROR_CONFIG.booking_payments.width, 21);
+  assert.equal(MIRROR_CONFIG.booking_payments.syncIndex, 17);
+
   for (const [table, config] of Object.entries(MIRROR_CONFIG)) {
     assert.ok(config.idColumn, `${table} must have a dedicated UUID lookup column`);
     assert.ok(Number.isInteger(config.idIndex), `${table} must have a UUID column index`);
@@ -56,10 +63,7 @@ test("Room Master source identity and daterange parsing are deterministic", () =
     "AKB-C3-301",
   );
   assert.equal(extractRoomExternalId("no source", "fallback"), "fallback");
-  assert.deepEqual(parseDateRange("[2026-08-13,2026-08-15)"), {
-    checkIn: "2026-08-13",
-    checkOut: "2026-08-15",
-  });
+  assert.deepEqual(parseDateRange("[2026-08-13,2026-08-15)"), { checkIn: "2026-08-13", checkOut: "2026-08-15" });
   assert.throws(() => parseDateRange("bad"), /INVALID_DATE_RANGE/);
 });
 
@@ -74,26 +78,10 @@ test("column conversion supports UUID anchors beyond Z", () => {
 
 test("room mirror updates only DB-owned operational cells and preserves owner/source columns", async () => {
   const patch = await buildMirrorPatch("room_units", {
-    id: "room-uuid",
-    room_number: "101",
-    official_beds: 2,
-    extra_places: 1,
-    max_capacity: 3,
-    sellable_status: "blocked",
-    operational_status: "ready",
-    deleted_at: null,
+    id: "room-uuid", room_number: "101", official_beds: 2, extra_places: 1, max_capacity: 3,
+    sellable_status: "blocked", operational_status: "ready", deleted_at: null,
   });
-
-  assert.deepEqual(patch, {
-    1: "room-uuid",
-    4: "101",
-    6: 2,
-    7: 1,
-    8: 3,
-    11: "blocked",
-    12: "ready",
-    14: null,
-  });
+  assert.deepEqual(patch, { 1: "room-uuid", 4: "101", 6: 2, 7: 1, 8: 3, 11: "blocked", 12: "ready", 14: null });
   for (const protectedIndex of [0, 2, 3, 5, 9, 10, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]) {
     assert.equal(Object.hasOwn(patch, protectedIndex), false, `protected room column ${protectedIndex}`);
   }
@@ -105,17 +93,12 @@ test("dynamic rows always include their Supabase UUID anchor", async () => {
     customers: { id: "c", created_at: "now", updated_at: "now" },
     bookings: { id: "b", booking_number: "BK-1", created_at: "now", updated_at: "now" },
     booking_rooms: { id: "br", booking_id: "b", room_unit_id: "r", created_at: "now", updated_at: "now" },
-    availability_holds: {
-      id: "h",
-      room_unit_id: "r",
-      date_range: "[2026-08-13,2026-08-14)",
-      created_at: "now",
-      updated_at: "now",
-    },
+    availability_holds: { id: "h", room_unit_id: "r", date_range: "[2026-08-13,2026-08-14)", created_at: "now", updated_at: "now" },
     cleaning_tasks: { id: "cl", room_unit_id: "r", created_at: "now", updated_at: "now" },
     maintenance_requests: { id: "m", room_unit_id: "r", created_at: "now", updated_at: "now" },
     room_inspections: { id: "i", room_unit_id: "r", created_at: "now" },
     leads: { id: "lead", lead_number: "LD-1", created_at: "now", updated_at: "now" },
+    booking_payments: { id: "pay", booking_id: "b", paid_at: "now", amount_kgs: 1000, status: "confirmed", updated_at: "now" },
   };
 
   for (const [table, row] of Object.entries(fixtures)) {
@@ -126,19 +109,10 @@ test("dynamic rows always include their Supabase UUID anchor", async () => {
 
 test("lead mirror matches the dedicated 30-column contract without inventing a second identity", async () => {
   const patch = await buildMirrorPatch("leads", {
-    id: "lead-uuid",
-    lead_number: "LD-2026-001",
-    created_at: "2026-08-13T06:00:00Z",
-    source: "website",
-    interest: "room",
-    status: "new",
-    name: "Example",
-    phone: "+996000000000",
-    children_ages: [4, 7],
-    wants_double_bed: true,
-    updated_at: "2026-08-13T06:00:00Z",
+    id: "lead-uuid", lead_number: "LD-2026-001", created_at: "2026-08-13T06:00:00Z",
+    source: "website", interest: "room", status: "new", name: "Example", phone: "+996000000000",
+    children_ages: [4, 7], wants_double_bed: true, updated_at: "2026-08-13T06:00:00Z",
   });
-
   assert.equal(patch[0], "LD-2026-001");
   assert.equal(patch[1], "lead-uuid");
   assert.deepEqual(patch[12], [4, 7]);
@@ -146,32 +120,50 @@ test("lead mirror matches the dedicated 30-column contract without inventing a s
   assert.equal(Object.keys(patch).every((index) => Number(index) >= 0 && Number(index) < 30), true);
 });
 
+test("payment mirror matches existing Оплаты columns and does not invent refunds", async () => {
+  const seen = [];
+  const patch = await buildMirrorPatch(
+    "booking_payments",
+    {
+      id: "payment-uuid", booking_id: "booking-uuid", paid_at: "2026-08-29T10:00:00Z",
+      method: "наличные", amount_kgs: 5000, currency: "KGS", status: "confirmed",
+      receipt_url: null, confirmed_by: "staff-uuid", confirmed_at: "2026-08-29T10:01:00Z",
+      balance_after_kgs: 15000, notes: "касса", updated_at: "2026-08-29T10:01:00Z", deleted_at: null,
+    },
+    async (kind, id) => { seen.push([kind, id]); return "BK-2026-001"; },
+  );
+  assert.deepEqual(seen, [["booking_external", "booking-uuid"]]);
+  assert.equal(patch[0], "payment-uuid");
+  assert.equal(patch[1], "payment-uuid");
+  assert.equal(patch[2], "BK-2026-001");
+  assert.equal(patch[7], 5000);
+  assert.equal(patch[8], "confirmed");
+  assert.equal(patch[10], "Да");
+  assert.equal(patch[14], "");
+  assert.equal(patch[15], "");
+  assert.equal(patch[17], "SYNCED");
+  assert.equal(patch[20], "PASS");
+});
+
+test("voided payment is mirrored as zero confirmed amount with audit reason", async () => {
+  const patch = await buildMirrorPatch("booking_payments", {
+    id: "payment-uuid", booking_id: "booking-uuid", paid_at: "now", method: "наличные",
+    amount_kgs: 5000, status: "void", confirmed_by: "staff", confirmed_at: "now", balance_after_kgs: 15000,
+    notes: "касса", void_reason: "ошибка суммы", updated_at: "now",
+  }, async () => "BK-1");
+  assert.equal(patch[7], 0);
+  assert.equal(patch[10], "Нет");
+  assert.match(patch[16], /АННУЛИРОВАНО: ошибка суммы/);
+});
+
 test("relationship fields are resolved without overwriting unrelated business columns", async () => {
   const seen = [];
   const patch = await buildMirrorPatch(
     "booking_rooms",
-    {
-      id: "br-id",
-      booking_id: "booking-id",
-      room_unit_id: "room-id",
-      check_in: "2026-08-13",
-      check_out: "2026-08-14",
-      adults: 2,
-      children: 0,
-      status: "confirmed",
-      created_at: "created",
-      updated_at: "updated",
-    },
-    async (kind, id) => {
-      seen.push([kind, id]);
-      return `${kind}:${id}`;
-    },
+    { id: "br-id", booking_id: "booking-id", room_unit_id: "room-id", check_in: "2026-08-13", check_out: "2026-08-14", adults: 2, children: 0, status: "confirmed", created_at: "created", updated_at: "updated" },
+    async (kind, id) => { seen.push([kind, id]); return `${kind}:${id}`; },
   );
-
-  assert.deepEqual(seen, [
-    ["booking_external", "booking-id"],
-    ["room_external", "room-id"],
-  ]);
+  assert.deepEqual(seen, [["booking_external", "booking-id"], ["room_external", "room-id"]]);
   assert.equal(patch[2], "booking_external:booking-id");
   assert.equal(patch[3], "room_external:room-id");
   assert.equal(patch[14], "SYNCED");
@@ -185,15 +177,11 @@ test("execute mode fails closed before credential loading unless explicitly enab
   const result = spawnSync(process.execPath, [workerPath, "--execute"], {
     encoding: "utf8",
     env: {
-      PATH: process.env.PATH ?? "",
-      HOME: process.env.HOME ?? "",
-      GOOGLE_SHEETS_ENABLED: "true",
-      AK_BERMET_SHEETS_MIRROR_ENABLED: "NO",
-      GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: sentinel,
+      PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", GOOGLE_SHEETS_ENABLED: "true",
+      AK_BERMET_SHEETS_MIRROR_ENABLED: "NO", GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: sentinel,
       SUPABASE_SERVICE_ROLE_KEY: sentinel,
     },
   });
-
   assert.equal(result.status, 2);
   assert.match(result.stderr, /BLOCKED: MIRROR_EXECUTION_NOT_APPROVED/);
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(sentinel));
