@@ -12,6 +12,18 @@ export interface ChessboardRoom {
   readonly extraPlaces?: number;
 }
 
+export interface ChessboardBookingService {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly quantity: number;
+  readonly unitPriceKgs: number;
+  readonly totalAmountKgs: number;
+  readonly unitLabel: string;
+  readonly scheduledFor: string | null;
+  readonly status: string;
+}
+
 export interface ChessboardBookingSummary {
   readonly bookingId: string;
   readonly bookingRoomId: string;
@@ -25,6 +37,7 @@ export interface ChessboardBookingSummary {
   readonly totalAmountKgs: number;
   readonly prepaymentRequiredKgs: number;
   readonly notes: string | null;
+  readonly services?: readonly ChessboardBookingService[];
 }
 
 export interface ChessboardPeriod {
