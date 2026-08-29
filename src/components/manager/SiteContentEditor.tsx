@@ -191,7 +191,10 @@ export default function SiteContentEditor({ fields, drafts, published, history, 
               const mapKey = keyOf(field.key, locale);
               const draft = draftMap.get(mapKey);
               const live = publishedMap.get(mapKey);
-              const value = values[mapKey] ?? field.fallbacks[locale] ?? "";
+              const fallback = field.fallbacks[locale] ?? "";
+              const value = values[mapKey] ?? fallback;
+              const savedDraftValue = draft?.draft_value ?? fallback;
+              const hasUnsavedChanges = value !== savedDraftValue;
               const isBusy = busy?.startsWith(mapKey) ?? false;
               const rowHistory = history.filter((item) => item.content_key === field.key && item.locale === locale).slice(0, 6);
 
@@ -207,6 +210,9 @@ export default function SiteContentEditor({ fields, drafts, published, history, 
                       <span className={`rounded-full px-2 py-1 ring-1 ${live ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-white text-muted ring-gold/15"}`}>
                         {live ? `published v${live.version}` : "fallback active"}
                       </span>
+                      {hasUnsavedChanges ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800 ring-1 ring-amber-200">есть несохранённые изменения</span>
+                      ) : null}
                     </div>
                   </div>
 
@@ -239,7 +245,7 @@ export default function SiteContentEditor({ fields, drafts, published, history, 
                       <>
                         <button
                           type="button"
-                          disabled={!storageReady || Boolean(busy)}
+                          disabled={!storageReady || Boolean(busy) || (Boolean(draft) && !hasUnsavedChanges)}
                           onClick={() => mutate({ action: "save", contentKey: field.key, locale, value }, `${mapKey}:save`, "Черновик сохранён.")}
                           className="rounded-lg border border-gold/30 bg-white px-3 py-2 text-xs font-semibold text-emerald-deep disabled:opacity-50"
                         >
@@ -247,7 +253,7 @@ export default function SiteContentEditor({ fields, drafts, published, history, 
                         </button>
                         <button
                           type="button"
-                          disabled={!storageReady || Boolean(busy) || !draft || !draft.draft_value.trim()}
+                          disabled={!storageReady || Boolean(busy) || !draft || !draft.draft_value.trim() || hasUnsavedChanges}
                           onClick={() => mutate({ action: "publish", contentKey: field.key, locale }, `${mapKey}:publish`, "Опубликовано. Публичный сайт обновлён.")}
                           className="rounded-lg bg-emerald-deep px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                         >
@@ -264,7 +270,13 @@ export default function SiteContentEditor({ fields, drafts, published, history, 
                       </>
                     ) : null}
                     <span className="ml-auto text-[10px] text-muted">
-                      {live ? `Опубликовано ${shortDate(live.published_at)}` : draft ? `Черновик ${shortDate(draft.updated_at)}` : "Изменений нет"}
+                      {hasUnsavedChanges
+                        ? "Сначала сохраните черновик перед публикацией или восстановлением версии"
+                        : live
+                          ? `Опубликовано ${shortDate(live.published_at)}`
+                          : draft
+                            ? `Черновик ${shortDate(draft.updated_at)}`
+                            : "Изменений нет"}
                     </span>
                   </div>
 
@@ -282,7 +294,7 @@ export default function SiteContentEditor({ fields, drafts, published, history, 
                             {canEdit && item.value ? (
                               <button
                                 type="button"
-                                disabled={!storageReady || Boolean(busy)}
+                                disabled={!storageReady || Boolean(busy) || hasUnsavedChanges}
                                 onClick={() => mutate({ action: "restore", historyId: item.id }, `${mapKey}:restore:${item.id}`, "Версия восстановлена в черновик. Публичная версия не менялась.")}
                                 className="shrink-0 rounded-lg border border-gold/20 px-3 py-1.5 font-semibold text-emerald-deep disabled:opacity-50"
                               >
