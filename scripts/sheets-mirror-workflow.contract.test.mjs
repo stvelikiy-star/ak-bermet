@@ -25,7 +25,8 @@ test("workflow fails closed on missing protected configuration and never echoes 
     "GOOGLE_SERVICE_ACCOUNT_EMAIL",
     "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
   ]) {
-    assert.match(workflow, new RegExp(`${name}: \\${\\{ secrets\\.${name} \\}\\}`));
+    const expected = name + ": " + "${{ secrets." + name + " }}";
+    assert.ok(workflow.includes(expected), `missing protected workflow input ${name}`);
   }
   assert.match(workflow, /MISSING_SECRET_NAME/);
   assert.match(workflow, /Secret values were not printed/);
