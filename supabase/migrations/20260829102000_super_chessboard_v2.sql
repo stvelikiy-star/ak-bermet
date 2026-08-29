@@ -1,6 +1,5 @@
 -- SUPER CHESSBOARD V2
 -- Safe booking placement changes + universal booking services.
--- This migration is repository-only until explicitly applied to an environment.
 
 create table if not exists public.booking_room_change_history (
   id uuid primary key default gen_random_uuid(),
@@ -164,119 +163,35 @@ begin
   ) then
     raise exception 'booking_move_not_authorized' using errcode = '42501';
   end if;
-
   if p_check_in is null or p_check_out is null or p_check_out <= p_check_in then
     raise exception 'invalid_booking_dates' using errcode = '22023';
   end if;
-
-  select br.* into v_booking_room
-  from public.booking_rooms br
-  where br.id = p_booking_room_id
-  for update;
-
-  if not found or v_booking_room.status <> 'active' then
-    raise exception 'booking_room_not_found' using errcode = '22023';
-  end if;
-
-  select b.* into v_booking
-  from public.bookings b
-  where b.id = v_booking_room.booking_id
-    and b.deleted_at is null
-  for update;
-
-  if not found then
-    raise exception 'booking_not_found' using errcode = '22023';
-  end if;
-
-  if v_booking.status not in ('pending_confirmation', 'confirmed') then
-    raise exception 'booking_move_status_not_allowed' using errcode = '22023';
-  end if;
-
-  select ru.* into v_target
-  from public.room_units ru
-  where ru.id = p_target_room_unit_id
-    and ru.deleted_at is null
-  for update;
-
-  if not found then
-    raise exception 'room_not_found' using errcode = '22023';
-  end if;
-
-  if v_target.sellable_status <> 'active' then
-    raise exception 'room_not_sellable' using errcode = '22023';
-  end if;
-
-  if v_target.operational_status in ('maintenance_required', 'maintenance_in_progress', 'blocked') then
-    raise exception 'room_operationally_blocked' using errcode = '22023';
-  end if;
-
-  if v_booking_room.adults + v_booking_room.children > v_target.max_capacity then
-    raise exception 'room_capacity_exceeded' using errcode = '22023';
-  end if;
-
-  if v_booking_room.extra_beds > v_target.extra_places then
-    raise exception 'extra_bed_capacity_exceeded' using errcode = '22023';
-  end if;
-
-  if v_booking_room.room_unit_id = p_target_room_unit_id
-     and v_booking_room.check_in = p_check_in
-     and v_booking_room.check_out = p_check_out then
-    return query
-      select v_booking.id, v_booking_room.id, v_booking_room.room_unit_id,
-             v_booking_room.check_in, v_booking_room.check_out;
+  select br.* into v_booking_room from public.booking_rooms br where br.id = p_booking_room_id for update;
+  if not found or v_booking_room.status <> 'active' then raise exception 'booking_room_not_found' using errcode = '22023'; end if;
+  select b.* into v_booking from public.bookings b where b.id = v_booking_room.booking_id and b.deleted_at is null for update;
+  if not found then raise exception 'booking_not_found' using errcode = '22023'; end if;
+  if v_booking.status not in ('pending_confirmation', 'confirmed') then raise exception 'booking_move_status_not_allowed' using errcode = '22023'; end if;
+  select ru.* into v_target from public.room_units ru where ru.id = p_target_room_unit_id and ru.deleted_at is null for update;
+  if not found then raise exception 'room_not_found' using errcode = '22023'; end if;
+  if v_target.sellable_status <> 'active' then raise exception 'room_not_sellable' using errcode = '22023'; end if;
+  if v_target.operational_status in ('maintenance_required', 'maintenance_in_progress', 'blocked') then raise exception 'room_operationally_blocked' using errcode = '22023'; end if;
+  if v_booking_room.adults + v_booking_room.children > v_target.max_capacity then raise exception 'room_capacity_exceeded' using errcode = '22023'; end if;
+  if v_booking_room.extra_beds > v_target.extra_places then raise exception 'extra_bed_capacity_exceeded' using errcode = '22023'; end if;
+  if v_booking_room.room_unit_id = p_target_room_unit_id and v_booking_room.check_in = p_check_in and v_booking_room.check_out = p_check_out then
+    return query select v_booking.id, v_booking_room.id, v_booking_room.room_unit_id, v_booking_room.check_in, v_booking_room.check_out;
     return;
   end if;
-
-  -- trg_booking_rooms_occupancy updates occupancy_periods in the same transaction.
-  -- The exclusion constraint on occupancy_periods is the final authority and
-  -- raises SQLSTATE 23P01 if the destination is no longer available.
-  update public.booking_rooms
-  set room_unit_id = p_target_room_unit_id,
-      check_in = p_check_in,
-      check_out = p_check_out
-  where id = v_booking_room.id;
-
-  select count(*) into v_active_room_count
-  from public.booking_rooms
-  where booking_id = v_booking.id and status = 'active';
-
-  if v_active_room_count = 1 then
-    update public.bookings
-    set check_in = p_check_in,
-        check_out = p_check_out
-    where id = v_booking.id;
-  end if;
-
-  insert into public.booking_room_change_history (
-    booking_room_id,
-    booking_id,
-    old_room_unit_id,
-    new_room_unit_id,
-    old_check_in,
-    old_check_out,
-    new_check_in,
-    new_check_out,
-    reason,
-    changed_by
-  ) values (
-    v_booking_room.id,
-    v_booking.id,
-    v_booking_room.room_unit_id,
-    p_target_room_unit_id,
-    v_booking_room.check_in,
-    v_booking_room.check_out,
-    p_check_in,
-    p_check_out,
-    nullif(btrim(coalesce(p_reason, '')), ''),
-    v_user_id
-  );
-
-  return query
-    select v_booking.id, v_booking_room.id, p_target_room_unit_id, p_check_in, p_check_out;
+  update public.booking_rooms set room_unit_id = p_target_room_unit_id, check_in = p_check_in, check_out = p_check_out where id = v_booking_room.id;
+  select count(*) into v_active_room_count from public.booking_rooms where booking_id = v_booking.id and status = 'active';
+  if v_active_room_count = 1 then update public.bookings set check_in = p_check_in, check_out = p_check_out where id = v_booking.id; end if;
+  insert into public.booking_room_change_history (booking_room_id, booking_id, old_room_unit_id, new_room_unit_id, old_check_in, old_check_out, new_check_in, new_check_out, reason, changed_by)
+  values (v_booking_room.id, v_booking.id, v_booking_room.room_unit_id, p_target_room_unit_id, v_booking_room.check_in, v_booking_room.check_out, p_check_in, p_check_out, nullif(btrim(coalesce(p_reason, '')), ''), v_user_id);
+  return query select v_booking.id, v_booking_room.id, p_target_room_unit_id, p_check_in, p_check_out;
 end;
 $$;
 
 revoke all on function public.fn_move_booking_room(uuid, uuid, date, date, text) from public;
+revoke execute on function public.fn_move_booking_room(uuid, uuid, date, date, text) from anon;
 grant execute on function public.fn_move_booking_room(uuid, uuid, date, date, text) to authenticated;
 grant execute on function public.fn_move_booking_room(uuid, uuid, date, date, text) to service_role;
 
@@ -288,15 +203,8 @@ create or replace function public.fn_add_booking_service(
   p_scheduled_for date default null,
   p_notes text default null
 )
-returns table (
-  booking_service_id uuid,
-  booking_id uuid,
-  service_code text,
-  total_amount_kgs numeric
-)
-language plpgsql
-security definer
-set search_path = public, pg_temp
+returns table (booking_service_id uuid, booking_id uuid, service_code text, total_amount_kgs numeric)
+language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare
   v_user_id uuid := auth.uid();
@@ -305,105 +213,42 @@ declare
   v_unit_price numeric(12,2);
   v_id uuid;
 begin
-  if v_user_id is null or not (
-    public.has_role('owner') or public.has_role('administrator') or public.has_role('manager')
-  ) then
-    raise exception 'booking_service_not_authorized' using errcode = '42501';
-  end if;
-
-  if p_quantity is null or p_quantity <= 0 then
-    raise exception 'invalid_service_quantity' using errcode = '22023';
-  end if;
-
-  select * into v_booking
-  from public.bookings
-  where id = p_booking_id and deleted_at is null
-  for update;
-
-  if not found then
-    raise exception 'booking_not_found' using errcode = '22023';
-  end if;
-
-  select * into v_service
-  from public.service_catalog
-  where code = upper(btrim(coalesce(p_service_code, '')))
-    and is_active = true;
-
-  if not found then
-    raise exception 'service_not_found' using errcode = '22023';
-  end if;
-
+  if v_user_id is null or not (public.has_role('owner') or public.has_role('administrator') or public.has_role('manager')) then raise exception 'booking_service_not_authorized' using errcode = '42501'; end if;
+  if p_quantity is null or p_quantity <= 0 then raise exception 'invalid_service_quantity' using errcode = '22023'; end if;
+  select * into v_booking from public.bookings where id = p_booking_id and deleted_at is null for update;
+  if not found then raise exception 'booking_not_found' using errcode = '22023'; end if;
+  select * into v_service from public.service_catalog where code = upper(btrim(coalesce(p_service_code, ''))) and is_active = true;
+  if not found then raise exception 'service_not_found' using errcode = '22023'; end if;
   if v_service.pricing_mode = 'fixed' then
     v_unit_price := v_service.price_kgs;
   else
-    if p_unit_price_kgs is null or p_unit_price_kgs < 0 then
-      raise exception 'manual_service_price_required' using errcode = '22023';
-    end if;
+    if p_unit_price_kgs is null or p_unit_price_kgs < 0 then raise exception 'manual_service_price_required' using errcode = '22023'; end if;
     v_unit_price := p_unit_price_kgs;
   end if;
-
-  insert into public.booking_services (
-    booking_id,
-    service_id,
-    service_name_snapshot,
-    quantity,
-    unit_price_kgs,
-    scheduled_for,
-    notes,
-    created_by
-  ) values (
-    v_booking.id,
-    v_service.id,
-    v_service.name,
-    p_quantity,
-    v_unit_price,
-    p_scheduled_for,
-    nullif(btrim(coalesce(p_notes, '')), ''),
-    v_user_id
-  ) returning id into v_id;
-
-  return query
-    select v_id, v_booking.id, v_service.code, round(p_quantity * v_unit_price, 2);
+  insert into public.booking_services (booking_id, service_id, service_name_snapshot, quantity, unit_price_kgs, scheduled_for, notes, created_by)
+  values (v_booking.id, v_service.id, v_service.name, p_quantity, v_unit_price, p_scheduled_for, nullif(btrim(coalesce(p_notes, '')), ''), v_user_id) returning id into v_id;
+  return query select v_id, v_booking.id, v_service.code, round(p_quantity * v_unit_price, 2);
 end;
 $$;
 
 revoke all on function public.fn_add_booking_service(uuid, text, numeric, numeric, date, text) from public;
+revoke execute on function public.fn_add_booking_service(uuid, text, numeric, numeric, date, text) from anon;
 grant execute on function public.fn_add_booking_service(uuid, text, numeric, numeric, date, text) to authenticated;
 grant execute on function public.fn_add_booking_service(uuid, text, numeric, numeric, date, text) to service_role;
 
-create or replace function public.fn_set_booking_service_status(
-  p_booking_service_id uuid,
-  p_status text
-)
-returns text
-language plpgsql
-security definer
-set search_path = public, pg_temp
+create or replace function public.fn_set_booking_service_status(p_booking_service_id uuid, p_status text)
+returns text language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
-  if auth.uid() is null or not (
-    public.has_role('owner') or public.has_role('administrator') or public.has_role('manager')
-  ) then
-    raise exception 'booking_service_not_authorized' using errcode = '42501';
-  end if;
-
-  if p_status not in ('planned','confirmed','completed','cancelled') then
-    raise exception 'invalid_service_status' using errcode = '22023';
-  end if;
-
-  update public.booking_services
-  set status = p_status,
-      updated_at = now()
-  where id = p_booking_service_id;
-
-  if not found then
-    raise exception 'booking_service_not_found' using errcode = '22023';
-  end if;
-
+  if auth.uid() is null or not (public.has_role('owner') or public.has_role('administrator') or public.has_role('manager')) then raise exception 'booking_service_not_authorized' using errcode = '42501'; end if;
+  if p_status not in ('planned','confirmed','completed','cancelled') then raise exception 'invalid_service_status' using errcode = '22023'; end if;
+  update public.booking_services set status = p_status, updated_at = now() where id = p_booking_service_id;
+  if not found then raise exception 'booking_service_not_found' using errcode = '22023'; end if;
   return p_status;
 end;
 $$;
 
 revoke all on function public.fn_set_booking_service_status(uuid, text) from public;
+revoke execute on function public.fn_set_booking_service_status(uuid, text) from anon;
 grant execute on function public.fn_set_booking_service_status(uuid, text) to authenticated;
 grant execute on function public.fn_set_booking_service_status(uuid, text) to service_role;
