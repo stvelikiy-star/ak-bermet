@@ -1,0 +1,70 @@
+name: AK BERMET Preview Build Verification
+
+on:
+  push:
+    branches:
+      - preview/ak-bermet-vercel-20260829
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ak-bermet-preview-build-verification
+  cancel-in-progress: true
+
+jobs:
+  clean-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ednqgzgjhnalsiiuekmw.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_7cDXEzFLEL41Rr9FCEqQUQ_b_5mBOQK
+      GOOGLE_SHEETS_ENABLED: "false"
+      AI_PROVIDER: mock
+      AI_ENABLE_REAL_CALLS: "false"
+
+    steps:
+      - name: Checkout exact preview branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Record source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "HEAD=$(git rev-parse HEAD)"
+          test -f src/components/manager/ManagerHeader.tsx
+          test -f src/components/manager/ManagerFilters.tsx
+          test -f src/components/manager/LeadTable.tsx
+          test -f src/components/manager/LeadCard.tsx
+          test -f src/components/manager/LeadStatusBadge.tsx
+          echo "Manager component set present."
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Manager live-data contract
+        run: npm run test:manager-live-data
+
+      - name: Booking chessboard rules
+        run: npm run test:booking-chessboard
+
+      - name: Housekeeping rules
+        run: npm run test:housekeeping
+
+      - name: Technician rules
+        run: npm run test:technician
+
+      - name: Inspection rules
+        run: npm run test:inspection
+
+      - name: Clean production build
+        run: npm run build
