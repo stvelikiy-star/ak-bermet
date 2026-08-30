@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import type { ChatTopic } from "@/types/chat";
 import { buildAiChatLeadInput } from "@/lib/ai/chat-lead-handoff";
 
