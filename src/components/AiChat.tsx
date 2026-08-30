@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import type { ChatSuggestedAction } from "@/types/chat";
+import type { ChatSuggestedAction, ChatTopic } from "@/types/chat";
 import { WA } from "@/data/site";
 import { whatsAppToMain, createChatHandoffText } from "@/lib/whatsapp";
+import AiChatLeadHandoff from "@/components/AiChatLeadHandoff";
 import {
   IconChat,
   IconClose,
   IconSend,
   IconLotus,
-
 } from "@/components/ui/icons";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
@@ -20,6 +20,7 @@ type Msg = {
   content: string;
   time: string;
   actions?: ChatSuggestedAction[];
+  topic?: ChatTopic;
   shouldHandoff?: boolean;
   isError?: boolean;
 };
@@ -105,6 +106,7 @@ export default function AiChat() {
           content: data.message,
           time: now(),
           actions: data.suggestedActions,
+          topic: data.topic,
           shouldHandoff: data.shouldHandoff,
         },
       ]);
@@ -117,6 +119,7 @@ export default function AiChat() {
           content:
             "Не удалось получить ответ. Попробуйте ещё раз или напишите администратору в WhatsApp.",
           time: now(),
+          topic: "handoff",
           isError: true,
           shouldHandoff: true,
         },
@@ -134,6 +137,10 @@ export default function AiChat() {
   };
 
   const isExternal = (a: ChatSuggestedAction) => a.type === "whatsapp" || a.type === "link";
+  const latestHandoffMessageId = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.shouldHandoff)?.id;
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content;
 
   return (
     <>
@@ -225,6 +232,13 @@ export default function AiChat() {
                         <WhatsAppIcon size={16} className="shrink-0" />
                         Перейти в WhatsApp к администратору
                       </a>
+                    )}
+                    {m.shouldHandoff && m.id === latestHandoffMessageId && (
+                      <AiChatLeadHandoff
+                        topic={m.topic}
+                        page={pathname}
+                        lastUserMessage={lastUserMessage}
+                      />
                     )}
                     {!m.shouldHandoff &&
                       m.actions?.map((a, i) => (
