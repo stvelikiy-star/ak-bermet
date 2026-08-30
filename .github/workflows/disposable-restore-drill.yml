@@ -56,7 +56,7 @@ jobs:
           SOURCE_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc 'select count(*) from supabase_migrations.schema_migrations')"
           test "$SOURCE_COUNT" = "$APPROVED_COUNT"
 
-          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
           create table public.restore_drill_marker (
             id integer primary key,
             marker text not null
@@ -87,7 +87,7 @@ jobs:
           MARKER_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d akbermet_restore_drill -Atc "select count(*) from public.restore_drill_marker where id=1 and marker='AK_BERMET_RESTORE_DRILL_2026'")"
           ROOM_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d akbermet_restore_drill -Atc "select to_regclass('public.room_units') is not null")"
           PAYMENT_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d akbermet_restore_drill -Atc "select to_regclass('public.booking_payments') is not null")"
-          CMS_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d akbermet_restore_drill -Atc "select to_regclass('public.site_content') is not null")"
+          CMS_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d akbermet_restore_drill -Atc "select to_regclass('public.site_content_public') is not null")"
           HOLD_RPC="$(docker exec "$DB_CONTAINER" psql -U postgres -d akbermet_restore_drill -Atc "select to_regprocedure('public.fn_create_availability_hold(uuid,date,date,uuid,uuid,text)') is not null")"
 
           test "$RESTORED_COUNT" = "$SOURCE_COUNT"
