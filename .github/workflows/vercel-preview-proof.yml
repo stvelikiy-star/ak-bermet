@@ -6,8 +6,6 @@ on:
     paths:
       - ".github/workflows/vercel-preview-proof.yml"
       - "scripts/vercel-preview-workflow.contract.test.mjs"
-      - "package.json"
-      - ".github/workflows/production-readiness.yml"
 
 permissions:
   contents: read
@@ -35,6 +33,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Preview workflow safety contract
+        run: node --test scripts/vercel-preview-workflow.contract.test.mjs
 
       - name: Verify protected configuration
         shell: bash
