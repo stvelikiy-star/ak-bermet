@@ -19,6 +19,14 @@ test("scheduled mirror stays dry-run until protected cutover approval", () => {
   assert.match(workflow, /node scripts\/sheets-sync-worker\.mjs --dry-run/);
 });
 
+test("pull requests can prove runtime credentials but can never execute the mirror", () => {
+  assert.match(workflow, /pull_request:[\s\S]*scripts\/sheets-sync-worker\.mjs/);
+  assert.match(workflow, /elif \[ "\$EVENT_NAME" = "pull_request" \]; then[\s\S]*mode="dry-run"[\s\S]*limit="25"/);
+  const prBranch = workflow.match(/elif \[ "\$EVENT_NAME" = "pull_request" \]; then([\s\S]*?)else/);
+  assert.ok(prBranch, "pull_request mode branch must exist");
+  assert.doesNotMatch(prBranch[1], /mode="execute"/);
+});
+
 test("workflow fails closed on missing protected configuration and never echoes secret values", () => {
   for (const name of [
     "NEXT_PUBLIC_SUPABASE_URL",
