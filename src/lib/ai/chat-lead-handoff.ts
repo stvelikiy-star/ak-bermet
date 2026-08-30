@@ -1,5 +1,5 @@
-import type { ChatTopic } from "@/types/chat";
-import type { LeadInput, LeadInterest } from "@/types/lead";
+import type { ChatTopic } from "../../types/chat";
+import type { LeadInput, LeadInterest } from "../../types/lead";
 
 const TOPIC_TO_INTEREST: Record<ChatTopic, LeadInterest> = {
   rooms: "rooms",
