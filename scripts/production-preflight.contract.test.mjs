@@ -10,11 +10,44 @@ const migrationDir = resolve(root, "supabase/migrations");
 const manifestPath = resolve(import.meta.dirname, "production-migrations-approved.json");
 const migrationNamePattern = /^\d{14}_.+\.sql$/;
 
+const cutoverAttestations = [
+  "AK_BERMET_CUTOVER_APPROVED",
+  "AK_BERMET_LIVE_BACKUP_VERIFIED",
+  "AK_BERMET_PRICING_GAPS_RESOLVED",
+  "AK_BERMET_LEGACY_BOOKINGS_RECONCILED",
+  "AK_BERMET_COTTAGES_READINESS_CONFIRMED",
+  "AK_BERMET_SHEETS_RUNTIME_VERIFIED",
+  "AK_BERMET_BROWSER_UAT_PASSED",
+  "AK_BERMET_AUTH_HARDENING_VERIFIED",
+  "AK_BERMET_MAIN_PROTECTION_VERIFIED",
+];
+
 function run(args = [], env = process.env) {
   return spawnSync(process.execPath, [script, ...args], {
     encoding: "utf8",
     env,
   });
+}
+
+function productionEnv(overrides = {}) {
+  return {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "",
+    NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
+    SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
+    SUPABASE_ACCESS_TOKEN: "access-token-test",
+    SUPABASE_PROJECT_REF: "project-ref-test",
+    SUPABASE_DB_PASSWORD: "db-password-test",
+    AK_BERMET_DATABASE_URL: "postgresql://example.invalid/db",
+    AK_BERMET_BACKUP_APPROVED: "YES",
+    ...overrides,
+  };
+}
+
+function cutoverEnv(overrides = {}) {
+  const attestations = Object.fromEntries(cutoverAttestations.map((name) => [name, "YES"]));
+  return productionEnv({ ...attestations, ...overrides });
 }
 
 test("approved migration manifest exactly matches the ordered repository migration chain", () => {
@@ -37,7 +70,7 @@ test("repository-only preflight is non-destructive and passes the approved migra
   assert.match(result.stdout, /approved production migration manifest is valid, unique, and ordered/);
   assert.match(result.stdout, /migration chain is exact and ordered \(\d+ files\)/);
   assert.match(result.stdout, /RESULT: PASS/);
-  assert.match(result.stdout, /performs no network calls, backup, migration, deployment, or production writes/);
+  assert.match(result.stdout, /performs no network calls, backup, migration, deployment, DNS changes, or production writes/);
 });
 
 test("production-env mode fails closed without printing secret values", () => {
@@ -56,22 +89,63 @@ test("production-env mode fails closed without printing secret values", () => {
 });
 
 test("production-env mode passes the Supabase release contract without Google Sheets credentials", () => {
-  const result = run(["--production-env"], {
-    PATH: process.env.PATH ?? "",
-    HOME: process.env.HOME ?? "",
-    NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
-    SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
-    SUPABASE_ACCESS_TOKEN: "access-token-test",
-    SUPABASE_PROJECT_REF: "project-ref-test",
-    SUPABASE_DB_PASSWORD: "db-password-test",
-    AK_BERMET_DATABASE_URL: "postgresql://example.invalid/db",
-    AK_BERMET_BACKUP_APPROVED: "YES",
-  });
+  const result = run(["--production-env"], productionEnv());
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /required Supabase\/release environment names are present/);
   assert.match(result.stdout, /RESULT: PASS/);
   assert.doesNotMatch(result.stdout + result.stderr, /GOOGLE_SERVICE_ACCOUNT/);
   assert.doesNotMatch(result.stdout + result.stderr, /GOOGLE_SHEETS_ENABLED=true/);
+});
+
+test("cutover-readiness mode implies the production environment contract", () => {
+  const result = run(["--cutover-readiness"], {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "",
+    ...Object.fromEntries(cutoverAttestations.map((name) => [name, "YES"])),
+  });
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /BLOCKED: production environment incomplete:/);
+  assert.match(result.stderr, /NEXT_PUBLIC_SUPABASE_URL/);
+  assert.doesNotMatch(result.stdout, /RESULT: PASS/);
+});
+
+test("cutover-readiness fails closed and reports only unresolved attestation names", () => {
+  const secretSentinel = "CUTOVER_SECRET_MUST_NOT_PRINT";
+  const env = cutoverEnv({
+    SUPABASE_SERVICE_ROLE_KEY: secretSentinel,
+    AK_BERMET_PRICING_GAPS_RESOLVED: "true",
+    AK_BERMET_BROWSER_UAT_PASSED: "",
+  });
+  const result = run(["--cutover-readiness"], env);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /BLOCKED: cutover readiness incomplete or not YES:/);
+  assert.match(result.stderr, /AK_BERMET_PRICING_GAPS_RESOLVED/);
+  assert.match(result.stderr, /AK_BERMET_BROWSER_UAT_PASSED/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secretSentinel));
+  assert.doesNotMatch(result.stdout + result.stderr, /=true/);
+});
+
+test("cutover-readiness requires explicit owner approval and every external gate", () => {
+  const result = run(
+    ["--cutover-readiness"],
+    cutoverEnv({ AK_BERMET_CUTOVER_APPROVED: "NO" }),
+  );
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /AK_BERMET_CUTOVER_APPROVED/);
+  assert.doesNotMatch(result.stdout, /RESULT: PASS/);
+});
+
+test("cutover-readiness passes only when production env and all explicit attestations are YES", () => {
+  const result = run(["--cutover-readiness"], cutoverEnv());
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /required Supabase\/release environment names are present/);
+  assert.match(result.stdout, /cutover readiness attestations are explicitly YES \(9 gates\)/);
+  assert.match(result.stdout, /operator-provided evidence claims/);
+  assert.match(result.stdout, /RESULT: PASS/);
+  assert.match(result.stdout, /performs no network calls, backup, migration, deployment, DNS changes, or production writes/);
 });
