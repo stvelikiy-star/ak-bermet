@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 35
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      RESTORE_DUMP_PATH: ${{ runner.temp }}/ak-bermet-app-data.dump
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -81,6 +82,8 @@ jobs:
             --file=/tmp/ak-bermet-app-data.dump
 
           docker exec "$DB_CONTAINER" pg_restore --list /tmp/ak-bermet-app-data.dump | grep -F 'TABLE DATA public customers'
+          docker cp "$DB_CONTAINER:/tmp/ak-bermet-app-data.dump" "$RESTORE_DUMP_PATH"
+          test -s "$RESTORE_DUMP_PATH"
 
       - name: Rebuild fresh schema before restore
         run: npx supabase db reset --local --no-seed
@@ -91,6 +94,8 @@ jobs:
           set -euo pipefail
           DB_CONTAINER="$(docker ps --filter 'name=supabase_db_' --format '{{.Names}}' | head -n 1)"
           test -n "$DB_CONTAINER"
+          test -s "$RESTORE_DUMP_PATH"
+          docker cp "$RESTORE_DUMP_PATH" "$DB_CONTAINER:/tmp/ak-bermet-app-data.dump"
 
           APPROVED_COUNT="$(node -e "const x=require('./scripts/production-migrations-approved.json'); process.stdout.write(String(x.migrations.length))")"
           FRESH_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc 'select count(*) from supabase_migrations.schema_migrations')"
@@ -121,6 +126,7 @@ jobs:
           echo "RESTORE_DRILL_PASS migrations=$FRESH_COUNT application_data_marker=$MARKER_COUNT"
 
           docker exec "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "delete from public.customers where id='00000000-0000-4000-8000-000000000013'::uuid"
+          rm -f "$RESTORE_DUMP_PATH"
 
       - name: Stop disposable local Supabase
         if: always()
