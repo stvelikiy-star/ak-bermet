@@ -3,6 +3,12 @@ name: Sheets Mirror
 on:
   schedule:
     - cron: "*/10 * * * *"
+  pull_request:
+    paths:
+      - ".github/workflows/sheets-mirror.yml"
+      - "scripts/sheets-sync-worker.mjs"
+      - "scripts/sheets-sync-worker.contract.test.mjs"
+      - "scripts/sheets-mirror-workflow.contract.test.mjs"
   workflow_dispatch:
     inputs:
       mode:
@@ -84,6 +90,12 @@ jobs:
               mode="dry-run"
             fi
             limit="100"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            # Pull requests are runtime-proof only. Never allow a PR-triggered
+            # workflow to mutate the workbook, even when the execution secret
+            # is enabled for scheduled runs.
+            mode="dry-run"
+            limit="25"
           else
             mode="${INPUT_MODE:-dry-run}"
             limit="${INPUT_LIMIT:-100}"
