@@ -9,6 +9,7 @@
 #
 # Optional, non-secret environment:
 #   AK_BERMET_POSTGRES_IMAGE=postgres:17-alpine
+#   AK_BERMET_BACKUP_ROOT=/absolute/private/backup/path
 #
 # The PostgreSQL image must already exist locally. This script never pulls an
 # image, applies migrations, restores a dump, or contacts Supabase tooling.
@@ -23,9 +24,8 @@ if [[ $- == *x* ]]; then
   exit 64
 fi
 
-readonly BACKUP_ROOT='/home/agent/ai-prof-backups/ak-bermet'
+readonly DEFAULT_BACKUP_ROOT='/home/agent/ai-prof-backups/ak-bermet'
 readonly DEFAULT_POSTGRES_IMAGE='postgres:17-alpine'
-readonly LOCK_DIR="${BACKUP_ROOT}/.backup.lock"
 
 log() {
   printf '[ak-bermet-backup] %s\n' "$1" >&2
@@ -62,6 +62,26 @@ database_password=${SUPABASE_DB_PASSWORD}
 unset SUPABASE_DB_PASSWORD
 [[ $database_password != *$'\n'* && $database_password != *$'\r'* ]] ||
   fail 'The database password contains an invalid line break.' 64
+
+backup_root=${AK_BERMET_BACKUP_ROOT:-$DEFAULT_BACKUP_ROOT}
+unset AK_BERMET_BACKUP_ROOT
+[[ -n $backup_root ]] || fail 'AK_BERMET_BACKUP_ROOT must not be empty.' 64
+[[ $backup_root != *$'\n'* && $backup_root != *$'\r'* ]] ||
+  fail 'AK_BERMET_BACKUP_ROOT contains an invalid line break.' 64
+case "$backup_root" in
+  /*) ;;
+  *) fail 'AK_BERMET_BACKUP_ROOT must be an absolute path.' 64 ;;
+esac
+[[ $backup_root != '/' ]] || fail 'AK_BERMET_BACKUP_ROOT must not be filesystem root.' 64
+command -v realpath >/dev/null 2>&1 || fail 'realpath is not available.' 69
+canonical_backup_root=$(realpath -m -- "$backup_root") ||
+  fail 'AK_BERMET_BACKUP_ROOT cannot be canonicalized.' 64
+[[ $canonical_backup_root == "$backup_root" ]] ||
+  fail 'AK_BERMET_BACKUP_ROOT must be canonical and must not traverse symlink components.' 64
+readonly BACKUP_ROOT=$canonical_backup_root
+readonly LOCK_DIR="${BACKUP_ROOT}/.backup.lock"
+backup_root=''
+canonical_backup_root=''
 
 # Parse only the non-secret connection identity from the URI. The password in
 # the URI is intentionally ignored: the raw password is delivered separately
@@ -111,6 +131,8 @@ docker image inspect "$postgres_image" >/dev/null 2>&1 ||
 
 [[ ! -L $BACKUP_ROOT ]] || fail 'The backup root must not be a symbolic link.' 73
 mkdir -p -- "$BACKUP_ROOT" || fail 'Cannot create the backup root.' 73
+[[ $(realpath -e -- "$BACKUP_ROOT") == "$BACKUP_ROOT" ]] ||
+  fail 'The backup root resolved through a symbolic link.' 73
 chmod 0700 -- "$BACKUP_ROOT" || fail 'Cannot secure the backup root.' 73
 
 if ! mkdir -- "$LOCK_DIR" 2>/dev/null; then

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, symlink, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -8,15 +10,60 @@ const scriptUrl = new URL("./ak-bermet-production-backup.sh", import.meta.url);
 const scriptPath = fileURLToPath(scriptUrl);
 const script = await readFile(scriptUrl, "utf8");
 
-test("backup is operator-gated and uses the fixed private destination", () => {
+const sentinelUrl = "postgresql://backup:placeholder@example.invalid:5432/db";
+const sentinelPassword = "do-not-print-this-password";
+
+function runWithRoot(root) {
+  return spawnSync("bash", [scriptPath], {
+    encoding: "utf8",
+    env: {
+      PATH: process.env.PATH ?? "",
+      AK_BERMET_BACKUP_APPROVED: "YES",
+      AK_BERMET_DATABASE_URL: sentinelUrl,
+      SUPABASE_DB_PASSWORD: sentinelPassword,
+      AK_BERMET_BACKUP_ROOT: root,
+    },
+  });
+}
+
+test("backup is operator-gated and keeps a private default destination", () => {
   assert.match(
     script,
-    /readonly BACKUP_ROOT='\/home\/agent\/ai-prof-backups\/ak-bermet'/
+    /readonly DEFAULT_BACKUP_ROOT='\/home\/agent\/ai-prof-backups\/ak-bermet'/
   );
+  assert.match(script, /backup_root=\$\{AK_BERMET_BACKUP_ROOT:-\$DEFAULT_BACKUP_ROOT\}/);
   assert.match(script, /AK_BERMET_BACKUP_APPROVED:-} == 'YES'/);
   assert.match(script, /chmod 0700 -- "\$BACKUP_ROOT"/);
   assert.match(script, /chmod 0600 -- "\$1" SHA256SUMS/);
-  assert.match(script, /The backup root must not be a symbolic link/);
+});
+
+test("backup root must be absolute, canonical, non-root, and free of symlink traversal", async () => {
+  assert.match(script, /AK_BERMET_BACKUP_ROOT must be an absolute path/);
+  assert.match(script, /AK_BERMET_BACKUP_ROOT must not be filesystem root/);
+  assert.match(script, /realpath -m -- "\$backup_root"/);
+  assert.match(script, /must be canonical and must not traverse symlink components/);
+
+  const relative = runWithRoot("relative/backup");
+  assert.equal(relative.status, 64);
+  assert.match(relative.stderr, /must be an absolute path/);
+
+  const root = runWithRoot("/");
+  assert.equal(root.status, 64);
+  assert.match(root.stderr, /must not be filesystem root/);
+
+  const sandbox = await mkdtemp(join(tmpdir(), "ak-bermet-backup-root-"));
+  try {
+    const realParent = join(sandbox, "real-parent");
+    const aliasParent = join(sandbox, "alias-parent");
+    await mkdir(realParent);
+    await symlink(realParent, aliasParent);
+
+    const symlinked = runWithRoot(join(aliasParent, "backup"));
+    assert.equal(symlinked.status, 64);
+    assert.match(symlinked.stderr, /canonical.*symlink/i);
+  } finally {
+    await rm(sandbox, { recursive: true, force: true });
+  }
 });
 
 test("database password is sent over stdin and absent from Docker/process arguments", () => {
@@ -40,6 +87,7 @@ test("database password is sent over stdin and absent from Docker/process argume
   assert.match(script, /Refusing to run with shell tracing enabled/);
   assert.match(script, /unset AK_BERMET_DATABASE_URL/);
   assert.match(script, /unset SUPABASE_DB_PASSWORD/);
+  assert.match(script, /unset AK_BERMET_BACKUP_ROOT/);
 });
 
 test("Session Pooler URI is decomposed into non-secret libpq parameters", () => {
@@ -65,15 +113,9 @@ test("Docker client enforces read-only transactions and a hardened container", (
 
 test("archive and checksum validation happen before atomic publication", () => {
   const restoreListAt = script.indexOf('pg_restore --list "$dump_file"');
-  const checksumCreateAt = script.indexOf(
-    'sha256sum "$1" > SHA256SUMS'
-  );
-  const checksumCheckAt = script.indexOf(
-    "sha256sum -c SHA256SUMS >/dev/null"
-  );
-  const publishAt = script.indexOf(
-    'mv --no-target-directory -- "$staging_dir" "$final_dir"'
-  );
+  const checksumCreateAt = script.indexOf('sha256sum "$1" > SHA256SUMS');
+  const checksumCheckAt = script.indexOf("sha256sum -c SHA256SUMS >/dev/null");
+  const publishAt = script.indexOf('mv --no-target-directory -- "$staging_dir" "$final_dir"');
 
   assert.ok(restoreListAt >= 0);
   assert.ok(restoreListAt < checksumCreateAt);
