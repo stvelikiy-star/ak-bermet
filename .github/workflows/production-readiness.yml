@@ -64,6 +64,11 @@ jobs:
       - name: Lead durability contract
         run: npm run test:lead-durability
 
+      - name: AI chat CRM handoff contract
+        run: |
+          node --experimental-strip-types --test src/lib/ai/chat-lead-handoff.test.ts
+          node --test src/components/AiChat.crm-handoff.contract.test.mjs
+
       - name: Lead Sheets outbox contract
         run: npm run test:leads-sheets-outbox
 
