@@ -11,17 +11,18 @@ test("restore drill is disposable and never targets a remote Supabase project", 
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /npx supabase start/);
-  assert.match(workflow, /supabase db reset --local --no-seed/);
+  assert.ok((workflow.match(/supabase db reset --local --no-seed/g) ?? []).length >= 2);
   assert.doesNotMatch(workflow, /--linked|db push|SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD|project[_-]?ref|supabase\.co|secrets\./i);
 });
 
-test("restore drill creates a real dump and restores it into a second local database", () => {
+test("restore drill rebuilds schema and restores a real application-data dump", () => {
   assert.match(workflow, /pg_dump/);
-  assert.match(workflow, /createdb -U postgres akbermet_restore_drill/);
+  assert.match(workflow, /--data-only/);
+  assert.match(workflow, /--table=public\.customers/);
   assert.match(workflow, /pg_restore/);
-  assert.match(workflow, /restore_drill_marker/);
+  assert.match(workflow, /AK BERMET RESTORE DRILL/);
   assert.match(workflow, /AK_BERMET_RESTORE_DRILL_2026/);
-  assert.match(workflow, /dropdb -U postgres akbermet_restore_drill/);
+  assert.doesNotMatch(workflow, /createdb|akbermet_restore_drill|realtime\.list_changes/i);
 });
 
 test("restore drill verifies migration ledger and critical PMS objects", () => {
