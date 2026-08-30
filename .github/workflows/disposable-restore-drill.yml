@@ -1,0 +1,142 @@
+name: Disposable Restore Drill
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/disposable-restore-drill.yml"
+      - "scripts/restore-drill-workflow.contract.test.mjs"
+      - "supabase/migrations/**"
+      - "scripts/production-migrations-approved.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ak-bermet-disposable-restore-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore workflow safety contract
+        run: node --test scripts/restore-drill-workflow.contract.test.mjs
+
+      - name: Start disposable local Supabase
+        run: npx supabase start
+
+      - name: Rebuild application schema from migrations
+        run: npx supabase db reset --local --no-seed
+
+      - name: Create application-data backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESTORE_DUMP_PATH="${RUNNER_TEMP}/ak-bermet-app-data.dump"
+          DB_CONTAINER="$(docker ps --filter 'name=supabase_db_' --format '{{.Names}}' | head -n 1)"
+          test -n "$DB_CONTAINER"
+
+          APPROVED_COUNT="$(node -e "const x=require('./scripts/production-migrations-approved.json'); process.stdout.write(String(x.migrations.length))")"
+          SOURCE_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$SOURCE_COUNT" = "$APPROVED_COUNT"
+
+          docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          insert into public.customers (
+            id,
+            full_name,
+            phone,
+            notes
+          ) values (
+            '00000000-0000-4000-8000-000000000013'::uuid,
+            'AK BERMET RESTORE DRILL',
+            '+996000000013',
+            'AK_BERMET_RESTORE_DRILL_2026'
+          );
+          SQL
+
+          docker exec "$DB_CONTAINER" pg_dump \
+            -U postgres \
+            -d postgres \
+            --format=custom \
+            --data-only \
+            --table=public.customers \
+            --no-owner \
+            --no-acl \
+            --file=/tmp/ak-bermet-app-data.dump
+
+          ARCHIVE_LIST="$(docker exec "$DB_CONTAINER" pg_restore --list /tmp/ak-bermet-app-data.dump)"
+          printf '%s\n' "$ARCHIVE_LIST" | grep -F 'TABLE DATA public customers'
+          test "$(printf '%s\n' "$ARCHIVE_LIST" | grep -c 'TABLE DATA')" = "1"
+
+          docker cp "$DB_CONTAINER:/tmp/ak-bermet-app-data.dump" "$RESTORE_DUMP_PATH"
+          test -s "$RESTORE_DUMP_PATH"
+
+      - name: Rebuild fresh schema before restore
+        run: npx supabase db reset --local --no-seed
+
+      - name: Restore application data and verify invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESTORE_DUMP_PATH="${RUNNER_TEMP}/ak-bermet-app-data.dump"
+          DB_CONTAINER="$(docker ps --filter 'name=supabase_db_' --format '{{.Names}}' | head -n 1)"
+          test -n "$DB_CONTAINER"
+          test -s "$RESTORE_DUMP_PATH"
+          docker cp "$RESTORE_DUMP_PATH" "$DB_CONTAINER:/tmp/ak-bermet-app-data.dump"
+
+          APPROVED_COUNT="$(node -e "const x=require('./scripts/production-migrations-approved.json'); process.stdout.write(String(x.migrations.length))")"
+          FRESH_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc 'select count(*) from supabase_migrations.schema_migrations')"
+          test "$FRESH_COUNT" = "$APPROVED_COUNT"
+
+          # The dump is already scoped to public.customers and verified above
+          # to contain exactly one TABLE DATA entry. Restoring the whole tiny
+          # archive avoids pattern-matching differences between pg_dump and
+          # pg_restore table selectors across PostgreSQL versions.
+          docker exec "$DB_CONTAINER" pg_restore \
+            -U postgres \
+            -d postgres \
+            --data-only \
+            --no-owner \
+            --no-acl \
+            --exit-on-error \
+            /tmp/ak-bermet-app-data.dump
+
+          MARKER_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select count(*) from public.customers where id='00000000-0000-4000-8000-000000000013'::uuid and notes='AK_BERMET_RESTORE_DRILL_2026'")"
+          ROOM_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select to_regclass('public.room_units') is not null")"
+          PAYMENT_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select to_regclass('public.booking_payments') is not null")"
+          CMS_TABLE="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select to_regclass('public.site_content_public') is not null")"
+          HOLD_RPC="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select to_regprocedure('public.fn_create_availability_hold(uuid,date,date,uuid,uuid,text)') is not null")"
+
+          echo "RESTORE_DRILL_INVARIANTS migrations=${FRESH_COUNT}/${APPROVED_COUNT} marker=${MARKER_COUNT} room=${ROOM_TABLE} payment=${PAYMENT_TABLE} cms=${CMS_TABLE} hold_rpc=${HOLD_RPC}"
+
+          test "$MARKER_COUNT" = "1"
+          test "$ROOM_TABLE" = "t"
+          test "$PAYMENT_TABLE" = "t"
+          test "$CMS_TABLE" = "t"
+          test "$HOLD_RPC" = "t"
+
+          echo "RESTORE_DRILL_PASS migrations=$FRESH_COUNT application_data_marker=$MARKER_COUNT"
+
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "delete from public.customers where id='00000000-0000-4000-8000-000000000013'::uuid"
+          rm -f "$RESTORE_DUMP_PATH"
+
+      - name: Stop disposable local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
