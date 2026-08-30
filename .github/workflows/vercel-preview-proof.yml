@@ -1,0 +1,64 @@
+name: Vercel Preview Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/vercel-preview-proof.yml"
+      - "scripts/vercel-preview-workflow.contract.test.mjs"
+      - "package.json"
+      - ".github/workflows/production-readiness.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ak-bermet-vercel-preview-proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_7GagNlblg6wDAIOoF44H7dFN
+      VERCEL_PROJECT_ID: prj_b3kaGYbW8gVtJg4o5PlP6K4kxaIV
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify protected configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "MISSING_SECRET_NAME: VERCEL_TOKEN"
+            echo "BLOCKED: Vercel preview token is not configured. Secret values were not printed."
+            exit 2
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pull preview environment
+        run: npx --yes vercel@59.10.0 pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      - name: Build preview artifact
+        run: npx --yes vercel@59.10.0 build --token="$VERCEL_TOKEN"
+
+      - name: Deploy preview only
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(npx --yes vercel@59.10.0 deploy --prebuilt --yes --token="$VERCEL_TOKEN")"
+          test -n "$url"
+          echo "PREVIEW_DEPLOYMENT_URL=$url"
