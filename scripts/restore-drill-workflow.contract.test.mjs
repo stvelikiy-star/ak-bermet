@@ -25,6 +25,13 @@ test("restore drill rebuilds schema and restores a real application-data dump", 
   assert.doesNotMatch(workflow, /createdb|akbermet_restore_drill|realtime\.list_changes/i);
 });
 
+test("restore dump survives the database container recreation", () => {
+  assert.match(workflow, /RESTORE_DUMP_PATH: \$\{\{ runner\.temp \}\}/);
+  assert.ok((workflow.match(/docker cp/g) ?? []).length >= 2);
+  assert.match(workflow, /test -s "\$RESTORE_DUMP_PATH"/);
+  assert.match(workflow, /rm -f "\$RESTORE_DUMP_PATH"/);
+});
+
 test("restore drill verifies migration ledger and critical PMS objects", () => {
   assert.match(workflow, /production-migrations-approved\.json/);
   assert.match(workflow, /supabase_migrations\.schema_migrations/);
