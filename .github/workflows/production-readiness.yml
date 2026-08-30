@@ -111,6 +111,9 @@ jobs:
       - name: Sheets mirror worker contract
         run: npm run test:sheets-sync-worker
 
+      - name: Legacy booking import guard
+        run: npm run test:legacy-bookings-import
+
       - name: Production preflight contract
         run: npm run test:production-preflight
 

@@ -22,6 +22,7 @@
     "test:staff-auth-provisioner": "node --test scripts/staff-auth-provisioner.contract.test.mjs",
     "test:sheets-sync-outbox": "node --test supabase/migrations/sheets-sync-outbox.contract.test.mjs",
     "test:sheets-sync-worker": "node --test scripts/sheets-sync-worker.contract.test.mjs scripts/sheets-mirror-workflow.contract.test.mjs",
+    "test:legacy-bookings-import": "node --test scripts/legacy-bookings-import-validator.contract.test.mjs",
     "test:production-preflight": "node --test scripts/production-preflight.contract.test.mjs",
     "test:local-auth-preflight": "node --test scripts/local-auth-preflight.contract.test.mjs",
     "preflight:production": "node scripts/production-preflight.mjs --production-env",
