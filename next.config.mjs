@@ -8,13 +8,21 @@ const nextConfig = {
       { source: "/favicon.png", destination: "/icon.svg", permanent: true },
     ];
   },
-  images: {
-    remotePatterns: [
+  async headers() {
+    return [
       {
-        protocol: "https",
-        hostname: "images.unsplash.com",
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
       },
-    ],
+    ];
   },
 };
 
