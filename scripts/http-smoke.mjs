@@ -1,16 +1,28 @@
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
+import { cpSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const port = Number(process.env.AK_BERMET_SMOKE_PORT || 3127);
 const baseUrl = `http://127.0.0.1:${port}`;
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const runtimeRoot = mkdtempSync(join(tmpdir(), "ak-bermet-http-smoke-"));
+const runtimeDir = join(runtimeRoot, "app");
+
+// Reproduce the Docker runner layout exactly: standalone server + public +
+// .next/static. Testing the packaged artifact is stricter than `next start`.
+cpSync(".next/standalone", runtimeDir, { recursive: true });
+cpSync("public", join(runtimeDir, "public"), { recursive: true });
+mkdirSync(join(runtimeDir, ".next"), { recursive: true });
+cpSync(".next/static", join(runtimeDir, ".next/static"), { recursive: true });
 
 const serverEnv = {
   ...process.env,
+  NODE_ENV: "production",
   PORT: String(port),
+  HOSTNAME: "127.0.0.1",
   NEXT_TELEMETRY_DISABLED: "1",
   GOOGLE_SHEETS_ENABLED: "false",
-  AI_PROVIDER: "mock",
   AI_ENABLE_REAL_CALLS: "false",
 };
 
@@ -25,7 +37,8 @@ for (const key of [
   delete serverEnv[key];
 }
 
-const server = spawn(npmCommand, ["run", "start", "--", "-p", String(port)], {
+const server = spawn(process.execPath, ["server.js"], {
+  cwd: runtimeDir,
   env: serverEnv,
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -45,7 +58,7 @@ async function waitForServer() {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     if (server.exitCode !== null) {
-      throw new Error(`Next.js server exited before smoke tests (code ${server.exitCode})\n${serverOutput}`);
+      throw new Error(`Standalone server exited before smoke tests (code ${server.exitCode})\n${serverOutput}`);
     }
     try {
       const response = await fetch(`${baseUrl}/`, { redirect: "manual" });
@@ -126,7 +139,9 @@ try {
   const chatStatus = await get("/api/chat/status");
   assert.equal(chatStatus.status, 200, "Chat status endpoint must be available");
   const chatStatusJson = await chatStatus.json();
-  assert.equal(chatStatusJson.provider, "mock", "CI smoke must remain in explicit mock provider mode");
+  // Production is intentionally fail-closed: a build-time/mock test setting may
+  // never make the deployed artifact advertise or serve mock AI.
+  assert.equal(chatStatusJson.provider, "openai", "Production artifact must never advertise mock AI");
   assert.equal(chatStatusJson.realCallsEnabled, false, "CI smoke must never enable real AI calls");
 
   const malformedLead = await get("/api/leads", {
@@ -150,7 +165,7 @@ try {
   const favicon = await fetch(`${baseUrl}/favicon.ico`, { redirect: "follow" });
   assert.equal(favicon.status, 200, "favicon compatibility URL must resolve");
 
-  console.log(`HTTP_SMOKE_PASS public=${publicPages.length} protected=7 api=4 seo=2`);
+  console.log(`HTTP_SMOKE_PASS public=${publicPages.length} protected=7 api=4 seo=2 artifact=standalone`);
 } finally {
   if (server.exitCode === null) {
     server.kill("SIGTERM");
@@ -160,4 +175,5 @@ try {
     ]);
     if (server.exitCode === null) server.kill("SIGKILL");
   }
+  rmSync(runtimeRoot, { recursive: true, force: true });
 }
