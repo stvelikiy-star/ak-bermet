@@ -1,63 +1,41 @@
-# TODO — следующие этапы AK BERMET
+# AK BERMET — текущие следующие действия
 
-> Stage 09 (готово): PIN-авторизация менеджера (middleware), чтение заявок из
-> Google Sheets, смена статуса + комментарий с сохранением, лист «История заявок».
->
+> **SUPERSEDED:** старый Stage 04–09 backlog завершён или архитектурно заменён текущим Supabase/CRM/operations контуром. Историю старого плана смотрите в Git history. Для финальной сдачи используйте `HANDOVER_RELEASE_2026-09-07.md`.
 
-> Stage 08 (готово): кабинет менеджера `/manager` (обзор, заявки, занятость,
-> номера, оплаты, отчёты, настройки) на mock-данных, без auth.
->
+## Сейчас НЕ делать
 
-> Stage 05 (готово): Google Sheets client (`src/lib/google-sheets.ts`), запись
-> заявок в лист «Заявки», fallback mock-режим, env setup, документация
-> (`GOOGLE_SHEETS_SETUP.md`). Дальше — доступность из листов и уведомления.
+- Не добавлять новые фичи и не переделывать дизайн без критической причины.
+- Не считать Google Sheets источником публичной availability.
+- Не придумывать тарифы для 14 Standard корпуса 3 и C3-301.
+- Не включать домен до импорта/сверки реальных текущих броней.
+- Не отмечать cutover gate PASS без фактического evidence.
 
+## Финальный release backlog
 
-Текущий статус: Stage 01–03 + 03.1 готовы (главная, внутренние страницы,
-навигация, SEO-база, sitemap/robots, logo-fallback, структура ассетов).
-Ниже — план дальнейшей разработки.
+- [ ] Зафиксировать final `main` SHA после handover-docs merge и Production Readiness PASS.
+- [ ] Включить и проверить GitHub branch protection для `main`.
+- [ ] Получить реальный актуальный реестр бронирований от администратора/ресепшн.
+- [ ] Заполнить и провалидировать `23_Импорт_Брони`; 0 дублей, 0 пересечений, суммы/оплаты сверены.
+- [ ] Импортировать и повторно сверить актуальные брони до публичного cutover.
+- [ ] Получить финальное подтверждение политики для 15 fail-closed room→price mappings.
+- [ ] Подтвердить фактическую готовность/статус коттеджного фонда.
+- [ ] Сделать свежий live DB backup непосредственно перед cutover; проверить hashes/restore path.
+- [ ] Восстановить GitHub Actions secrets для scheduled Sheets Mirror и получить реальный зелёный run.
+- [ ] Включить Supabase Leaked Password Protection и повторить auth/role smoke.
+- [ ] Развернуть exact final SHA в Vercel production.
+- [ ] Снять/настроить Vercel Deployment Protection для публичного production URL.
+- [ ] Провести desktop/mobile browser UAT, RU/KG/EN/KZ, legal, forms, availability, robots/sitemap, links, no 5xx.
+- [ ] Провести финальный role UAT: owner/admin/manager/housekeeping/technician + denied-access checks.
+- [ ] Проверить booking → payment → check-in → checkout → cleaning → maintenance/inspection → READY.
+- [ ] Проверить WhatsApp → webhook → n8n → AI → durable CRM lead → manager notification → human handoff.
+- [ ] После всех evidence-backed gates переключить `akbermet.kg` с rollback-ready конфигурацией.
+- [ ] Проверить HTTPS/canonical/www/robots/sitemap/runtime logs после DNS cutover.
+- [ ] Провести обучение персонала и зафиксировать owner acceptance.
 
----
+## Cutover gate command
 
-## Stage 04 — Google Sheets / CRM
-- Приём заявок с сайта в таблицу/CRM.
-- Номерной фонд (категории, корпуса).
-- Занятость по датам.
-- Оплаты и их статусы.
-- Статусы заявок (новая, в работе, подтверждена, отменена).
+```bash
+npm run preflight:cutover
+```
 
-## Stage 05 — AI Chat API
-- База знаний (номера, источники, SPA, цены, правила).
-- Обработка вопросов реальным AI вместо локальных заготовок.
-- Передача сложных обращений администратору.
-- Хэндофф в WhatsApp с контекстом диалога.
-
-## Stage 06 — Booking / Availability
-- Проверка доступности по датам и категориям.
-- Предварительная бронь (hold).
-- Статусы брони и подтверждение администратором.
-
-## Stage 07 — FreedomPay
-- Предоплата 20%.
-- Страницы success / fail.
-- Отслеживание статуса платежа и привязка к заявке.
-
-## Stage 08 — Admin Panel
-- Управление номерами и корпусами.
-- Заявки и оплаты.
-- Занятость / календарь.
-- Контент сайта (тексты, фото).
-- Акции.
-
----
-
-## Технический бэклог (можно делать параллельно)
-- Заменить Unsplash-плейсхолдеры на реальные фото (`/public/images/...`).
-- Добавить реальный логотип `brand/logo-ak-bermet.png` и включить
-  `LOGO_IMAGE_ENABLED` в `src/components/ui/Logo.tsx`.
-- Добавить реальные `favicon.ico` / `apple-touch-icon.png` (сейчас favicon
-  генерируется из `src/app/icon.svg`).
-- Добавить реальные ссылки на соцсети в `Footer` (`SOCIAL_LINKS`).
-- OG-изображение для соцсетей (`/public/images/brand/og.jpg`) + поле в metadata.
-- Подключить аналитику (например, через тег в `layout.tsx`).
-- i18n (RU / KG / EN) — переключатель языка в Header уже зарезервирован.
+Команда обязана fail-closed, пока все 9 внешних release attestations не выставлены точным `YES` на основании доказательств.
