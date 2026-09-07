@@ -1,0 +1,50 @@
+name: Refresh Security Lockfile
+
+on:
+  push:
+    branches: [security/deps-2026-09-07]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-security-lockfile-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: ${{ !contains(github.event.head_commit.message, '[lockfile-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Refresh lockfile with npm registry
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Verify patched dependency graph
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=moderate
+          npm ls next eslint-config-next qs
+
+      - name: Commit generated lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo 'package-lock.json already current'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'security: refresh npm lockfile [lockfile-generated]'
+          git push origin HEAD:security/deps-2026-09-07
