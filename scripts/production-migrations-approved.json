@@ -32,12 +32,12 @@
     "20260825191341_consolidate_operational_select_policies.sql",
     "20260825191549_split_admin_write_policies.sql",
     "20260825201822_harden_staff_rpc_role_checks.sql",
-    "20260829102000_super_chessboard_v2.sql",
-    "20260829110500_super_chessboard_rpc_acl_hardening.sql",
-    "20260829113000_super_chessboard_move_rpc_fix.sql",
-    "20260829115500_manual_payment_ledger.sql",
-    "20260829130000_site_content_cms_core.sql",
-    "20260829133000_site_content_cms_rpc_runtime_fix.sql",
-    "20260830083000_add_super_chessboard_fk_indexes.sql"
+    "20260829103843_super_chessboard_v2.sql",
+    "20260829111717_super_chessboard_rpc_acl_hardening.sql",
+    "20260829112001_super_chessboard_move_rpc_fix.sql",
+    "20260829125512_manual_payment_ledger.sql",
+    "20260829140341_site_content_cms_core.sql",
+    "20260829141145_site_content_cms_rpc_runtime_fix.sql",
+    "20260830083140_add_super_chessboard_fk_indexes.sql"
   ]
 }
