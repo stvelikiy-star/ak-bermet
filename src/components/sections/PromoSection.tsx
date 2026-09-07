@@ -1,18 +1,22 @@
 import { featuredPromo as promo } from "@/data/promos";
 import { WA } from "@/data/site";
+import { t } from "@/i18n/dictionary";
+import { getLocale } from "@/i18n/locale.server";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import { IconGift, IconArrowRight } from "@/components/ui/icons";
 
-export default function PromoSection() {
+export default async function PromoSection() {
+  const locale = await getLocale();
+
   return (
     <section id="promo" className="bg-beige py-16 sm:py-24">
       <div className="mx-auto max-w-site px-4 sm:px-6 lg:px-8">
         <div className="mb-10 text-center">
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider2 text-gold-dark">
-            Выгода
+            {t("Выгода", locale)}
           </p>
           <h2 className="eyebrow-line font-display text-3xl font-semibold text-emerald-deep sm:text-4xl">
-            Акции и специальные предложения
+            {t("Акции и специальные предложения", locale)}
           </h2>
         </div>
 
@@ -23,24 +27,24 @@ export default function PromoSection() {
             </span>
             <div className="flex-1">
               <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-gold-soft">
-                {promo.badge}
+                {t(promo.badge, locale)}
               </span>
               <h3 className="mt-3 font-display text-2xl font-semibold text-white">
-                {promo.title}
+                {t(promo.title, locale)}
               </h3>
               <p className="mt-2 text-lg font-semibold text-gold-soft">
-                {promo.offer}
+                {t(promo.offer, locale)}
               </p>
-              <p className="mt-2 text-sm text-white/75">{promo.details}</p>
+              <p className="mt-2 text-sm text-white/75">{t(promo.details, locale)}</p>
               <p className="mt-3 text-xs leading-relaxed text-white/45">
-                {promo.note}
+                {t(promo.note, locale)}
               </p>
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <a
                   href="/promos"
                   className="inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-6 py-3 text-sm font-semibold text-emerald-deep transition-transform hover:-translate-y-0.5"
                 >
-                  Смотреть акции <IconArrowRight className="h-4 w-4" />
+                  {t("Смотреть акции", locale)} <IconArrowRight className="h-4 w-4" />
                 </a>
                 <a
                   href={WA.promo}
@@ -49,7 +53,7 @@ export default function PromoSection() {
                   className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-colors hover:border-gold/60 hover:text-gold-soft"
                 >
                   <WhatsAppIcon size={18} className="shrink-0" />
-                  Уточнить актуальность
+                  {t("Уточнить актуальные акции", locale)}
                 </a>
               </div>
             </div>

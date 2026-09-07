@@ -52,8 +52,8 @@ if (manifestValid) pass("approved production migration manifest is valid, unique
 else fail("approved production migration manifest is invalid, duplicated, or unordered");
 
 const packageJson = JSON.parse(read("package.json"));
-if (packageJson.engines?.node === ">=22.0.0") pass("Node runtime contract is >=22.0.0");
-else fail("package.json must require Node >=22.0.0");
+if (packageJson.engines?.node === "22.x") pass("Node runtime contract is pinned to 22.x");
+else fail("package.json must pin Node to 22.x");
 
 const dockerfile = read("Dockerfile");
 const node22Stages = dockerfile.match(/^FROM node:22-alpine AS /gm) ?? [];

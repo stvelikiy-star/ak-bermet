@@ -65,9 +65,13 @@ test("approved migration manifest exactly matches the ordered repository migrati
 });
 
 test("repository-only preflight is non-destructive and passes the approved migration/runtime contract", () => {
+  const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+  assert.equal(packageJson.engines?.node, "22.x");
+
   const result = run();
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /approved production migration manifest is valid, unique, and ordered/);
+  assert.match(result.stdout, /Node runtime contract is pinned to 22\.x/);
   assert.match(result.stdout, /migration chain is exact and ordered \(\d+ files\)/);
   assert.match(result.stdout, /RESULT: PASS/);
   assert.match(result.stdout, /performs no network calls, backup, migration, deployment, DNS changes, or production writes/);
