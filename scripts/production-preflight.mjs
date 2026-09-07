@@ -16,6 +16,21 @@ const REQUIRED_PRODUCTION_ENV = [
   "AK_BERMET_DATABASE_URL",
 ];
 
+// These are explicit operator/owner attestations, not inferred state. Cutover
+// must fail closed until each external release gate has been independently
+// verified and set to the exact value YES in the cutover execution context.
+const REQUIRED_CUTOVER_ATTESTATIONS = [
+  "AK_BERMET_CUTOVER_APPROVED",
+  "AK_BERMET_LIVE_BACKUP_VERIFIED",
+  "AK_BERMET_PRICING_GAPS_RESOLVED",
+  "AK_BERMET_LEGACY_BOOKINGS_RECONCILED",
+  "AK_BERMET_COTTAGES_READINESS_CONFIRMED",
+  "AK_BERMET_SHEETS_RUNTIME_VERIFIED",
+  "AK_BERMET_BROWSER_UAT_PASSED",
+  "AK_BERMET_AUTH_HARDENING_VERIFIED",
+  "AK_BERMET_MAIN_PROTECTION_VERIFIED",
+];
+
 const failures = [];
 const pass = (message) => console.log(`PASS: ${message}`);
 const fail = (message) => failures.push(message);
@@ -76,7 +91,10 @@ if (manifestValid) {
   }
 }
 
-if (process.argv.includes("--production-env")) {
+const productionEnvMode = process.argv.includes("--production-env");
+const cutoverReadinessMode = process.argv.includes("--cutover-readiness");
+
+if (productionEnvMode || cutoverReadinessMode) {
   const missing = REQUIRED_PRODUCTION_ENV.filter((name) => !process.env[name]?.trim());
   if (process.env.AK_BERMET_BACKUP_APPROVED !== "YES") {
     missing.push("AK_BERMET_BACKUP_APPROVED=YES");
@@ -89,10 +107,25 @@ if (process.argv.includes("--production-env")) {
   }
 }
 
+if (cutoverReadinessMode) {
+  const blocked = REQUIRED_CUTOVER_ATTESTATIONS.filter(
+    (name) => process.env[name] !== "YES",
+  );
+
+  if (blocked.length === 0) {
+    pass(`cutover readiness attestations are explicitly YES (${REQUIRED_CUTOVER_ATTESTATIONS.length} gates)`);
+  } else {
+    fail(`cutover readiness incomplete or not YES: ${blocked.join(", ")}`);
+  }
+}
+
 if (failures.length > 0) {
   for (const message of failures) console.error(`BLOCKED: ${message}`);
   process.exitCode = 2;
 } else {
   console.log("RESULT: PASS");
-  console.log("NOTE: this preflight performs no network calls, backup, migration, deployment, or production writes.");
+  if (cutoverReadinessMode) {
+    console.log("NOTE: cutover attestations are operator-provided evidence claims; this preflight does not infer or bypass the underlying release gates.");
+  }
+  console.log("NOTE: this preflight performs no network calls, backup, migration, deployment, DNS changes, or production writes.");
 }
