@@ -3,15 +3,15 @@ import fs from "node:fs";
 import test from "node:test";
 
 const migration = fs.readFileSync(
-  new URL("./20260829102000_super_chessboard_v2.sql", import.meta.url),
+  new URL("./20260829103843_super_chessboard_v2.sql", import.meta.url),
   "utf8",
 );
 const aclHardening = fs.readFileSync(
-  new URL("./20260829110500_super_chessboard_rpc_acl_hardening.sql", import.meta.url),
+  new URL("./20260829111717_super_chessboard_rpc_acl_hardening.sql", import.meta.url),
   "utf8",
 );
 const moveRepair = fs.readFileSync(
-  new URL("./20260829113000_super_chessboard_move_rpc_fix.sql", import.meta.url),
+  new URL("./20260829112001_super_chessboard_move_rpc_fix.sql", import.meta.url),
   "utf8",
 );
 const placementRoute = fs.readFileSync(
