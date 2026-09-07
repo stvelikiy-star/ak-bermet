@@ -41,7 +41,7 @@ export default function ManagerLeadsPage() {
     let active = true;
     (async () => {
       try {
-        const res = await fetch("/api/manager/leads");
+        const res = await fetch("/api/manager/leads", { cache: "no-store" });
         const data = await res.json();
         if (!res.ok || !data.ok) {
           if (data.configured === false) setConfigured(false);
@@ -123,12 +123,13 @@ export default function ManagerLeadsPage() {
       <main className="space-y-5 p-4 lg:p-8">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Изменения сохраняются в подключённом источнике заявок. Если запись
-            уже изменил другой сотрудник, сохранение будет отклонено.
+            Заявки читаются и изменяются в CRM-базе Supabase. Google Sheets получает
+            изменения асинхронно как отчётное зеркало и не блокирует работу менеджера.
+            Если запись уже изменил другой сотрудник, сохранение будет отклонено.
           </div>
           {!configured && (
             <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
-              Источник не настроен
+              CRM-база не настроена
             </span>
           )}
         </div>
