@@ -132,6 +132,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Production HTTP smoke
+        run: node scripts/http-smoke.mjs
+
       - name: Repository generated-file hygiene
         run: |
           test -z "$(git ls-files '*.tsbuildinfo')"
