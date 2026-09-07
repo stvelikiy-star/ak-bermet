@@ -18,15 +18,17 @@ export async function GET() {
     return NextResponse.json({
       ok: false,
       configured: false,
-      message: "Supabase не настроен: заполните SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY в .env.local",
+      message: "CRM-база Supabase не настроена на этом окружении.",
     });
   }
 
   try {
     const data = await getOperationsData();
     return NextResponse.json({ ok: true, configured: true, data });
-  } catch (error) {
-    console.error("[MANAGER] getOperationsData failed:", error);
+  } catch {
+    // Raw Supabase/PostgREST errors can contain internal query/schema details.
+    // Keep production logs free of provider payloads and credentials.
+    console.error("[MANAGER_OPERATIONS] Supabase read failed");
     return NextResponse.json(
       {
         ok: false,

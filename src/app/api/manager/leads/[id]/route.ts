@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
-import {
-  isGoogleSheetsEnabled,
-  StaleLeadError,
-  updateLeadStatusInSheet,
-} from "@/lib/google-sheets";
+import { isSupabaseConfigured } from "@/lib/supabase-admin";
+import { ManagerLeadUpdateError, updateManagerLead } from "@/lib/manager-leads-supabase";
 import { STATUS_ORDER } from "@/lib/manager-utils";
 import type { LeadStatus } from "@/types/lead";
 
 export const runtime = "nodejs";
 
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
+
+function isValidIsoTimestamp(value: string): boolean {
+  return value.length <= 64 && Number.isFinite(Date.parse(value));
+}
 
 export async function PATCH(
   request: Request,
@@ -64,38 +65,42 @@ export async function PATCH(
   }
 
   if (
-    payload.expectedUpdatedAt !== null &&
-    typeof payload.expectedUpdatedAt !== "string"
+    typeof payload.expectedUpdatedAt !== "string" ||
+    !isValidIsoTimestamp(payload.expectedUpdatedAt)
   ) {
     return NextResponse.json(
-      { ok: false, message: "Некорректная версия заявки" },
-      { status: 422 }
+      { ok: false, message: "Обновите список заявок перед сохранением." },
+      { status: 409 }
     );
   }
 
-  if (!isGoogleSheetsEnabled()) {
+  if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { ok: false, message: "Источник заявок не настроен." },
+      { ok: false, configured: false, message: "CRM-база не настроена." },
       { status: 503 }
     );
   }
 
   try {
     const { id } = await params;
-    const updatedAt = await updateLeadStatusInSheet({
+    if (!id || id.length > 100) {
+      return NextResponse.json(
+        { ok: false, message: "Некорректный ID заявки" },
+        { status: 422 }
+      );
+    }
+
+    const updatedAt = await updateManagerLead({
       leadId: id,
       status,
       managerComment: payload.managerComment ?? "",
-      managerName: staff.fullName ?? staff.email ?? "",
+      managerUserId: staff.userId,
       expectedUpdatedAt: payload.expectedUpdatedAt,
     });
 
-    return NextResponse.json({
-      ok: true,
-      updatedAt,
-    });
+    return NextResponse.json({ ok: true, updatedAt });
   } catch (error) {
-    if (error instanceof StaleLeadError) {
+    if (error instanceof ManagerLeadUpdateError && error.code === "stale") {
       return NextResponse.json(
         {
           ok: false,
@@ -104,7 +109,8 @@ export async function PATCH(
         { status: 409 }
       );
     }
-    console.error("[MANAGER] updateLead failed:", error);
+    // Raw database errors are intentionally not logged or returned.
+    console.error("[MANAGER_LEADS] Supabase update failed");
     return NextResponse.json(
       {
         ok: false,
