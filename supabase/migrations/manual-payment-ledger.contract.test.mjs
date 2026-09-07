@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-const migration = fs.readFileSync(new URL("./20260829115500_manual_payment_ledger.sql", import.meta.url), "utf8");
+const migration = fs.readFileSync(new URL("./20260829125512_manual_payment_ledger.sql", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../../src/app/api/manager/payments/route.ts", import.meta.url), "utf8");
 const page = fs.readFileSync(new URL("../../src/app/manager/payments/page.tsx", import.meta.url), "utf8");
 const form = fs.readFileSync(new URL("../../src/components/manager/ManualPaymentForm.tsx", import.meta.url), "utf8");

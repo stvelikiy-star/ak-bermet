@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-const migration = fs.readFileSync(new URL("./20260829130000_site_content_cms_core.sql", import.meta.url), "utf8");
-const runtimeFix = fs.readFileSync(new URL("./20260829133000_site_content_cms_rpc_runtime_fix.sql", import.meta.url), "utf8");
+const migration = fs.readFileSync(new URL("./20260829140341_site_content_cms_core.sql", import.meta.url), "utf8");
+const runtimeFix = fs.readFileSync(new URL("./20260829141145_site_content_cms_rpc_runtime_fix.sql", import.meta.url), "utf8");
 const registry = fs.readFileSync(new URL("../../src/lib/site-content.ts", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../../src/app/api/manager/content/route.ts", import.meta.url), "utf8");
 const page = fs.readFileSync(new URL("../../src/app/manager/content/page.tsx", import.meta.url), "utf8");
