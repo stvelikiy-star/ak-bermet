@@ -9,18 +9,18 @@ export type Promo = {
   cta: { label: string; href: string };
 };
 
-export const promos: Promo[] = [
-  {
-    badge: "Сезонное предложение",
-    title: "Проведите июнь с комфортом",
-    offer: "3+1: бронируйте 3 ночи — 4-я ночь бесплатно",
-    details: "Действует с 8 по 30 июня на номера категории люкс корпуса 2 и 3.",
-    note: "Акции действуют в определённые периоды. Актуальность предложения уточняйте у администратора.",
-    cta: { label: "Уточнить акцию", href: WA.promo31 },
-  },
-];
+// No dated promotion is exposed as active unless it is currently confirmed.
+// The June 8–30 "3+1" offer is expired and must not be presented to guests.
+export const promos: Promo[] = [];
 
-// Первая (активная) акция — используется в секции на главной
-export const featuredPromo = promos[0];
+// The home page keeps a safe, non-price-bearing CTA instead of an expired offer.
+export const featuredPromo: Promo = {
+  badge: "Актуальные предложения",
+  title: "Специальные условия для вашего заезда",
+  offer: "Уточните доступные предложения у администратора",
+  details: "Акции зависят от дат и категории номера.",
+  note: "Окончательные условия подтверждает администратор перед бронированием.",
+  cta: { label: "Уточнить предложения", href: WA.promo },
+};
 
 export const promosPlaceholder = "Новые предложения скоро появятся.";
