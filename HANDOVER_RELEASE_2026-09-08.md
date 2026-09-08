@@ -8,18 +8,18 @@
 
 - Repository: `stvelikiy-star/ak-bermet`.
 - Default branch: `main`.
-- Current pre-docs code baseline: `02fa3ac8777755cffdd276e2a7794f3c9cb2bc5d`.
+- Current pre-auth-hardening baseline: `3e6b8b0ead4da18a87be10040e180bac610b9aea`.
 - PR #68: release/security hardening merged.
 - PR #69: Actions/lint/dependency-audit modernization merged.
-- Post-merge Production Readiness for `02fa3ac...`: PASS through Docker build.
+- PR #70: current handover/source-of-truth documentation merged.
 - Runtime contract: Node.js `22.x`.
 - Application stack: Next.js `15.5.25`, TypeScript, Tailwind CSS.
 - Transactional source of truth: Supabase/PostgreSQL.
-- Google Sheets: one-way reporting/export mirror; never the public availability authority.
+- Google Sheets: reporting/export mirror only; never the public availability authority.
 
 Release rule: `PLANNED != IMPLEMENTED != TESTED != MERGED != DEPLOYED != PRODUCTION VERIFIED`.
 
-Final accepted SHA must be re-fixed after this documentation PR is merged and its post-merge Production Readiness succeeds.
+The final accepted SHA must be fixed only after the last release/hardening PR is merged and that exact `main` SHA passes post-merge Production Readiness.
 
 ## 2. Canonical hotel data
 
@@ -64,11 +64,11 @@ Commercial/legal core:
 - cancellation <7 days: non-refundable;
 - no-show: non-refundable.
 
-Pricing remains fail-closed where the authoritative mapping is unresolved. No tariff may be invented.
+Pricing remains fail-closed where an authoritative room-to-price mapping is unresolved. No tariff may be invented.
 
 ## 3. Implemented and CI-tested core
 
-Current `main` contains and verifies:
+Current release contains and verifies:
 
 - RU / KG / EN / KZ public localization;
 - verified room master and public room catalog;
@@ -89,38 +89,47 @@ Current `main` contains and verifies:
 - Sheets outbox/worker;
 - legacy-booking import guard;
 - production preflight and fail-closed cutover gate;
-- full dependency security audit;
+- production + full dependency security audit;
+- ESLint zero-warning gate and TypeScript typecheck;
 - production Next.js build;
 - standalone production HTTP smoke;
 - production Docker build;
 - disposable DB restore drill with migration replay + data restore + invariant validation.
 
-## 4. Supabase security state
+## 4. Supabase/Auth security state
 
-Positive evidence:
+Positive live/repository evidence:
 
 - public application tables are RLS-enabled;
 - anonymous EXECUTE is denied for audited privileged RPCs;
-- staff SECURITY DEFINER RPCs intentionally expose EXECUTE to `authenticated` and enforce hotel roles internally;
+- staff SECURITY DEFINER RPCs expose EXECUTE to `authenticated` only where the function itself checks hotel roles;
 - internal helpers are constrained by repository security contracts;
-- security-definer search paths are pinned by migrations/contracts.
+- SECURITY DEFINER search paths are pinned by migrations/contracts;
+- the staff provisioner is pinned to the exact DEV project and requires explicit execute gates;
+- credential manifests must be private owner files and credentials are never logged;
+- staff password manifests require unique passwords of 14–256 characters and reject slot/email-derived predictable passwords;
+- the current auth-hardening PR additionally requires uppercase + lowercase + digit + symbol and rejects whitespace/control characters.
 
-Open auth hardening item:
+Supabase live advisor reports Leaked Password Protection disabled. Current Supabase organization plan is `free`, and current Supabase documentation states leaked-password/HIBP protection is available on Pro Plan and above. Therefore a paid plan upgrade is **not** a mandatory AK BERMET release dependency.
 
-- Supabase Leaked Password Protection is currently disabled according to the live security advisor.
+For the current Free plan, `AK_BERMET_AUTH_HARDENING_VERIFIED` may be set only after:
 
-Therefore `AK_BERMET_AUTH_HARDENING_VERIFIED` must remain unset until this feature is enabled and role/auth smoke is repeated.
+1. the repository password-policy hardening is merged and CI-green;
+2. the 17 existing staff accounts/role bindings remain intact;
+3. real-session role UAT is repeated for owner/administrator/manager/housekeeping/technician;
+4. denied-access checks prove cross-role and unauthorized access is blocked.
 
-Performance advisor currently reports many `unused_index` INFO notices. Because the connected database has almost no booking/lead/operational workload, these statistics are not sufficient evidence to remove indexes. No index is to be dropped based only on these notices.
+Leaked Password Protection should be enabled later if the Supabase organization is upgraded to Pro or higher; it is defense in depth, not a reason to fabricate a failed release on the Free plan.
+
+Performance advisor currently reports many `unused_index` INFO notices. Because the operational workload is nearly empty, this is not sufficient evidence to remove indexes. No index is to be dropped based only on those notices.
 
 ## 5. GitHub state
 
-- Current branch inspection: `main` SHA `02fa3ac...`.
-- Production Readiness on that SHA: PASS.
-- `main` still reports `protected: false`.
-- required status checks enforcement is off.
+- `main` protection has repeatedly reported `protected: false`.
+- required status-check enforcement is off.
+- the connected GitHub integration exposes protection/ruleset reads but no administrative write action for enabling it.
 
-Therefore `AK_BERMET_MAIN_PROTECTION_VERIFIED` must remain unset until protection/rules are enabled and verified.
+Therefore `AK_BERMET_MAIN_PROTECTION_VERIFIED` must remain unset until protection/required checks are enabled through an authorized GitHub administration path and then re-read as enabled.
 
 ## 6. Vercel state
 
@@ -131,9 +140,9 @@ Project-level configuration inspected on 2026-09-08 reports:
 - framework: Next.js;
 - configured Node version: `24.x`.
 
-This conflicts with the repository/runtime contract `engines.node = 22.x` and the release CI baseline on Node 22. The final production environment must be aligned to the accepted Node 22 contract or explicitly revalidated under a deliberately changed runtime before cutover. No silent runtime drift is acceptable.
+This conflicts with the repository/runtime contract `engines.node = 22.x` and release CI on Node 22. Final production must align to Node 22 or intentionally change the runtime contract and fully revalidate it before cutover.
 
-Latest production deployment inspected on 2026-09-08:
+Latest inspected production deployment:
 
 - deployment: `dpl_2gK4i8pRPMgMwdcTUrcNuWK5FAK8`;
 - state: READY;
@@ -142,11 +151,21 @@ Latest production deployment inspected on 2026-09-08:
 - source commit: merge PR #61;
 - build detected Next.js `15.5.21`.
 
-This deployment is **not the accepted final release** because current `main` is newer (`02fa3ac...` before this docs PR), is on Next `15.5.25`, and includes dependency-security repairs absent from the old Vercel build.
+This deployment is **not** the accepted final release because current `main` is newer, uses Next.js `15.5.25`, and contains security/dependency hardening absent from the old build. The protected/share-token access path also means final anonymous browser UAT is not yet proven.
 
-Final Vercel production must align the runtime contract, deploy the exact accepted post-docs `main` SHA, and pass browser/runtime verification before the deployment gate is considered complete.
+Final Vercel production must align the runtime contract, deploy the exact accepted final `main` SHA, and pass public browser/runtime verification.
 
-## 7. External cutover gates — fail closed
+## 7. Booking/Sheets evidence
+
+Live Google Sheets cutover snapshot verification on 2026-09-08 shows:
+
+- `23_Импорт_Брони` contains only the staging notice and headers;
+- `Бронирования` contains only headers;
+- Supabase `bookings` count is 0.
+
+A search of recently modified accessible AK BERMET Sheets did not reveal a newer working booking register. Therefore `AK_BERMET_LEGACY_BOOKINGS_RECONCILED` must remain unset until reception/admin supplies the real current reservation register and it is validated/imported/reconciled. No synthetic booking rows may be created to make this gate pass.
+
+## 8. External cutover gates — fail closed
 
 `npm run preflight:cutover` requires all nine external attestations to be exact `YES` with evidence:
 
@@ -162,37 +181,41 @@ Final Vercel production must align the runtime contract, deploy the exact accept
 
 No gate may be marked PASS by assumption.
 
-## 8. Current blockers
+## 9. Current blockers
 
-- Enable and verify GitHub `main` protection / required checks.
-- Enable Supabase Leaked Password Protection and repeat staff/auth denial tests.
-- Obtain the current real reservation register from reception/admin.
-- Validate/import/reconcile reservations with zero duplicate/overlap defects before public availability is exposed.
-- Resolve or explicitly accept the remaining fail-closed pricing mappings using authoritative hotel data.
+- Merge/test the current Free-plan staff password-policy hardening and repeat real role/denial UAT.
+- Enable and verify GitHub `main` protection / required checks through an authorized admin path.
+- Obtain the real current reservation register from reception/admin and reconcile/import it with zero duplicates/overlaps.
+- Resolve or explicitly accept remaining fail-closed pricing mappings from authoritative hotel data.
 - Confirm factual cottage operational readiness.
-- Make a fresh live database backup immediately before production data cutover and verify its restore path/hash evidence.
-- Verify scheduled Sheets Mirror credentials/run in the final production environment, despite the current 169 successful queue records.
-- Align Vercel project runtime from the currently reported Node `24.x` to the repository Node `22.x` contract, or deliberately revalidate a changed contract before release.
-- Deploy exact final `main` SHA to Vercel production.
-- Perform real desktop/mobile browser UAT on the externally accessible deployment.
-- Run final owner/admin/manager/housekeeping/technician role UAT including forbidden-access checks.
+- Verify scheduled Sheets Mirror credentials/run in the final production environment.
+- Create a fresh live database backup immediately before production data cutover and verify hash/restore evidence.
+- Align Vercel runtime from the currently reported Node `24.x` to the Node `22.x` release contract, or deliberately revalidate a changed runtime contract.
+- Deploy the exact final `main` SHA to Vercel production.
+- Make the final deployment externally accessible for anonymous browser UAT.
+- Run desktop/mobile RU/KG/EN/KZ browser UAT and no-5xx/API smoke.
+- Run final owner/admin/manager/housekeeping/technician UAT including forbidden-access checks.
 - Run booking -> payment -> check-in -> checkout -> cleaning -> maintenance/inspection -> READY E2E.
 - Run WhatsApp -> webhook -> n8n -> AI -> durable CRM lead -> manager notification -> human handoff E2E.
 - Switch `akbermet.kg` only after evidence-backed gates and rollback readiness.
 
-## 9. Safe cutover order
+Optional paid hardening, not a blocker on the current Free plan:
+
+- Supabase Pro+ Leaked Password Protection / HIBP.
+
+## 10. Safe cutover order
 
 1. Freeze feature work.
-2. Merge only evidence-backed release/handover fixes.
-3. Confirm final `main` SHA + post-merge Production Readiness PASS.
+2. Merge only evidence-backed release/hardening changes.
+3. Confirm exact final `main` SHA + post-merge Production Readiness PASS.
 4. Enable/verify `main` protection.
-5. Resolve the current-bookings import/reconciliation gate.
-6. Resolve pricing and cottage factual gates.
-7. Enable Supabase leaked-password protection; rerun auth/role smoke.
+5. Finish staff auth/role/denial UAT.
+6. Resolve current-bookings import/reconciliation.
+7. Resolve pricing and cottage factual gates.
 8. Verify final Sheets runtime.
 9. Create fresh live DB backup and verify restore evidence.
-10. Align Vercel runtime contract and deploy exact final SHA to production.
-11. Run public browser/mobile/localization/API smoke with no stale claims or 5xx.
+10. Align Vercel runtime and deploy exact final SHA.
+11. Run public browser/mobile/localization/API smoke.
 12. Run all staff-role UAT and denied-access tests.
 13. Run booking/payment/operations end to end.
 14. Run WhatsApp/n8n/AI/handoff end to end.
@@ -202,7 +225,7 @@ No gate may be marked PASS by assumption.
 18. Train staff and record owner acceptance.
 19. Capture final SHA, final backup, final checklist and handover evidence.
 
-## 10. Handover acceptance
+## 11. Handover acceptance
 
 The project is only `FULLY HANDED OVER` when:
 
@@ -218,6 +241,6 @@ The project is only `FULLY HANDED OVER` when:
 - staff training is complete;
 - owner acceptance is recorded.
 
-## 11. Rollback principle
+## 12. Rollback principle
 
 Do not destroy or overwrite the previous public target as part of cutover. Preserve the prior deployment/DNS target and fresh database backup until post-cutover checks are green and the owner accepts the release.
