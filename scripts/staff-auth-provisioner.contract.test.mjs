@@ -31,6 +31,12 @@ function expectCode(fn, code) {
   assert.throws(fn, (error) => error instanceof ProvisioningError && error.code === code);
 }
 
+function manifestWithFirstPassword(password) {
+  const manifest = makeManifest();
+  manifest.slots[0].password = password;
+  return manifest;
+}
+
 test("staff slot contract is exactly 17 numbered role slots", () => {
   assert.equal(EXPECTED_STAFF_SLOTS.length, 17);
   const counts = Object.fromEntries(["owner", "administrator", "manager", "housekeeping", "technician"].map((role) => [role, 0]));
@@ -47,6 +53,39 @@ test("manifest supplies credentials only; labels and roles come from the fixed c
   assert.equal(entries[2].label, "Менеджер 1");
   assert.equal(entries[2].role, "manager");
   assert.equal(entries[8].label, "Горничная 3");
+});
+
+test("staff passwords require length, four character classes and no whitespace/control characters", () => {
+  assert.equal(validateManifest(makeManifest()).length, 17);
+
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("Aa1!short")),
+    "MANIFEST_PASSWORD_LENGTH_INVALID",
+  );
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("lowercase!234567890")),
+    "MANIFEST_PASSWORD_COMPLEXITY_INVALID",
+  );
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("UPPERCASE!234567890")),
+    "MANIFEST_PASSWORD_COMPLEXITY_INVALID",
+  );
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("Strong!PasswordOnly")),
+    "MANIFEST_PASSWORD_COMPLEXITY_INVALID",
+  );
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("StrongPassword12345")),
+    "MANIFEST_PASSWORD_COMPLEXITY_INVALID",
+  );
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("Strong!Pass 12345")),
+    "MANIFEST_PASSWORD_WHITESPACE_INVALID",
+  );
+  expectCode(
+    () => validateManifest(manifestWithFirstPassword("Strong!Pass\n12345")),
+    "MANIFEST_PASSWORD_WHITESPACE_INVALID",
+  );
 });
 
 test("manifest fails closed on missing slots, duplicate email, duplicate password and wrong project", () => {

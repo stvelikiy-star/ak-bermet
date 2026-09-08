@@ -42,6 +42,23 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 320;
 }
 
+function validateStaffPassword(password, slot) {
+  if (password.length < 14 || password.length > 256) {
+    throw new ProvisioningError("MANIFEST_PASSWORD_LENGTH_INVALID", slot);
+  }
+  if (/[\s\x00-\x1F\x7F]/u.test(password)) {
+    throw new ProvisioningError("MANIFEST_PASSWORD_WHITESPACE_INVALID", slot);
+  }
+  if (
+    !/[A-Z]/.test(password)
+    || !/[a-z]/.test(password)
+    || !/[0-9]/.test(password)
+    || !/[^A-Za-z0-9\s]/.test(password)
+  ) {
+    throw new ProvisioningError("MANIFEST_PASSWORD_COMPLEXITY_INVALID", slot);
+  }
+}
+
 export function validateManifest(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ProvisioningError("MANIFEST_NOT_OBJECT");
@@ -75,9 +92,7 @@ export function validateManifest(value) {
     const password = typeof entry.password === "string" ? entry.password : "";
     if (!isEmail(email)) throw new ProvisioningError("MANIFEST_EMAIL_INVALID", slot);
     if (seenEmails.has(email)) throw new ProvisioningError("MANIFEST_EMAIL_DUPLICATE", slot);
-    if (password.length < 14 || password.length > 256) {
-      throw new ProvisioningError("MANIFEST_PASSWORD_LENGTH_INVALID", slot);
-    }
+    validateStaffPassword(password, slot);
     if (seenPasswords.has(password)) throw new ProvisioningError("MANIFEST_PASSWORD_DUPLICATE", slot);
     if (password.toLowerCase().includes(slot.toLowerCase()) || password.toLowerCase().includes(email.split("@")[0])) {
       throw new ProvisioningError("MANIFEST_PASSWORD_TOO_PREDICTABLE", slot);
