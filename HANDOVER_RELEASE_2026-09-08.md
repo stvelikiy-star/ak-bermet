@@ -126,6 +126,13 @@ Therefore `AK_BERMET_MAIN_PROTECTION_VERIFIED` must remain unset until protectio
 
 Project: `ak-bermet-functional-preview-v2-20260829`.
 
+Project-level configuration inspected on 2026-09-08 reports:
+
+- framework: Next.js;
+- configured Node version: `24.x`.
+
+This conflicts with the repository/runtime contract `engines.node = 22.x` and the release CI baseline on Node 22. The final production environment must be aligned to the accepted Node 22 contract or explicitly revalidated under a deliberately changed runtime before cutover. No silent runtime drift is acceptable.
+
 Latest production deployment inspected on 2026-09-08:
 
 - deployment: `dpl_2gK4i8pRPMgMwdcTUrcNuWK5FAK8`;
@@ -137,7 +144,7 @@ Latest production deployment inspected on 2026-09-08:
 
 This deployment is **not the accepted final release** because current `main` is newer (`02fa3ac...` before this docs PR), is on Next `15.5.25`, and includes dependency-security repairs absent from the old Vercel build.
 
-Final Vercel production must deploy the exact accepted post-docs `main` SHA and pass browser/runtime verification before the deployment gate is considered complete.
+Final Vercel production must align the runtime contract, deploy the exact accepted post-docs `main` SHA, and pass browser/runtime verification before the deployment gate is considered complete.
 
 ## 7. External cutover gates — fail closed
 
@@ -165,6 +172,7 @@ No gate may be marked PASS by assumption.
 - Confirm factual cottage operational readiness.
 - Make a fresh live database backup immediately before production data cutover and verify its restore path/hash evidence.
 - Verify scheduled Sheets Mirror credentials/run in the final production environment, despite the current 169 successful queue records.
+- Align Vercel project runtime from the currently reported Node `24.x` to the repository Node `22.x` contract, or deliberately revalidate a changed contract before release.
 - Deploy exact final `main` SHA to Vercel production.
 - Perform real desktop/mobile browser UAT on the externally accessible deployment.
 - Run final owner/admin/manager/housekeeping/technician role UAT including forbidden-access checks.
@@ -183,7 +191,7 @@ No gate may be marked PASS by assumption.
 7. Enable Supabase leaked-password protection; rerun auth/role smoke.
 8. Verify final Sheets runtime.
 9. Create fresh live DB backup and verify restore evidence.
-10. Deploy exact final SHA to Vercel production.
+10. Align Vercel runtime contract and deploy exact final SHA to production.
 11. Run public browser/mobile/localization/API smoke with no stale claims or 5xx.
 12. Run all staff-role UAT and denied-access tests.
 13. Run booking/payment/operations end to end.
