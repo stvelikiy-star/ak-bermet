@@ -27,12 +27,13 @@ const serverEnv = {
 };
 
 // The CI smoke intentionally runs without Supabase credentials. Public pages
-// must render from verified static fallbacks, while staff areas must fail
-// closed and redirect to /staff/login.
+// must render from verified static fallbacks, while staff areas and data APIs
+// must fail closed rather than silently switching to mock data.
 for (const key of [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "OPENAI_API_KEY",
 ]) {
   delete serverEnv[key];
 }
@@ -92,6 +93,16 @@ async function expectStaffRedirect(path) {
   assert.match(location, /\/staff\/login\?from=/, `${path} must redirect to staff login`);
 }
 
+function expectSecurityHeaders(response) {
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.equal(
+    response.headers.get("permissions-policy"),
+    "camera=(), microphone=(), geolocation=()",
+  );
+}
+
 try {
   await waitForServer();
 
@@ -117,6 +128,26 @@ try {
 
   for (const path of publicPages) await expectHtml200(path);
 
+  const homeResponse = await get("/");
+  assert.equal(homeResponse.status, 200);
+  expectSecurityHeaders(homeResponse);
+
+  for (const [locale, htmlLang] of [
+    ["ru", "ru"],
+    ["kg", "ky"],
+    ["en", "en"],
+    ["kz", "kk"],
+  ]) {
+    const response = await get("/", { headers: { cookie: `ak_locale=${locale}` } });
+    assert.equal(response.status, 200, `locale ${locale} must render`);
+    const html = await response.text();
+    assert.match(
+      html,
+      new RegExp(`<html[^>]*lang=["']${htmlLang}["']`, "i"),
+      `locale ${locale} must render html lang=${htmlLang}`,
+    );
+  }
+
   const promosHtml = await expectHtml200("/promos");
   assert.doesNotMatch(promosHtml, />\s*3\+1\s*</i, "Expired June 3+1 promo must not be published");
   assert.doesNotMatch(promosHtml, /8\s*(?:–|-)\s*30\s+июня/i, "Expired June promo dates must not be published");
@@ -136,13 +167,28 @@ try {
   const managerStatus = await get("/api/manager/status");
   assert.equal(managerStatus.status, 403, "Unauthenticated manager API must return 403");
 
+  const availability = await get(
+    "/api/availability?checkIn=2026-10-01&checkOut=2026-10-02&guests=2",
+  );
+  assert.equal(availability.status, 503, "Production availability must fail closed without Supabase authority");
+  const availabilityJson = await availability.json();
+  assert.equal(availabilityJson.code, "availability_unknown");
+
   const chatStatus = await get("/api/chat/status");
   assert.equal(chatStatus.status, 200, "Chat status endpoint must be available");
   const chatStatusJson = await chatStatus.json();
-  // Production is intentionally fail-closed: a build-time/mock test setting may
-  // never make the deployed artifact advertise or serve mock AI.
   assert.equal(chatStatusJson.provider, "openai", "Production artifact must never advertise mock AI");
   assert.equal(chatStatusJson.realCallsEnabled, false, "CI smoke must never enable real AI calls");
+
+  const chat = await get("/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: "Здравствуйте", history: [] }),
+  });
+  assert.equal(chat.status, 503, "Production AI must fail closed when real calls are disabled");
+  const chatJson = await chat.json();
+  assert.equal(chatJson.ok, false);
+  assert.equal(chatJson.shouldHandoff, true);
 
   const malformedLead = await get("/api/leads", {
     method: "POST",
@@ -165,7 +211,9 @@ try {
   const favicon = await fetch(`${baseUrl}/favicon.ico`, { redirect: "follow" });
   assert.equal(favicon.status, 200, "favicon compatibility URL must resolve");
 
-  console.log(`HTTP_SMOKE_PASS public=${publicPages.length} protected=7 api=4 seo=2 artifact=standalone`);
+  console.log(
+    `HTTP_SMOKE_PASS public=${publicPages.length} locales=4 protected=7 api=6 seo=2 headers=4 artifact=standalone`,
+  );
 } finally {
   if (server.exitCode === null) {
     server.kill("SIGTERM");

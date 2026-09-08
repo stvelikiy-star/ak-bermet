@@ -34,18 +34,13 @@ export default function ManagerHeader({ title }: { title: string }) {
             {title}
           </h1>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden rounded-full bg-emerald-deep/5 px-3 py-1 text-[11px] font-medium text-emerald-deep ring-1 ring-gold/20 sm:inline">
-            Демо-режим
-          </span>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-full border border-gold/30 px-4 py-1.5 text-xs font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
-          >
-            Выйти
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={logout}
+          className="rounded-full border border-gold/30 px-4 py-1.5 text-xs font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
+        >
+          Выйти
+        </button>
       </header>
 
       {/* Мобильный сайдбар */}

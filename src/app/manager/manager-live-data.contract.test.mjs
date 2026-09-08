@@ -13,6 +13,7 @@ const contents = Object.fromEntries(
   files.map((path) => [path, fs.readFileSync(new URL(path, import.meta.url), "utf8")]),
 );
 const availabilityPage = fs.readFileSync(new URL("./availability/page.tsx", import.meta.url), "utf8");
+const managerHeader = fs.readFileSync(new URL("../../components/manager/ManagerHeader.tsx", import.meta.url), "utf8");
 const chessboardShared = fs.readFileSync(new URL("../../lib/booking-chessboard.ts", import.meta.url), "utf8");
 const chessboardLoader = fs.readFileSync(new URL("../../lib/booking-chessboard-server.ts", import.meta.url), "utf8");
 
@@ -22,6 +23,7 @@ test("manager operational pages do not import demo manager-mock data", () => {
     assert.match(source, /createSupabaseServerClient/, `${path} must read through authenticated Supabase`);
     assert.match(source, /getCurrentStaff/, `${path} must preserve staff role gating`);
   }
+  assert.doesNotMatch(managerHeader, /Демо-режим|Mock mode/i, "live manager header must not advertise a fake demo mode");
 });
 
 test("manager overview uses real operational enum values", () => {
