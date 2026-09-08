@@ -40,6 +40,9 @@ jobs:
       - name: Production dependency security audit
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Full dependency security audit
+        run: npm audit --audit-level=high
+
       - name: Lint
         run: npm run lint
 
