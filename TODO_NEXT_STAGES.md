@@ -4,31 +4,34 @@
 
 ## Уже подтверждено
 
-- [x] Текущий pre-docs `main` SHA `02fa3ac8777755cffdd276e2a7794f3c9cb2bc5d` прошёл post-merge Production Readiness полностью, включая Docker build.
+- [x] PR #70 с актуальным handover/source-of-truth merged в `main` SHA `3e6b8b0ead4da18a87be10040e180bac610b9aea`.
 - [x] Production и полный dependency audit проходят без high vulnerabilities.
 - [x] Disposable Restore Drill прошёл rebuild -> backup -> fresh rebuild -> restore -> invariant verification.
 - [x] Supabase live inventory сверён: 169 units / 407 official beds / 484 max capacity.
 - [x] Активная V6-структура сверена: 7 активных inventory groups; исторический Corpus 4 soft-deleted.
 - [x] Staff/Auth live count сверён: 17 users/active role assignments.
 - [x] Sheets queue live status: 169 success.
+- [x] Google Sheets `23_Импорт_Брони` и `Бронирования` перепроверены: реальных строк бронирований пока нет.
+- [x] Supabase plan проверен: Free. Leaked Password Protection/HIBP по актуальной документации доступна только на Pro+.
 
 ## Сейчас НЕ делать
 
 - Не добавлять новые фичи и не переделывать дизайн без release-critical причины.
 - Не считать Google Sheets источником публичной availability.
 - Не придумывать тарифы для fail-closed room-to-price mappings.
-- Не включать публичный домен до сверки реальных текущих броней.
+- Не создавать фиктивные брони ради прохождения cutover gate.
 - Не считать текущий Vercel production финальным: он собран со старого SHA `e0407c3...`.
 - Не принимать Vercel Node `24.x` как норму молча: repository/runtime contract сейчас Node `22.x`.
+- Не требовать платный Supabase Pro только ради HIBP: на Free gate закрывается нашей password policy + реальным role/denial UAT.
 - Не отмечать cutover gate PASS без фактического evidence.
 - Не удалять индексы только по `unused_index` advisor на почти пустой operational workload.
 
 ## Финальный release backlog
 
-- [ ] Merge handover-docs PR и получить новый final `main` SHA.
-- [ ] Получить post-merge Production Readiness PASS на новом final SHA.
-- [ ] Включить и проверить GitHub branch protection / required checks для `main`.
-- [ ] Включить Supabase Leaked Password Protection и повторить auth/role denial smoke.
+- [ ] Merge текущий Free-plan staff password-policy hardening PR после полного CI PASS.
+- [ ] Получить post-merge Production Readiness PASS на новом final `main` SHA.
+- [ ] Повторить реальные role/session UAT и denied-access checks для owner/admin/manager/housekeeping/technician.
+- [ ] Включить и проверить GitHub branch protection / required checks для `main` через admin-доступ.
 - [ ] Получить реальный актуальный реестр бронирований от администратора/ресепшн.
 - [ ] Заполнить и провалидировать `23_Импорт_Брони`; 0 дублей, 0 пересечений, суммы/оплаты сверены.
 - [ ] Импортировать и повторно сверить актуальные брони до публичного cutover.
@@ -38,14 +41,17 @@
 - [ ] Сделать свежий live DB backup непосредственно перед cutover; проверить hash/restore evidence.
 - [ ] Выровнять Vercel project runtime с Node `22.x` contract либо намеренно пересогласовать runtime и полностью перепроверить release.
 - [ ] Развернуть exact final SHA в Vercel production.
-- [ ] Проверить Deployment Protection/public access для browser UAT.
+- [ ] Убрать/настроить Deployment Protection для нормального anonymous browser UAT.
 - [ ] Провести desktop/mobile browser UAT: RU/KG/EN/KZ, legal, forms, availability, robots/sitemap, links, no 5xx.
-- [ ] Провести финальный role UAT: owner/admin/manager/housekeeping/technician + denied-access checks.
 - [ ] Проверить booking -> payment -> check-in -> checkout -> cleaning -> maintenance/inspection -> READY.
 - [ ] Проверить WhatsApp -> webhook -> n8n -> AI -> durable CRM lead -> manager notification -> human handoff.
 - [ ] После всех evidence-backed gates переключить `akbermet.kg` с rollback-ready конфигурацией.
 - [ ] Проверить HTTPS/canonical/www/robots/sitemap/runtime logs после DNS cutover.
 - [ ] Провести обучение персонала и зафиксировать owner acceptance.
+
+## Optional hardening при переходе Supabase на Pro+
+
+- [ ] Включить Leaked Password Protection / HIBP.
 
 ## Cutover gate command
 
