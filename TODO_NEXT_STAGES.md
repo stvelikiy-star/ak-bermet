@@ -19,6 +19,7 @@
 - Не придумывать тарифы для fail-closed room-to-price mappings.
 - Не включать публичный домен до сверки реальных текущих броней.
 - Не считать текущий Vercel production финальным: он собран со старого SHA `e0407c3...`.
+- Не принимать Vercel Node `24.x` как норму молча: repository/runtime contract сейчас Node `22.x`.
 - Не отмечать cutover gate PASS без фактического evidence.
 - Не удалять индексы только по `unused_index` advisor на почти пустой operational workload.
 
@@ -35,6 +36,7 @@
 - [ ] Подтвердить фактическую готовность/статус коттеджного фонда.
 - [ ] Проверить scheduled Sheets Mirror в финальном runtime окружении.
 - [ ] Сделать свежий live DB backup непосредственно перед cutover; проверить hash/restore evidence.
+- [ ] Выровнять Vercel project runtime с Node `22.x` contract либо намеренно пересогласовать runtime и полностью перепроверить release.
 - [ ] Развернуть exact final SHA в Vercel production.
 - [ ] Проверить Deployment Protection/public access для browser UAT.
 - [ ] Провести desktop/mobile browser UAT: RU/KG/EN/KZ, legal, forms, availability, robots/sitemap, links, no 5xx.
