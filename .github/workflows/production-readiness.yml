@@ -87,6 +87,9 @@ jobs:
       - name: Manual booking transaction contract
         run: npm run test:manual-booking
 
+      - name: Ready-only booking placement contract
+        run: node --test supabase/migrations/ready-only-booking-room-operations.contract.test.mjs
+
       - name: Manual payment ledger contract
         run: npm run test:manual-payments
 
