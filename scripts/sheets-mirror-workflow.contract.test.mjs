@@ -10,16 +10,19 @@ test("Sheets mirror runs on schedule with single non-cancelling concurrency grou
   assert.match(workflow, /cancel-in-progress: false/);
 });
 
-test("scheduled mirror stays dry-run until protected cutover approval", () => {
+test("scheduled mirror is disabled until protected cutover approval", () => {
   assert.match(workflow, /default: "dry-run"/);
   assert.match(workflow, /MIRROR_APPROVAL: \$\{\{ secrets\.AK_BERMET_SHEETS_MIRROR_ENABLED \}\}/);
-  assert.match(workflow, /if \[ "\$EVENT_NAME" = "schedule" \]; then[\s\S]*MIRROR_APPROVAL[\s\S]*mode="execute"[\s\S]*mode="dry-run"/);
+  assert.match(workflow, /if \[ "\$EVENT_NAME" = "schedule" \]; then[\s\S]*MIRROR_APPROVAL[\s\S]*mode="execute"[\s\S]*mode="disabled"/);
+  assert.match(workflow, /case "\$mode" in disabled\|dry-run\|execute/);
+  assert.match(workflow, /Report disabled schedule/);
+  assert.match(workflow, /steps\.config\.outputs\.mode == 'disabled'/);
   assert.match(workflow, /MIRROR_EXECUTION_NOT_APPROVED/);
   assert.match(workflow, /node scripts\/sheets-sync-worker\.mjs --execute/);
   assert.match(workflow, /node scripts\/sheets-sync-worker\.mjs --dry-run/);
 });
 
-test("workflow fails closed on missing protected configuration and never echoes secret values", () => {
+test("protected configuration is required only when the worker will access data", () => {
   for (const name of [
     "NEXT_PUBLIC_SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -31,6 +34,7 @@ test("workflow fails closed on missing protected configuration and never echoes 
     const expected = name + ": " + "${{ secrets." + name + " }}";
     assert.ok(workflow.includes(expected), `missing protected workflow input ${name}`);
   }
+  assert.match(workflow, /Verify protected configuration[\s\S]*if: steps\.config\.outputs\.mode != 'disabled'/);
   assert.match(workflow, /MISSING_SECRET_NAME/);
   assert.match(workflow, /Secret values were not printed/);
   assert.doesNotMatch(workflow, /echo "\$\{!name/);
