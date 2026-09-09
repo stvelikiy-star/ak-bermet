@@ -1,0 +1,42 @@
+name: Vercel OIDC Probe
+
+on:
+  push:
+    branches:
+      - fix/sheets-mirror-disabled-mode-2026-09-09
+    paths:
+      - .github/workflows/vercel-oidc-probe.yml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Acquire GitHub OIDC token
+        id: token
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            core.setSecret(token);
+            core.setOutput('token', token);
+      - name: Probe protected exact-SHA preview
+        shell: bash
+        env:
+          OIDC_TOKEN: ${{ steps.token.outputs.token }}
+          PREVIEW_URL: https://ak-bermet-functional-preview-v2-20260829-gum7rytx5-ai-prof-kg.vercel.app
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o /tmp/body -D /tmp/headers -w '%{http_code}' \
+            -H "x-vercel-trusted-oidc-idp-token: ${OIDC_TOKEN}" \
+            "${PREVIEW_URL}/")
+          echo "HTTP_STATUS=${status}"
+          if [ "$status" != "200" ]; then
+            sed -n '1,20p' /tmp/headers | sed -E 's/(set-cookie:).*/\1 [redacted]/I'
+            exit 1
+          fi
+          grep -qi 'AK BERMET\|Ак-Бермет\|Ак Бермет' /tmp/body
