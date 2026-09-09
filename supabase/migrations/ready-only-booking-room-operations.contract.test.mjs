@@ -50,7 +50,7 @@ test("chessboard move requires strict ready target before moving booking_rooms",
 });
 
 test("patched RPCs preserve hardened execution model and ACLs", () => {
-  assert.equal((normalized.match(/security definer/g) ?? []).length, 2);
+  assert.equal((normalized.match(/language plpgsql security definer/g) ?? []).length, 2);
   assert.equal((normalized.match(/set search_path = public, pg_temp/g) ?? []).length, 2);
   assert.equal((normalized.match(/room_not_ready/g) ?? []).length, 2);
 
