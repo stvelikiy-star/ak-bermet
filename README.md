@@ -60,6 +60,7 @@ The main CI workflow runs:
 - TypeScript typecheck;
 - room master / Pricing V6 / legal / availability / leads / AI / Sheets contracts;
 - booking / chessboard / payments / CMS contracts;
+- ready-only internal booking-placement contract;
 - staff auth / housekeeping / technician / inspection contracts;
 - production preflight contract;
 - production Next.js build;
@@ -79,31 +80,41 @@ npm run preflight:cutover
 
 The command must remain blocked until every external release attestation is backed by evidence. Do not set any gate to `YES` by assumption.
 
+## Current accepted release state
+
+- Accepted GitHub `main`: `a01afab1869caeaf5f095a8974a940f10158863d`.
+- Post-merge Production Readiness #234 for that exact SHA: PASS.
+- Repository approved migration chain: 38 migrations.
+- Live AK BERMET Supabase ledger: 37 migrations; migration `20260909050000_enforce_ready_for_manual_booking_and_move.sql` is intentionally **not yet applied**.
+- Live inventory remains 169 total / 137 `active + ready` / 32 non-sellable; current live bookings = 0 and live availability holds = 0 at the latest verification.
+
 ## Current known external blockers
 
-- GitHub `main` branch protection still must be enabled and verified.
-- Supabase Leaked Password Protection must be enabled and re-verified.
-- Current real hotel reservations must be obtained, validated and reconciled before public cutover.
-- Remaining fail-closed pricing mappings require authoritative resolution/acceptance.
-- Cottage operational readiness requires factual confirmation.
-- Fresh live DB backup must be created immediately before production data cutover.
-- Exact accepted `main` SHA still must be deployed to final Vercel production and pass public browser UAT.
+- GitHub `main` branch protection / required checks must be enabled and then re-verified. Current branch state is `protected: false`.
+- A fresh recoverable live database backup must be created immediately before applying the pending 38th migration or performing production data cutover.
+- The connected Supabase organization is on Free plan; automatic database backup/PITR is not available for this project, so the backup gate requires an explicit dump/checksum/restore-verification path.
+- Current real hotel reservations must be obtained and reconciled, or an authoritative owner/reception confirmation must state that there are no active reservations to migrate.
+- Remaining pricing gaps and cottage readiness require authoritative owner decisions. Unverified units must stay blocked/inactive; prices must never be invented.
+- Final Sheets Mirror scheduler runtime still needs post-fix execution evidence.
+- Exact accepted `main` SHA must still be deployed to Vercel production and pass anonymous browser/mobile UAT. The latest inspected Vercel production deployment was built from an older SHA.
 - WhatsApp -> webhook -> n8n -> AI -> CRM lead -> manager notification -> human handoff requires full real E2E evidence for automation handover.
+
+Supabase Leaked Password Protection / HIBP is **optional Pro+ defense in depth**, not a required blocker for the current Free-plan release. The repository enforces a strict staff-password policy as compensating hardening.
 
 ## Handover source of truth
 
 Use:
 
-- `HANDOVER_RELEASE_2026-09-08.md` — current handover state and cutover sequence.
+- `HANDOVER_RELEASE_2026-09-09.md` — current handover state and cutover sequence.
 - `TODO_NEXT_STAGES.md` — remaining release backlog only.
 - `scripts/production-migrations-approved.json` — approved ordered migration ledger.
 
-Historical Stage documents and older README content are retained in Git history only and must not be used as the current release status.
+`HANDOVER_RELEASE_2026-09-08.md`, historical Stage documents and older snapshots remain historical evidence and must not be used as the current release status.
 
 ## Safety rules
 
 - Never invent room availability or prices.
 - Never treat Google Sheets as transactional availability authority.
-- Never expose Supabase service-role credentials in client code.
-- Never apply production migrations without an approved ledger, fresh backup and production approval.
+- Never expose Supabase service-role or database credentials in client code, CI logs or repository files.
+- Never apply production migrations without an approved ledger, fresh recoverable backup and evidence-backed release decision.
 - Never cut over `akbermet.kg` without a rollback path and completed evidence-backed gates.
