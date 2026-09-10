@@ -82,8 +82,9 @@ The command must remain blocked until every external release attestation is back
 
 ## Current accepted release state
 
-- Accepted GitHub `main`: `a01afab1869caeaf5f095a8974a940f10158863d`.
-- Post-merge Production Readiness #234 for that exact SHA: PASS.
+- Accepted functional GitHub baseline: `563c79b5a78410918aaff96d85e4aa9b87d96b0a`.
+- Current `main` tip is documentation commit `1f8e1e923992945170a34e798664b01b67b57ef0` on top of that baseline.
+- Production Readiness #236 for the exact functional baseline: PASS.
 - Repository approved migration chain: 38 migrations.
 - Live AK BERMET Supabase ledger: 37 migrations; migration `20260909050000_enforce_ready_for_manual_booking_and_move.sql` is intentionally **not yet applied**.
 - Live inventory remains 169 total / 137 `active + ready` / 32 non-sellable; current live bookings = 0 and live availability holds = 0 at the latest verification.
@@ -95,8 +96,9 @@ The command must remain blocked until every external release attestation is back
 - The connected Supabase organization is on Free plan; automatic database backup/PITR is not available for this project, so the backup gate requires an explicit dump/checksum/restore-verification path.
 - Current real hotel reservations must be obtained and reconciled, or an authoritative owner/reception confirmation must state that there are no active reservations to migrate.
 - Remaining pricing gaps and cottage readiness require authoritative owner decisions. Unverified units must stay blocked/inactive; prices must never be invented.
-- Final Sheets Mirror scheduler runtime still needs post-fix execution evidence.
-- Exact accepted `main` SHA must still be deployed to Vercel production and pass anonymous browser/mobile UAT. The latest inspected Vercel production deployment was built from an older SHA.
+- Sheets Mirror post-fix is confirmed by scheduled runs #80 and #81 (`completed/success`) on the current `main` tip.
+- The exact current release SHA still must be deployed to Vercel production and pass anonymous browser/mobile UAT; the latest inspected Vercel production deployment was built from an older SHA.
+- Supabase security advisor reports leaked-password protection disabled; on the current Free plan this is defense-in-depth, but it should be enabled when the plan permits or recorded as a security exception.
 - WhatsApp -> webhook -> n8n -> AI -> CRM lead -> manager notification -> human handoff requires full real E2E evidence for automation handover.
 
 Supabase Leaked Password Protection / HIBP is **optional Pro+ defense in depth**, not a required blocker for the current Free-plan release. The repository enforces a strict staff-password policy as compensating hardening.
