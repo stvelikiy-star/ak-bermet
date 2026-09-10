@@ -1,6 +1,6 @@
 # AK BERMET — FINAL HANDOVER RELEASE
 
-Дата фиксации: 2026-09-09 (Asia/Bishkek)
+Дата актуализации: 2026-09-10 (Asia/Bishkek)
 
 Этот файл — текущая точка входа для финальной сдачи AK BERMET. `HANDOVER_RELEASE_2026-09-08.md` и более старые Stage/TODO документы — исторические снимки.
 
@@ -8,9 +8,10 @@
 
 - Repository: `stvelikiy-star/ak-bermet`.
 - Default branch: `main`.
-- Current accepted code baseline: `a01afab1869caeaf5f095a8974a940f10158863d`.
+- Accepted functional code baseline: `563c79b5a78410918aaff96d85e4aa9b87d96b0a`.
+- Current `main` tip: `1f8e1e923992945170a34e798664b01b67b57ef0` (documentation refresh on top of the accepted functional baseline).
 - PR #76 merged: strict ready-only internal booking placement.
-- Post-merge Production Readiness #234 for exact `a01afab...`: PASS through dependency audits, lint, typecheck, all critical contracts, production build, HTTP smoke and Docker build.
+- Production Readiness #236 for exact functional baseline `563c79b...`: PASS through dependency audits, lint, typecheck, all critical contracts, production build, HTTP smoke and Docker build.
 - Runtime contract: Node.js `22.x`.
 - Application stack: Next.js `15.5.25`, TypeScript, Tailwind CSS.
 - Transactional source of truth: Supabase/PostgreSQL.
@@ -74,7 +75,7 @@ Evidence:
 - Production Readiness #233 on PR head: PASS;
 - Disposable Restore Drill #18: PASS;
 - PR #76 merged;
-- Production Readiness #234 on merge SHA `a01afab...`: PASS.
+- Production Readiness #236 on accepted functional baseline `563c79b...`: PASS.
 
 Live database verification currently still reports both functions as `ready-only = false`, which is expected because migration 38 has not been applied. The live apply is blocked only by the fresh-backup gate.
 
@@ -142,8 +143,8 @@ Therefore:
 
 Current `main`:
 
-- SHA: `a01afab1869caeaf5f095a8974a940f10158863d`;
-- Production Readiness #234: PASS;
+- SHA: `1f8e1e923992945170a34e798664b01b67b57ef0` (documentation tip; functional baseline `563c79b...`);
+- Production Readiness #236 for the functional baseline: PASS;
 - branch protection: `protected: false`;
 - required status checks enforcement: off.
 
@@ -167,7 +168,7 @@ Latest inspected production deployment:
 - build detected Next.js `15.5.25`;
 - build bootstrap fetched source SHA `0d9feabeb42a29052ee2246633afff3c8ff79963`.
 
-This deployment is stale relative to accepted `main a01afab...` and is not the final release artifact.
+This deployment is stale relative to current `main 1f8e1e9` and accepted functional baseline `563c79b...`; it is not the final release artifact.
 
 Recent Vercel runtime scan found no runtime error clusters in the checked interval, but that does not convert the stale deployment into accepted production evidence.
 
@@ -192,18 +193,13 @@ Historical worker path is proven:
 - 169 room queue rows processed successfully;
 - 169 corresponding history rows recorded on 2026-08-30.
 
-Final scheduled runtime is not yet proven after the latest scheduler fix.
+Post-fix scheduled runtime is now confirmed:
 
-Latest observed scheduled run:
+- Sheets Mirror #80 — source SHA `1f8e1e9`, `completed/success`;
+- Sheets Mirror #81 — source SHA `1f8e1e9`, `completed/success`;
+- both are scheduled runs after the scheduler safety fix.
 
-- Sheets Mirror #74;
-- source SHA: `fa8d98536ed18deef109514aae3c0179798c13fe`;
-- conclusion: failure;
-- occurred before the merged scheduler safety fix.
-
-No newer post-fix scheduled PASS was observed at the latest check.
-
-`AK_BERMET_SHEETS_RUNTIME_VERIFIED` remains false.
+`AK_BERMET_SHEETS_RUNTIME_VERIFIED` is now supported by current Actions evidence and is no longer a release blocker.
 
 ## 12. Reservation state
 
@@ -220,7 +216,7 @@ Never create synthetic bookings to satisfy this gate.
 
 ## 13. Public domain state
 
-Available web evidence on 2026-09-09 still shows `akbermet.kg` serving the legacy site. No verified domain cutover to the new Next.js release has occurred.
+Available web evidence on 2026-09-10 still shows `akbermet.kg` serving the legacy site. No verified domain cutover to the new Next.js release has occurred.
 
 Do not switch the domain until all cutover gates, exact-SHA deployment, backup and rollback readiness are satisfied.
 
@@ -246,7 +242,7 @@ No gate may be set to `YES` without evidence.
 2. Enable and verify GitHub `main` protection / required Production Readiness check.
 3. Obtain authoritative reservation evidence.
 4. Record owner decision for the 32 blocked units / 137-room safe launch policy.
-5. Obtain a post-fix scheduled Sheets Mirror PASS.
+5. Sheets Mirror post-fix PASS is already recorded in runs #80/#81.
 6. Create fresh live `pg_dump`, checksum it and validate restore/archive evidence.
 7. Apply approved migration `20260909050000_enforce_ready_for_manual_booking_and_move.sql` to live Supabase.
 8. Re-verify live migration ledger = 38, ready-only RPC definitions, inventory counts, bookings/holds and Supabase advisors.
