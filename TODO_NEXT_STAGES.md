@@ -4,7 +4,8 @@
 
 ## Уже подтверждено
 
-- [x] Current accepted `main`: `563c79b5a78410918aaff96d85e4aa9b87d96b0a`.
+- [x] Accepted functional baseline: `563c79b5a78410918aaff96d85e4aa9b87d96b0a`.
+- [x] Current `main` tip: `0cef608ade44904770bf14b267ca2a7d52e64fed` (documentation-only synchronization on top of the functional baseline).
 - [x] Production Readiness #236 для exact `563c79b...` полностью PASS.
 - [x] PR #76 merged: internal manual booking и chessboard room move имеют repository-level strict `operational_status = ready` gate.
 - [x] Disposable Restore Drill #18 PASS: approved migration chain rebuilt, application-data backup/restore и DB invariants проверены на disposable Supabase.
@@ -21,14 +22,15 @@
 - [x] SECURITY DEFINER audit: anon EXECUTE = 0; authenticated staff RPCs остаются role/identity guarded.
 - [x] Supabase organization plan = Free; HIBP/Leaked Password Protection = optional Pro+ hardening, не обязательный cutover gate.
 - [x] Historical Sheets worker path реально отработал end-to-end: 169 queue success + 169 history rows на 2026-08-30.
-- [x] Scheduled Sheets Mirror после scheduler fix подтверждён: run #76 PASS и run #77 PASS на `main 563c79b...` 2026-09-09.
+- [x] Scheduled Sheets Mirror после scheduler fix подтверждён: runs #76–#81 PASS; последние #80/#81 прошли на `main 1f8e1e9` 2026-09-09/10.
 - [x] Google Sheets booking-import surfaces и live Supabase на последней проверке не содержали активных броней для автоматического переноса.
 - [x] GitHub `main` ранее проверен как `protected: false`, required checks enforcement off.
 - [x] Vercel latest inspected production deployment `dpl_Fy9PqcRA4SXZwigdXjr2wuzBo38e` READY, но build source SHA `0d9feabeb42a29052ee2246633afff3c8ff79963` stale относительно current `main`.
+- [x] Последний preview deployment `dpl_FjZDSEmG91hWXcKUaiPY4YiVZQDT` READY и build PASS, но source SHA `d86384d...` также старее current `main`; project Node setting = `24.x`, repository contract = `22.x`.
 - [x] Vercel recent runtime error scan: no runtime error clusters found в проверенном интервале.
 - [x] Release-secret presence preflight ранее показал отсутствие `VERCEL_TOKEN`, `AK_BERMET_DATABASE_URL`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `AK_BERMET_BACKUP_ENCRYPTION_KEY` в GitHub Actions secrets.
-- [x] Google Drive strict search ранее не нашёл свежего AK BERMET DB backup за 2026-09-09.
-- [x] Публичный `akbermet.kg` по последнему подтверждённому evidence всё ещё обслуживал legacy site; cutover нового release не подтверждён.
+- [x] Google Drive strict search 2026-09-10 не нашёл свежего AK BERMET DB backup или отдельного authoritative reservation register.
+- [x] Публичный `akbermet.kg` по проверке 2026-09-10 всё ещё обслуживает legacy site; cutover нового release не подтверждён.
 
 ## Сейчас НЕ делать
 
@@ -51,7 +53,7 @@
   - [ ] либо письменно/операционно подтвердить запуск 137 verified active rooms, оставив 32 blocked/inactive.
 - [ ] Для pricing gap: не активировать 14 C3 Standard + C3-301 без подтверждённого тарифа/сопоставления.
 - [ ] Для cottages: не снимать `DO_NOT_ACTIVATE` без подтверждённой готовности.
-- [x] Scheduled Sheets Mirror подтверждён post-fix: #76 PASS и #77 PASS на current `main`.
+- [x] Scheduled Sheets Mirror подтверждён post-fix: #76–#81 PASS; это больше не blocker.
 - [ ] Сделать свежий live DB `pg_dump` непосредственно перед live migration/cutover и записать checksum + archive/restore validation evidence.
 - [ ] После backup применить approved migration `20260909050000_enforce_ready_for_manual_booking_and_move.sql`.
 - [ ] После migration проверить live ledger = 38, обе RPC имеют strict ready-only gate, inventory counts не изменились и новые ошибки advisors отсутствуют/объяснены.
