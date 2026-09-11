@@ -39,6 +39,7 @@
     "20260829140341_site_content_cms_core.sql",
     "20260829141145_site_content_cms_rpc_runtime_fix.sql",
     "20260830083140_add_super_chessboard_fk_indexes.sql",
-    "20260909050000_enforce_ready_for_manual_booking_and_move.sql"
+    "20260909050000_enforce_ready_for_manual_booking_and_move.sql",
+    "20260911050000_guest_qr_access_and_requests.sql"
   ]
 }
