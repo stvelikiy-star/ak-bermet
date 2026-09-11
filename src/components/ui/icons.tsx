@@ -275,3 +275,10 @@ export const IconBed2 = (p: IconProps) => (
     <path d="M3 18v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5M3 18v-9M21 18v-2M3 14h18M7 11V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
   </svg>
 );
+
+export const IconQr = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" />
+    <path d="M14 14h3v3h-3zM18 18h2M18 14h2M14 18v2M20 14v3" />
+  </svg>
+);

@@ -12,6 +12,7 @@ import {
   IconShield,
   IconClock,
   IconEye,
+  IconQr,
 } from "@/components/ui/icons";
 
 const NAV = [
@@ -20,6 +21,7 @@ const NAV = [
   { href: "/manager/bookings", label: "Бронирования", icon: IconCalendar },
   { href: "/manager/availability", label: "Шахматка", icon: IconBed },
   { href: "/manager/rooms", label: "Номерной фонд", icon: IconBed2 },
+  { href: "/manager/qr", label: "QR гостей", icon: IconQr },
   { href: "/manager/operations", label: "Операции", icon: IconClock },
   { href: "/manager/inspections", label: "Проверки", icon: IconEye },
   { href: "/manager/payments", label: "Оплаты", icon: IconGift },

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import ManagerHeader from "@/components/manager/ManagerHeader";
 import ManagerStatCard from "@/components/manager/ManagerStatCard";
@@ -11,6 +12,7 @@ import {
   IconCheck,
   IconCalendar,
   IconShield,
+  IconBed,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +91,8 @@ export default async function ManagerDashboard() {
   let confirmedBookings = 0;
   let cleaningOpen = 0;
   let blockingRepairs = 0;
+  let totalRooms = 0;
+  let readyRooms = 0;
 
   if (supabase) {
     const [
@@ -99,6 +103,8 @@ export default async function ManagerDashboard() {
       confirmedResult,
       cleaningResult,
       maintenanceResult,
+      totalRoomsResult,
+      readyRoomsResult,
     ] = await Promise.all([
       supabase
         .from("leads")
@@ -112,9 +118,11 @@ export default async function ManagerDashboard() {
       supabase.from("bookings").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("status", "confirmed"),
       supabase.from("cleaning_tasks").select("id", { count: "exact", head: true }).not("status", "in", "(done,cancelled)"),
       supabase.from("maintenance_requests").select("id", { count: "exact", head: true }).eq("blocks_room", true).not("status", "in", "(completed,closed,cancelled)"),
+      supabase.from("room_units").select("id", { count: "exact", head: true }).is("deleted_at", null),
+      supabase.from("room_units").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("sellable_status", "active").eq("operational_status", "ready"),
     ]);
 
-    const results = [recentResult, newResult, progressResult, pendingResult, confirmedResult, cleaningResult, maintenanceResult];
+    const results = [recentResult, newResult, progressResult, pendingResult, confirmedResult, cleaningResult, maintenanceResult, totalRoomsResult, readyRoomsResult];
     readError = results.some((result) => Boolean(result.error));
     if (!readError) {
       recent = (recentResult.data ?? []) as RecentLead[];
@@ -124,6 +132,8 @@ export default async function ManagerDashboard() {
       confirmedBookings = confirmedResult.count ?? 0;
       cleaningOpen = cleaningResult.count ?? 0;
       blockingRepairs = maintenanceResult.count ?? 0;
+      totalRooms = totalRoomsResult.count ?? 0;
+      readyRooms = readyRoomsResult.count ?? 0;
     }
   }
 
@@ -139,14 +149,29 @@ export default async function ManagerDashboard() {
           <AccessPanel>Не удалось безопасно прочитать актуальные данные CRM. Mock-данные не используются.</AccessPanel>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <ManagerStatCard label="Новые заявки" value={newLeads} icon={IconUsers} />
               <ManagerStatCard label="Заявки в работе" value={inProgress} icon={IconClock} />
               <ManagerStatCard label="Брони ждут подтверждения" value={pendingBookings} icon={IconGift} />
               <ManagerStatCard label="Подтверждённые брони" value={confirmedBookings} icon={IconCheck} />
               <ManagerStatCard label="Открытые уборки" value={cleaningOpen} icon={IconCalendar} />
               <ManagerStatCard label="Блокирующие ремонты" value={blockingRepairs} icon={IconShield} />
+              <ManagerStatCard label="Готовы / всего номеров" value={readyRooms + " / " + totalRooms} icon={IconBed} />
             </div>
+
+            <section className="rounded-xl border border-gold/15 bg-white p-4 shadow-soft">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display text-lg font-semibold text-emerald-deep">Быстрые действия</h2>
+                  <p className="mt-1 text-sm text-muted">Операционные разделы без обходных путей.</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <Link href="/manager/availability" className="rounded-full bg-emerald-deep px-4 py-2 font-semibold text-gold-soft">Открыть шахматку</Link>
+                  <Link href="/manager/qr" className="rounded-full border border-gold/30 px-4 py-2 font-semibold text-emerald-deep">QR гостей</Link>
+                  <Link href="/manager/bookings" className="rounded-full border border-gold/30 px-4 py-2 font-semibold text-emerald-deep">Брони</Link>
+                </div>
+              </div>
+            </section>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <section className="lg:col-span-2">
