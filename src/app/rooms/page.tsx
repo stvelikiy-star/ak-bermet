@@ -5,6 +5,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
 import BookingLeadForm from "@/components/forms/BookingLeadForm";
+import PublicAvailabilitySearch from "@/components/availability/PublicAvailabilitySearch";
 import Photo from "@/components/ui/Photo";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import { WA } from "@/data/site";
@@ -169,6 +170,12 @@ export default async function RoomsPage() {
               ))}
             </ul>
           </div>
+        </Container>
+      </section>
+
+      <section className="bg-cream py-16 sm:py-24">
+        <Container className="max-w-5xl">
+          <PublicAvailabilitySearch />
         </Container>
       </section>
 
