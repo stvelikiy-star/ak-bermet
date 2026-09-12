@@ -30,6 +30,11 @@ export default function ManagerSettingsPage() {
   const sheets = isGoogleSheetsEnabled();
   const ai = getAIProviderName();
   const realAI = isRealAIEnabled();
+  const aiStatus = realAI
+    ? `${ai} (real)`
+    : ai === "mock"
+      ? "Локальный mock (только development/test)"
+      : "OpenAI не настроен; используется передача администратору";
 
   return (
     <>
@@ -154,7 +159,7 @@ export default function ManagerSettingsPage() {
             />
             <Row
               label="AI-провайдер"
-              value={realAI ? `${ai} (real)` : `${ai} (mock)`}
+              value={aiStatus}
             />
             <Row label="FreedomPay" value="Не подключено" />
             <Row label="1С" value="Не подключено" />
