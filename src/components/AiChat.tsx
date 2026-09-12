@@ -41,7 +41,7 @@ export default function AiChat() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [demoMode, setDemoMode] = useState(true);
+  const [realCallsEnabled, setRealCallsEnabled] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([
     {
       id: uid(),
@@ -57,8 +57,8 @@ export default function AiChat() {
   useEffect(() => {
     fetch("/api/chat/status")
       .then((r) => r.json())
-      .then((d) => setDemoMode(!d.realCallsEnabled))
-      .catch(() => setDemoMode(true));
+      .then((d) => setRealCallsEnabled(d.realCallsEnabled === true))
+      .catch(() => setRealCallsEnabled(false));
   }, []);
 
   useEffect(() => {
@@ -170,8 +170,8 @@ export default function AiChat() {
                 AI-помощник Ак-Бермет
               </p>
               <p className="flex items-center gap-1.5 text-[11px] text-gold-soft">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                {demoMode ? "Демо-режим · Онлайн 24/7" : "Онлайн 24/7"}
+                <span className={`h-1.5 w-1.5 rounded-full ${realCallsEnabled ? "bg-emerald-400" : "bg-gold"}`} />
+                {realCallsEnabled ? "AI-помощник онлайн" : "Связь с администратором"}
               </p>
             </div>
             <button
