@@ -38,11 +38,39 @@ export async function POST(request: NextRequest) {
   const admin = getSupabaseAdminClient();
   const { data: room, error: roomError } = await admin.from("room_units").select("id, room_number, buildings ( name )").eq("id", roomUnitId).is("deleted_at", null).maybeSingle();
   if (roomError || !room) return NextResponse.json({ ok: false, code: "ROOM_NOT_FOUND" }, { status: 404 });
-  const { error: revokeError } = await admin.from("guest_room_access_tokens").update({ revoked_at: new Date().toISOString() }).eq("room_unit_id", roomUnitId).is("revoked_at", null);
+  const rotationTime = new Date().toISOString();
+  const { data: revokedRows, error: revokeError } = await admin
+    .from("guest_room_access_tokens")
+    .update({ revoked_at: rotationTime })
+    .eq("room_unit_id", roomUnitId)
+    .is("revoked_at", null)
+    .select("id");
   if (revokeError) return NextResponse.json({ ok: false, code: "QR_ROTATION_FAILED" }, { status: 503 });
+
   const token = createGuestToken();
-  const { data: inserted, error } = await admin.from("guest_room_access_tokens").insert({ room_unit_id: roomUnitId, token_hash: hashGuestToken(token), label, expires_at: expiresAt.toISOString(), created_by: staff?.userId ?? null }).select("id, room_unit_id, label, expires_at, created_at").single();
-  if (error || !inserted) return NextResponse.json({ ok: false, code: "QR_CREATE_FAILED" }, { status: 503 });
+  const { data: inserted, error } = await admin
+    .from("guest_room_access_tokens")
+    .insert({
+      room_unit_id: roomUnitId,
+      token_hash: hashGuestToken(token),
+      label,
+      expires_at: expiresAt.toISOString(),
+      created_by: staff?.userId ?? null,
+    })
+    .select("id, room_unit_id, label, expires_at, created_at")
+    .single();
+
+  if (error || !inserted) {
+    // Do not leave the room without access if token creation fails after rotation.
+    const revokedIds = (revokedRows ?? []).map((row) => row.id).filter(Boolean);
+    if (revokedIds.length > 0) {
+      await admin
+        .from("guest_room_access_tokens")
+        .update({ revoked_at: null })
+        .in("id", revokedIds);
+    }
+    return NextResponse.json({ ok: false, code: "QR_CREATE_FAILED" }, { status: 503 });
+  }
   const url = guestPortalUrl(new URL(request.url).origin, token);
   const qrDataUrl = await QRCode.toDataURL(url, { width: 320, margin: 2, errorCorrectionLevel: "M" });
   const building = Array.isArray(room.buildings) ? room.buildings[0] : room.buildings;
