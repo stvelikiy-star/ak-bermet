@@ -1,124 +1,86 @@
-# CRM & Leads — архитектура (Stage 04)
+# CRM & Leads — актуальная архитектура AK BERMET
 
-Документ описывает модель заявок, текущий mock-поток и план интеграции с
-Google Sheets / CRM на Stage 05.
+Supabase/PostgreSQL — транзакционный источник истины. Google Sheets — только
+асинхронное отчётное зеркало через DB outbox; таблица не участвует в бронях и
+не является fallback-хранилищем.
 
----
+## 1. Типы заявок
 
-## 1. Типы заявок (interest)
+| interest | Откуда | Форма |
+| --- | --- | --- |
+| `rooms` | /rooms | BookingLeadForm |
+| `garden` | /garden | BookingLeadForm |
+| `hot_springs` | /hot-springs | SpaLeadForm |
+| `spa` | /spa | SpaLeadForm |
+| `events` | /events | EventLeadForm |
+| `promo` | /promos | BookingLeadForm |
+| `general` | /contacts | GeneralLeadForm |
 
-| interest      | Откуда                         | Форма             |
-| ------------- | ------------------------------ | ----------------- |
-| `rooms`       | /rooms                         | BookingLeadForm   |
-| `garden`      | /garden                        | BookingLeadForm   |
-| `hot_springs` | /hot-springs                   | SpaLeadForm       |
-| `spa`         | /spa                           | SpaLeadForm       |
-| `events`      | /events                        | EventLeadForm     |
-| `promo`       | /promos                        | BookingLeadForm   |
-| `general`     | /contacts                      | GeneralLeadForm   |
-| `food`        | (зарезервировано)              | —                 |
+Источники поддерживают `website`, `ai_chat`, `whatsapp`, `phone`,
+NaNinstagram`, `tour_agency` и `manual`.
 
-Источник (`source`) сейчас всегда `website`. Поддерживаются также `ai_chat`,
-`whatsapp`, `phone`, `instagram`, `tour_agency`, `manual`.
+## 2. Долговечная заявка: сайт → CRM
 
----
+1. Форма валидируется на клиенте через `src/lib/lead-schema.ts` и отправляет
+   `POST /api/leads`.
+2. Сервер повторно валидирует вход и выполняет единственную durable-запись через
+   `persistPublicLead` в Supabase/PostgreSQL.
+3. При ошибке базы маршрут возвращает `503`; интерфейс не показывает ложный
+   success и не делает вид, что заявка сохранена.
+4. Принятая заявка получает CRM-статус, а DB outbox может зеркалировать её в лист
+   «Заявки».
+5. `/manager/leads` читает реальные записи и изменяет статусы/комментарии
+   через защищённые manager API.
 
-## 2. Какие поля собираются
+## 3. Доступность и бронь
 
-Базовые (всегда): `name`, `phone`, `interest`, `source`.
+Предварительная доступность `GET /api/availability` читает из Supabase:
 
-Проживание (`BookingLeadForm`): `checkIn`, `checkOut`, `adults`, `children`,
-`childrenAges`, `roomCategory`, `wantsDoubleBed`, `needsExtraBed`, `needsWifi`,
-`needsLowerFloor`, `message`.
+- активный `room_units` с учётом sellable и operational статусов;
+- `occupancy_periods` (бронь, техблоки, стоп-продажи);
+- неистёкшие durable holds из `availability_holds`.
 
-Мероприятия (`EventLeadForm`): `checkIn` (дата), `eventType`, `guestsCount`,
-`hallSize`, `message` (включая потребность в проживании / питании / кофе-брейке).
+При ошибке источника ответ fail-closed. Mock fixtures доступны только при явном
+локальном `NODE_ENV=development|test` и `AVAILABILITY_SOURCE=mock`; в
+production они недоступны.
 
-SPA / источники (`SpaLeadForm`): `spaService`, `checkIn` (дата визита),
-`guestsCount`, `message`.
+Публичная форма создаёт заявку и передаёт пользователя администратору. Это
+осознанное правило: сайт не обещает мгновенную бронь без проверки сотрудником.
+Менеджер создаёт бронь из `/manager/bookings` или шахматки:
 
-Общий вопрос (`GeneralLeadForm`): тема + `message`.
+NaNPOST /api/manager/bookings` → `fn_create_manual_booking` → клиент, бронь,
+размещение и история статуса. База повторно проверяет даты, вместимость, sellable/
+operational status и пересечения с бронями, holds, техблоками и стоп-продажами.
 
-Полная схема — в `src/types/lead.ts`.
+## 4. CRM-статусы
 
----
+NaNnew` → `in_progress` → `waiting_admin` → `waiting_prepayment` →
+NaNprepaid` → `confirmed`; `cancelled` и `lost` доступны из
+соответствующих операционных сценариев.
 
-## 3. Как сейчас работает mock-поток
+Бронь имеет отдельный жизненный цикл: `pending_confirmation`,
+NaNconfirmed`, `checked_in`, `checking_out`, `completed`,
+NaNcancelled` и `no_show`. История статусов хранится append-only.
 
-1. Пользователь заполняет форму → клиентская валидация (`src/lib/lead-schema.ts`).
-2. `POST /api/leads` (`src/app/api/leads/route.ts`):
-   - повторно валидирует `name`, `phone`, `interest`, `source`;
-   - присваивает `id` и `createdAt`, ставит `status = "new"`;
-   - логирует заявку в server console;
-   - возвращает `{ ok: true, leadId }`.
-3. Форма показывает success-состояние и предлагает «Продолжить в WhatsApp»
-   с уже собранным текстом (`src/lib/whatsapp.ts`).
+## 5. Роли
 
-Предварительная проверка наличия: `GET /api/availability` читает активный номерной фонд и занятость из Supabase; при ошибке источника система отвечает fail-closed и не подменяет данные demo-вариантами.
+- `owner`, `administrator`, `manager` — заявки, бронь, доступность и шахматка.
+- `housekeeping` — уборка и готовность комнат.
+- `technician` — ремонт, технические блоки и инспекции.
 
-> Публичные заявки сохраняются в Supabase. Google Sheets используется только как асинхронное отчётное зеркало.
+Каждый write-route повторно проверяет Supabase Auth и роль на сервере. UI-скрытие
+кнопки не является механизмом безопасности.
 
----
+## 6. Google Sheets
 
-## 4. Как подключить Google Sheets на Stage 05
+Sheets синхронизируется только как отчётное зеркало. При отключённой таблице
+Supabase CRM продолжает работать. Сервисный аккаунт, ключ и прочие секреты
+хранятся только в env.
 
-В `src/app/api/leads/route.ts` есть точка:
+## 7. Бизнес-правила
 
-```ts
-// TODO Stage 05: send this lead to Google Sheets and notify admin.
-```
-
-План:
-1. Сервисный аккаунт Google + доступ к таблице.
-2. Серверная функция `appendLeadToSheet(lead)` (вызов в route после валидации).
-3. Уведомление администратора (WhatsApp/Telegram/email) — отдельный модуль.
-4. В `src/lib/availability.ts` заменить `mockRooms`/`queryAvailability` на чтение
-   листов «Номерной фонд» и «Занятость» (там стоит соответствующий TODO).
-
-Домен и контакты берутся из `src/data/site.ts`, WhatsApp-тексты — из
-`src/lib/whatsapp.ts`. Ключи и токены должны лежать в переменных окружения
-(`.env`), не в коде.
-
----
-
-## 5. Нужные листы (Google Sheets)
-
-1. **Номерной фонд** — соответствует `RoomUnit` (`src/types/availability.ts`).
-2. **Занятость** — соответствует `OccupancyRecord`.
-3. **Заявки** — соответствует `Lead`.
-4. **Оплаты** — статусы предоплаты 20% (Stage 07, FreedomPay).
-5. **Услуги и цены** — источники, SPA, залы, кофе-брейк.
-6. **FAQ база AI** — вопросы/ответы для Stage 05 (AI Chat).
-
----
-
-## 6. Статусы заявок (LeadStatus)
-
-`new` → `in_progress` → `waiting_admin` → `waiting_prepayment` → `prepaid`
-→ `confirmed` · и `cancelled` / `lost` на любом этапе.
-
----
-
-## 7. Бизнес-правила (зашиты в тексты)
-
-- Бронь подтверждается только после проверки администратором.
-- Для фиксации брони нужна предоплата 20%.
-- Сайт/AI не обещают точное наличие.
-- Реквизиты оплаты не публикуются в формах; оплату отправляет администратор
-  после подтверждения наличия.
-- Акции действуют только в определённые периоды.
+- Бронь подтверждает администратор после проверки наличия.
+- Для фиксации брони применяется предоплата 20%.
+- Сайт и AI не обещают точное наличие.
+- Оплату и реквизиты отправляет администратор после подтверждения.
 - Медицинские эффекты источников не обещаются.
-
----
-
-## Обновление Stage 05 — Google Sheets подключён
-
-- `POST /api/leads` теперь пишет заявку в лист «Заявки» через `src/lib/google-sheets.ts`
-  (`appendLeadToSheet`) при наличии env-переменных; иначе — fallback-лог (заявка не
-  теряется), ответ содержит флаг `stored`.
-- Порядок колонок — константа `leadToRow`. Для Stage 06 добавлены
-  `ROOMS_HEADER` и `OCCUPANCY_HEADER`.
-- Настройка — `GOOGLE_SHEETS_SETUP.md` и `.env.example`
-  (`GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`).
-- Дальше: чтение доступности из листов «Номерной фонд» / «Занятость» и
-  уведомление администратора.
