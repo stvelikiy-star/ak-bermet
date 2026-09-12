@@ -1,80 +1,58 @@
-# Авторизация менеджера + сохранение в Google Sheets (Stage 09)
+# Авторизация персонала и сохранение данных AK BERMET
 
-## 1. Как работает простой manager auth
+## Актуальный production-контур
 
-PIN-защита через env. `/manager/*` закрыт `middleware.ts`: без валидной cookie
-→ redirect на `/manager/login`. Вход: `POST /api/manager/login` сверяет PIN с
-`MANAGER_ACCESS_PIN` и ставит httpOnly-cookie с производным значением сессии
-(сам PIN в cookie не хранится). Проверка — `src/lib/manager-auth.ts` (работает и
-в Edge-middleware, и в Node-роутах).
+Защищённые разделы используют Supabase Auth и профиль персонала в Supabase.
+Legacy PIN-cookie и общий PIN не являются рабочим способом доступа и не должны
+возвращаться в production.
 
-## 2. Какие env нужны
+Маршруты:
 
-```env
-MANAGER_AUTH_ENABLED=true
-MANAGER_ACCESS_PIN=123456
-MANAGER_SESSION_COOKIE=akbermet_manager_session
-MANAGER_SESSION_HOURS=12
-GOOGLE_SHEETS_LEAD_HISTORY_SHEET_NAME=История заявок
-```
+- `/staff/login` — вход через Supabase Auth.
+- `/manager`, `/manager/leads`, `/manager/bookings`, `/manager/availability` — CRM и бронирование.
+- `/housekeeping` — операционные задания горничных.
+- `/technician` — ремонт, техблоки и инспекции.
 
-## 3. Как войти
+API на сервере повторно вызывает `getCurrentStaff()` и проверяет роль. Отсутствие
+сессии, профиля или роли закрывает доступ fail-closed.
 
-Открыть `/manager` → редирект на `/manager/login` → ввести PIN из `.env.local`
-→ при успехе редирект на `/manager`.
+## Роли
 
-## 4. Почему это MVP, а не production auth
+- `owner`, `administrator`, `manager` — CRM, бронь и шахматка.
+- `housekeeping` — операционные задания уборки в пределах своей роли.
+- `technician` — ремонт, технические блоки и инспекции.
 
-Один общий PIN, без пользователей и ролей, без хеширования паролей и брутфорс-
-защиты. Подходит только для демо/MVP. **Для production нужна нормальная
-авторизация с ролями** (owner/manager), хранилище пользователей и т. п.
+Проверка роли выполняется и в UI, и в каждом write-route; скрытие кнопки не считается
+защитой.
 
-## 5. Заявки из Google Sheets
+## CRM и бронь
 
-`GET /api/manager/leads`: при `GOOGLE_SHEETS_ENABLED=true` читает лист «Заявки»
-через `getLeadsFromSheet()`; иначе отдаёт mock и помечает ответ `source:"mock"`
-(в UI — бейдж «Mock mode»).
+NaNPOST /api/leads` сохраняет публичную заявку в Supabase. `GET/PATCH`
+manager API читают и меняют CRM-данные через авторизованный серверный клиент.
 
-## 6. Как меняются статусы
+NaNPOST /api/manager/bookings` вызывает атомарную `fn_create_manual_booking`.
+Конфликты дат, вместимость, sellable/operational статусы и историю брони проверяет
+база. Шахматка читает тот же источник и после изменения обновляет данные через
+NaNrouter.refresh()`.
 
-В деталях заявки — выбор статуса + комментарий → «Сохранить изменения» →
-`PATCH /api/manager/leads/[id]`. При включённом Sheets вызывается
-`updateLeadStatusInSheet()`: находит строку по ID, обновляет Статус, Менеджер,
-Комментарий менеджера, Дата последнего обновления.
+Google Sheets — только асинхронное зеркало через DB outbox. Отключённая таблица не
+должна превращать принятую Supabase-заявку в mock или ложный success.
 
-## 7. История заявок
+## Операторская настройка
 
-После каждого обновления `appendLeadHistoryToSheet()` добавляет строку в лист
-«История заявок»: ID истории, ID заявки, Дата, Статус, Менеджер, Комментарий.
+1. Создать сотрудника через одобренный Supabase Auth flow.
+2. Создать/проверить его профиль и назначить ровно нужную роль.
+3. Проверить доступ только к соответствующему разделу.
+4. Не хранить пароли, service-role ключи и DB URI в GitHub, Drive или клиентском коде.
 
-## 8. Какие листы нужны в Google Sheets
+## Диагностика
 
-«Заявки» (+ колонки Менеджер, Комментарий менеджера, Дата последнего обновления),
-«История заявок», а также «Номерной фонд», «Занятость», «Оплаты», «Услуги и
-цены» (см. `GOOGLE_SHEETS_SETUP.md`).
+Если вход не работает, проверять в таком порядке:
 
-## 9. Что делать, если Google Sheets выключен
+1. Есть ли пользователь в Supabase Auth.
+2. Есть ли активный профиль персонала с корректной ролью.
+3. Совпадают ли env приложения для Supabase URL/publishable key.
+4. Не истекла ли сессия браузера.
 
-Production-контур не использует `manager-mock`: manager-разделы требуют Supabase Auth/RBAC, читают данные из Supabase и сохраняют изменения в транзакционную базу. При отсутствии конфигурации доступ закрывается fail-closed.
-
-## 10. Что нужно для настоящего production auth
-
-NextAuth / Supabase Auth или собственный провайдер, роли и права, хранилище
-пользователей, защита от перебора, аудит входов. Текущая PIN-защита это не
-заменяет.
-
-> Текущая PIN-защита подходит только для MVP/демо. Для production нужна
-> нормальная авторизация с ролями.
-
-## Важно про middleware и env
-
-`src/middleware.ts` выполняется в Edge-runtime, который **инлайнит значения
-`process.env` во время сборки**. Поэтому:
-
-- при `npm run dev` middleware читает env в рантайме — защита работает сразу;
-- при `npm run build` / `npm start` переменные `MANAGER_AUTH_ENABLED` и
-  `MANAGER_ACCESS_PIN` должны присутствовать **на момент сборки** (через
-  `.env.local` или окружение CI), иначе редирект не активируется.
-
-Node-роуты `/api/manager/*` читают env в рантайме и помечены
-`export const dynamic = "force-dynamic"`, поэтому проверяют сессию всегда.
+Этот документ заменяет старое описание PIN/mock-режима; старые ссылки на общий PIN,
+mock CRM и чтение заявок из Sheets считать историческими.
