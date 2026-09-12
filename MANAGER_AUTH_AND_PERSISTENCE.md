@@ -55,8 +55,7 @@ GOOGLE_SHEETS_LEAD_HISTORY_SHEET_NAME=История заявок
 
 ## 9. Что делать, если Google Sheets выключен
 
-Всё работает на mock: заявки из `manager-mock`, сохранение возвращает ok без
-записи, UI показывает «Mock mode». Сайт не ломается.
+Production-контур не использует `manager-mock`: manager-разделы требуют Supabase Auth/RBAC, читают данные из Supabase и сохраняют изменения в транзакционную базу. При отсутствии конфигурации доступ закрывается fail-closed.
 
 ## 10. Что нужно для настоящего production auth
 
