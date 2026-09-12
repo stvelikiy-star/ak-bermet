@@ -11,9 +11,9 @@ import {
   BLOCKING_BOOKING_STATUSES,
 } from "@/types/availability";
 
-// Mock inventory is a local development/test aid only. Non-mock availability is loaded from authoritative Supabase server-side.
+// Local fixture inventory is available only for explicit development/test runs. Non-fixture availability is loaded from authoritative Supabase server-side.
 
-// Demo-данные номерного фонда (НЕ реальная доступность).
+// Local test fixture inventory (НЕ production availability).
 export const mockRooms: RoomUnit[] = [
   {
     id: "garden-lux-01",
@@ -110,7 +110,7 @@ export const mockRooms: RoomUnit[] = [
   },
 ];
 
-// Demo-занятость (пустая — реальная появится на Stage 05).
+// Local test fixture occupancy; production occupancy is loaded from Supabase.
 export const mockOccupancy: OccupancyRecord[] = [];
 
 // Осторожное сообщение — нельзя обещать точное наличие.
@@ -283,7 +283,7 @@ export function filterRooms(
     }));
 }
 
-// Предварительный подбор по mock-данным.
+// Предварительный подбор по local test fixtures; production route uses Supabase.
 export function queryAvailability(q: AvailabilityQuery): AvailabilityItem[] {
   return filterRooms(mockRooms, q, mockOccupancy);
 }
