@@ -83,7 +83,7 @@ The command must remain blocked until every external release attestation is back
 
 ## Current accepted release state
 
-- Current `main` tip: `13bcc411a17ca5ca96d92e9d4b03798ec38e8801` (`docs: record public availability to CRM handoff`).
+- Current `main` tip: `472ef4340d86a3fc4994843b46e6f22208e5afbb` (`fix: memoize guest service refresh callback`).
 - Production Readiness workflow for this release commit: PASS (run `34614442708`).
 - Repository approved migration chain: 40 migrations.
 - Live AK BERMET Supabase ledger: 40 migrations; latest live migration is `20260911150916` (Supabase-assigned timestamp for the guest QR foreign-key indexes).
