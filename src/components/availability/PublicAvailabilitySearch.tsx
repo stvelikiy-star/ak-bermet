@@ -178,8 +178,8 @@ export default function PublicAvailabilitySearch() {
 
           {items.length ? (
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item) => (
-                <article key={`${item.building}-${item.category}`} className="rounded-xl border border-gold/15 bg-white p-4">
+              {items.map((item, index) => (
+                <article key={`${item.building}-${item.category}-${index}`} className="rounded-xl border border-gold/15 bg-white p-4">
                   <h4 className="font-semibold text-emerald-deep">{item.category}</h4>
                   <p className="mt-1 text-xs text-muted">{item.building} · до {item.capacity} гостей</p>
                   <p className="mt-3 text-xs leading-relaxed text-muted">
