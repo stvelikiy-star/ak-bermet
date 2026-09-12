@@ -10,6 +10,7 @@ Unified hotel website + PMS/CRM/operations platform for AK BERMET.
 - Google Sheets is a reporting/integration mirror only and is **not** the authority for public availability.
 - Supabase Auth + RBAC + RLS protect staff access.
 - Public website supports RU / KG / EN / KZ.
+- Public /rooms search reads authoritative Supabase availability and routes the guest to a durable CRM request; it does not promise instant confirmation.
 - Manager CRM includes leads, availability, rooms, bookings/chessboard, payments, reports and CMS.
 - Operations include housekeeping, maintenance/technician tasks, inspections and room readiness states.
 - AI chat is fail-closed in production and may hand off a durable lead to CRM; it is not booking/payment authority.
@@ -82,7 +83,7 @@ The command must remain blocked until every external release attestation is back
 
 ## Current accepted release state
 
-- Current `main` tip: `c535eb8fa4904ce168abb4577b3588f0f1973f9c` (`chore: approve guest QR foreign-key indexes`).
+- Current `main` tip: `ef22f7c9472290e757f3800a8c75b30bb538266e` (`feat: connect rooms page to public availability search`).
 - Production Readiness workflow for this release commit: PASS (run `34614442708`).
 - Repository approved migration chain: 40 migrations.
 - Live AK BERMET Supabase ledger: 40 migrations; latest live migration is `20260911150916` (Supabase-assigned timestamp for the guest QR foreign-key indexes).
@@ -100,7 +101,7 @@ The command must remain blocked until every external release attestation is back
 - A fresh recoverable database dump/restore drill is **NOT VERIFIED**. The owner has explicitly accepted this as a release risk; no production backup was claimed or published.
 - Supabase security advisor currently reports 28 existing `SECURITY DEFINER` functions executable by authenticated users. These are operational RPCs and were not revoked blindly; each should be reviewed against its role policy before final handover. Performance advisor reports 76 INFO unused-index notices and 6 multiple-permissive-policy notices.
 - GitHub branch protection and required checks are **NOT VERIFIED** in the current audit.
-- The latest production build is healthy and runtime errors were absent in the last 7 days, but the public custom-domain browser/mobile UAT is **NOT VERIFIED**.
+- The latest known production build is healthy and runtime errors were absent in the last 7 days, but it still predates the latest main-branch UI/docs hardening commits. A fresh deployment and public custom-domain browser/mobile UAT are **NOT VERIFIED**.
 
 Supabase Leaked Password Protection / HIBP is **optional Pro+ defense in depth**, not a required blocker for the current Free-plan release. The repository enforces a strict staff-password policy as compensating hardening.
 
