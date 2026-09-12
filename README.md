@@ -83,7 +83,7 @@ The command must remain blocked until every external release attestation is back
 
 ## Current accepted release state
 
-- Current `main` tip: `472ef4340d86a3fc4994843b46e6f22208e5afbb` (`fix: memoize guest service refresh callback`).
+- Current `main` tip: `173ddaa3ff875fc5f320ce509403f7a2bd124711` (`docs: add current AK BERMET delivery status`).
 - Production Readiness workflow for this release commit: PASS (run `34614442708`).
 - Repository approved migration chain: 40 migrations.
 - Live AK BERMET Supabase ledger: 40 migrations; latest live migration is `20260911150916` (Supabase-assigned timestamp for the guest QR foreign-key indexes).
@@ -109,6 +109,7 @@ Supabase Leaked Password Protection / HIBP is **optional Pro+ defense in depth**
 
 Use:
 
+- `CURRENT_STATUS_2026-09-12.md` — actual implementation and release status.
 - `HANDOVER_RELEASE_2026-09-09.md` — current handover state and cutover sequence.
 - `TODO_NEXT_STAGES.md` — remaining release backlog only.
 - `scripts/production-migrations-approved.json` — approved ordered migration ledger.
