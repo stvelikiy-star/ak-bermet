@@ -82,24 +82,25 @@ The command must remain blocked until every external release attestation is back
 
 ## Current accepted release state
 
-- Accepted functional GitHub baseline: `563c79b5a78410918aaff96d85e4aa9b87d96b0a`.
-- Current `main` tip is documentation commit `1f8e1e923992945170a34e798664b01b67b57ef0` on top of that baseline.
-- Production Readiness #236 for the exact functional baseline: PASS.
-- Repository approved migration chain: 38 migrations.
-- Live AK BERMET Supabase ledger: 37 migrations; migration `20260909050000_enforce_ready_for_manual_booking_and_move.sql` is intentionally **not yet applied**.
-- Live inventory remains 169 total / 137 `active + ready` / 32 non-sellable; current live bookings = 0 and live availability holds = 0 at the latest verification.
+- Current `main` tip: `c535eb8fa4904ce168abb4577b3588f0f1973f9c` (`chore: approve guest QR foreign-key indexes`).
+- Production Readiness workflow for this release commit: PASS (run `34614442708`).
+- Repository approved migration chain: 40 migrations.
+- Live AK BERMET Supabase ledger: 40 migrations; latest live migration is `20260911150916` (Supabase-assigned timestamp for the guest QR foreign-key indexes).
+- Live inventory: 169 total / 137 `active + ready` / 32 `inactive + blocked`.
+- Current live counts at the latest audit: 1 booking, 0 availability holds, 0 active guest QR tokens, 0 guest service requests, 0 leads.
+- Current production deployment: Vercel `dpl_J5RhvHAYZmdn8oBk4FeaE1mCiwzH`, state `READY`, production alias `ak-bermet-functional-preview-v2-202.vercel.app`.
+- The custom domain `akbermet.kg` is not attached to this Vercel project; domain cutover remains intentionally separate.
 
 ## Current known external blockers
 
-- GitHub `main` branch protection / required checks must be enabled and then re-verified. Current branch state is `protected: false`.
-- A fresh recoverable live database backup must be created immediately before applying the pending 38th migration or performing production data cutover.
-- The connected Supabase organization is on Free plan; automatic database backup/PITR is not available for this project, so the backup gate requires an explicit dump/checksum/restore-verification path.
-- Current real hotel reservations must be obtained and reconciled, or an authoritative owner/reception confirmation must state that there are no active reservations to migrate.
-- Remaining pricing gaps and cottage readiness require authoritative owner decisions. Unverified units must stay blocked/inactive; prices must never be invented.
-- Sheets Mirror post-fix is confirmed by scheduled runs #80 and #81 (`completed/success`) on the current `main` tip.
-- The exact current release SHA still must be deployed to Vercel production and pass anonymous browser/mobile UAT; the latest inspected Vercel production deployment was built from an older SHA.
-- Supabase security advisor reports leaked-password protection disabled; on the current Free plan this is defense-in-depth, but it should be enabled when the plan permits or recorded as a security exception.
-- WhatsApp -> webhook -> n8n -> AI -> CRM lead -> manager notification -> human handoff requires full real E2E evidence for automation handover.
+- A live owner/reception reconciliation is still required for the 1 existing booking and for the 32 `inactive + blocked` units. Prices and availability must not be invented.
+- Manager, housekeeping and technician journeys have build/smoke evidence, but real authenticated browser UAT with owner-provided accounts is **NOT VERIFIED**.
+- No guest QR has been issued yet. QR creation, printing and guest-request handling require a real manager-session UAT before handover.
+- Payment gateway, WhatsApp/Telegram automation, Google Sheets mirror, physical lock/TTLock/TTHotel and email/SMS delivery are **UNKNOWN / NOT VERIFIED** for production; credentials and real E2E evidence are not present in the audit sources.
+- A fresh recoverable database dump/restore drill is **NOT VERIFIED**. The owner has explicitly accepted this as a release risk; no production backup was claimed or published.
+- Supabase security advisor currently reports 28 existing `SECURITY DEFINER` functions executable by authenticated users. These are operational RPCs and were not revoked blindly; each should be reviewed against its role policy before final handover. Performance advisor reports 76 INFO unused-index notices and 6 multiple-permissive-policy notices.
+- GitHub branch protection and required checks are **NOT VERIFIED** in the current audit.
+- The latest production build is healthy and runtime errors were absent in the last 7 days, but the public custom-domain browser/mobile UAT is **NOT VERIFIED**.
 
 Supabase Leaked Password Protection / HIBP is **optional Pro+ defense in depth**, not a required blocker for the current Free-plan release. The repository enforces a strict staff-password policy as compensating hardening.
 
