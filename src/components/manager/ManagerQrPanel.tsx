@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 interface Room { id: string; roomNumber: string; buildingName: string; }
 interface QrItem { id: string; roomUnitId: string; roomNumber: string; buildingName: string; label: string; expiresAt: string; createdAt: string; url?: string; qrDataUrl?: string; }
 interface GuestRequest { id: string; roomNumber: string; buildingName: string; requestType: string; message: string | null; status: string; createdAt: string; }
 export default function ManagerQrPanel({ rooms }: { rooms: Room[] }) {
   const [items, setItems] = useState<QrItem[]>([]); const [requests, setRequests] = useState<GuestRequest[]>([]); const [busyRoom, setBusyRoom] = useState<string | null>(null); const [message, setMessage] = useState("");
-  async function loadGuestService() { try { const [qrResponse, requestResponse] = await Promise.all([fetch("/api/manager/guest-qr", { cache: "no-store" }), fetch("/api/manager/guest-requests", { cache: "no-store" })]); const [qrBody, requestBody] = await Promise.all([qrResponse.json(), requestResponse.json()]); if (qrBody.ok) setItems(qrBody.items ?? []); if (requestBody.ok) setRequests(requestBody.items ?? []); } catch { setMessage("Не удалось прочитать данные гостевого сервиса."); } }\n  useEffect(() => { void loadGuestService(); const timer = window.setInterval(() => void loadGuestService(), 30000); return () => window.clearInterval(timer); }, []);
+  const loadGuestService = useCallback(async () => { try { const [qrResponse, requestResponse] = await Promise.all([fetch("/api/manager/guest-qr", { cache: "no-store" }), fetch("/api/manager/guest-requests", { cache: "no-store" })]); const [qrBody, requestBody] = await Promise.all([qrResponse.json(), requestResponse.json()]); if (qrBody.ok) setItems(qrBody.items ?? []); if (requestBody.ok) setRequests(requestBody.items ?? []); } catch { setMessage("Не удалось прочитать данные гостевого сервиса."); } }, []);\n  useEffect(() => { void loadGuestService(); const timer = window.setInterval(() => void loadGuestService(), 30000); return () => window.clearInterval(timer); }, [loadGuestService]);
   const activeByRoom = useMemo(() => new Map(items.map((item) => [item.roomUnitId, item])), [items]);
   async function createQr(room: Room) {
     setBusyRoom(room.id); setMessage("");
