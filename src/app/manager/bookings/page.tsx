@@ -1,5 +1,6 @@
 import ManagerHeader from "@/components/manager/ManagerHeader";
 import ManualBookingForm, { type ManualBookingRoomOption } from "@/components/manager/ManualBookingForm";
+import BookingStatusActions from "@/components/manager/BookingStatusActions";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
@@ -129,7 +130,7 @@ export default async function ManagerBookingsPage() {
               <div className="flex flex-wrap items-end justify-between gap-2 border-b border-gold/10 p-4">
                 <div>
                   <h2 className="font-display text-lg font-semibold text-emerald-deep">Брони в CRM</h2>
-                  <p className="mt-1 text-xs text-muted">Последние 100 записей. После создания номер сразу занимает даты в шахматке.</p>
+                  <p className="mt-1 text-xs text-muted">Последние 100 записей. Подтверждение требует зафиксированной предоплаты не меньше 20%; заселение возможно только в готовый номер.</p>
                 </div>
                 <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-emerald-deep ring-1 ring-gold/15">{bookings.length} броней</span>
               </div>
@@ -138,7 +139,7 @@ export default async function ManagerBookingsPage() {
                 <div className="p-6 text-sm text-muted">Пока броней нет. Реальные текущие брони можно внести вручную при сдаче проекта.</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[950px] text-left text-xs">
+                  <table className="w-full min-w-[1120px] text-left text-xs">
                     <thead className="bg-cream/60 text-muted">
                       <tr>
                         <th className="px-4 py-3">№ брони</th>
@@ -149,6 +150,7 @@ export default async function ManagerBookingsPage() {
                         <th className="px-4 py-3">Статус</th>
                         <th className="px-4 py-3">Сумма</th>
                         <th className="px-4 py-3">20%</th>
+                        <th className="px-4 py-3">Действия</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gold/10">
@@ -170,6 +172,7 @@ export default async function ManagerBookingsPage() {
                             <td className="px-4 py-3"><span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800 ring-1 ring-amber-100">{STATUS_LABELS[booking.status] ?? booking.status}</span></td>
                             <td className="px-4 py-3 font-medium text-emerald-deep">{money(booking.total_amount_kgs)} сом</td>
                             <td className="px-4 py-3 text-emerald-deep">{money(booking.prepayment_required_kgs)} сом</td>
+                            <td className="px-4 py-3"><BookingStatusActions bookingId={booking.id} bookingNumber={booking.booking_number} status={booking.status} /></td>
                           </tr>
                         );
                       })}
