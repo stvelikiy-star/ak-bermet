@@ -14,6 +14,8 @@ const ALLOWED_SOURCES = new Set([
   "tour_agency",
   "manual",
 ]);
+const STATUS_TARGETS = new Set(["confirmed", "checked_in", "checked_out", "cancelled", "no_show"]);
+const TERMINAL_TARGETS = new Set(["cancelled", "no_show"]);
 
 interface ManualBookingPayload {
   roomUnitId: string;
@@ -99,6 +101,25 @@ function publicError(error: { code?: string | null; message?: string | null }): 
   return { status: 500, code: "BOOKING_CREATE_FAILED" };
 }
 
+function statusError(error: { code?: string | null; message?: string | null }): { status: number; code: string } {
+  if (error.code === "42501") return { status: 403, code: "ACCESS_DENIED" };
+  if (error.code !== "22023") return { status: 500, code: "BOOKING_STATUS_UPDATE_FAILED" };
+  const message = error.message ?? "";
+  const known: Record<string, { status: number; code: string }> = {
+    booking_not_found: { status: 404, code: "BOOKING_NOT_FOUND" },
+    prepayment_required: { status: 409, code: "PREPAYMENT_REQUIRED" },
+    check_in_too_early: { status: 409, code: "CHECK_IN_TOO_EARLY" },
+    room_not_ready_for_check_in: { status: 409, code: "ROOM_NOT_READY_FOR_CHECK_IN" },
+    booking_room_missing: { status: 409, code: "BOOKING_ROOM_MISSING" },
+    transition_not_allowed: { status: 409, code: "TRANSITION_NOT_ALLOWED" },
+    invalid_terminal_status: { status: 400, code: "INVALID_STATUS_TARGET" },
+    cancellation_reason_required: { status: 400, code: "CANCELLATION_REASON_REQUIRED" },
+    no_show_too_early: { status: 409, code: "NO_SHOW_TOO_EARLY" },
+    reason_too_long: { status: 400, code: "INVALID_REASON" },
+  };
+  return known[message] ?? { status: 400, code: "INVALID_STATUS_CHANGE" };
+}
+
 export async function POST(request: NextRequest) {
   const staff = await getCurrentStaff();
   if (!hasAnyRole(staff, [...MANAGER_ROLES])) {
@@ -157,4 +178,56 @@ export async function POST(request: NextRequest) {
     },
     { status: 201 },
   );
+}
+
+export async function PATCH(request: NextRequest) {
+  const staff = await getCurrentStaff();
+  if (!hasAnyRole(staff, [...MANAGER_ROLES])) {
+    return NextResponse.json({ ok: false, code: "ACCESS_DENIED" }, { status: 403 });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, code: "INVALID_JSON" }, { status: 400 });
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return NextResponse.json({ ok: false, code: "INVALID_STATUS_CHANGE" }, { status: 400 });
+  }
+
+  const input = raw as Record<string, unknown>;
+  const bookingId = typeof input.bookingId === "string" ? input.bookingId.trim() : "";
+  const targetStatus = typeof input.targetStatus === "string" ? input.targetStatus.trim() : "";
+  const note = typeof input.note === "string" ? input.note.trim() : "";
+  if (!isUuid(bookingId) || !STATUS_TARGETS.has(targetStatus) || note.length > 1000) {
+    return NextResponse.json({ ok: false, code: "INVALID_STATUS_CHANGE" }, { status: 400 });
+  }
+  if (targetStatus === "cancelled" && !note) {
+    return NextResponse.json({ ok: false, code: "CANCELLATION_REASON_REQUIRED" }, { status: 400 });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, code: "AUTH_CONFIGURATION" }, { status: 503 });
+  }
+
+  const { data, error } = TERMINAL_TARGETS.has(targetStatus)
+    ? await supabase.rpc("fn_terminate_booking", {
+        p_booking_id: bookingId,
+        p_new_status: targetStatus,
+        p_reason: note || null,
+      })
+    : await supabase.rpc("fn_advance_booking_status", {
+        p_booking_id: bookingId,
+        p_new_status: targetStatus,
+        p_note: note || null,
+      });
+
+  if (error) {
+    const safe = statusError(error);
+    return NextResponse.json({ ok: false, code: safe.code }, { status: safe.status });
+  }
+
+  return NextResponse.json({ ok: true, status: data ?? targetStatus });
 }
