@@ -16,6 +16,7 @@ import {
   availabilityHoldRpcHttpStatus,
   createAvailabilityHoldRpc,
 } from "@/lib/supabase-admin";
+import type { AvailabilityHoldRpcClient } from "@/lib/supabase-admin";
 import { getSupabasePublicClient } from "@/lib/supabase/public-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type {
@@ -247,7 +248,7 @@ export async function POST(request: Request) {
           leadId: null,
           idempotencyKey: body.idempotencyKey.trim(),
         },
-        serverClient
+        serverClient as unknown as AvailabilityHoldRpcClient
       );
       const { idempotency_key, ...publicHold } = hold;
       void idempotency_key;
