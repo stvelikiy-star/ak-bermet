@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Lead } from "@/types/lead";
-import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { getSupabasePublicClient } from "@/lib/supabase/public-client";
 
 export interface PersistedPublicLead {
   id: string;
@@ -14,90 +14,44 @@ export class PublicLeadPersistenceError extends Error {
   }
 }
 
-function preserveUnresolvedRoomCategory(lead: Lead): string | null {
-  const message = lead.message?.trim() ?? "";
-  if (!lead.roomCategory) return message || null;
-
-  const categoryNote = `Категория номера: ${lead.roomCategory}`;
-  return message ? `${categoryNote}\n${message}` : categoryNote;
-}
-
-async function resolveRoomCategoryId(
-  client: SupabaseClient,
-  lead: Lead,
-): Promise<{ roomCategoryId: string | null; message: string | null }> {
-  if (!lead.roomCategory) {
-    return { roomCategoryId: null, message: lead.message?.trim() || null };
-  }
-
-  const { data, error } = await client
-    .from("room_categories")
-    .select("id")
-    .eq("name", lead.roomCategory)
-    .is("deleted_at", null)
-    .limit(2);
-
-  if (!error && data?.length === 1 && typeof data[0]?.id === "string") {
-    return {
-      roomCategoryId: data[0].id,
-      message: lead.message?.trim() || null,
-    };
-  }
-
-  // A lead must never be lost only because category reference data drifted.
-  // Preserve the user's exact choice in the free-text field for the manager.
-  return {
-    roomCategoryId: null,
-    message: preserveUnresolvedRoomCategory(lead),
-  };
-}
-
 export async function persistPublicLead(
   lead: Lead,
-  client: SupabaseClient = getSupabaseAdminClient(),
+  client: SupabaseClient = getSupabasePublicClient(),
 ): Promise<PersistedPublicLead> {
-  const { roomCategoryId, message } = await resolveRoomCategoryId(client, lead);
+  // The RPC owns the allowlist, forces status=new, resolves room categories
+  // server-side and cannot set staff ownership/customer/booking/audit fields.
+  const { data, error } = await client.rpc("fn_public_create_lead", {
+    p_source: lead.source,
+    p_interest: lead.interest,
+    p_name: lead.name,
+    p_phone: lead.phone,
+    p_check_in: lead.checkIn ?? null,
+    p_check_out: lead.checkOut ?? null,
+    p_adults: lead.adults ?? null,
+    p_children: lead.children ?? null,
+    p_children_ages: lead.childrenAges ?? null,
+    p_room_category_name: lead.roomCategory ?? null,
+    p_wants_double_bed: lead.wantsDoubleBed ?? null,
+    p_needs_extra_bed: lead.needsExtraBed ?? null,
+    p_needs_wifi: lead.needsWifi ?? null,
+    p_needs_lower_floor: lead.needsLowerFloor ?? null,
+    p_event_type: lead.eventType ?? null,
+    p_guests_count: lead.guestsCount ?? null,
+    p_hall_size: lead.hallSize ?? null,
+    p_spa_service: lead.spaService ?? null,
+    p_message: lead.message?.trim() || null,
+    p_preferred_contact: lead.preferredContact ?? null,
+  });
 
-  // Explicit allowlist: public input cannot set staff ownership, booking links,
-  // customer identity, audit fields, or database-generated identifiers.
-  const payload = {
-    source: lead.source,
-    interest: lead.interest,
-    status: lead.status,
-    name: lead.name,
-    phone: lead.phone,
-    check_in: lead.checkIn ?? null,
-    check_out: lead.checkOut ?? null,
-    adults: lead.adults ?? null,
-    children: lead.children ?? null,
-    children_ages: lead.childrenAges ?? null,
-    room_category_id: roomCategoryId,
-    wants_double_bed: lead.wantsDoubleBed ?? null,
-    needs_extra_bed: lead.needsExtraBed ?? null,
-    needs_wifi: lead.needsWifi ?? null,
-    needs_lower_floor: lead.needsLowerFloor ?? null,
-    event_type: lead.eventType ?? null,
-    guests_count: lead.guestsCount ?? null,
-    hall_size: lead.hallSize ?? null,
-    spa_service: lead.spaService ?? null,
-    message,
-    preferred_contact: lead.preferredContact ?? null,
-  };
-
-  const { data, error } = await client
-    .from("leads")
-    .insert(payload)
-    .select("id, lead_number")
-    .single();
-
+  const row = Array.isArray(data) ? data[0] : data;
   if (
     error ||
-    !data ||
-    typeof data.id !== "string" ||
-    typeof data.lead_number !== "string"
+    !row ||
+    typeof row.lead_id !== "string" ||
+    typeof row.lead_number !== "string"
   ) {
     throw new PublicLeadPersistenceError();
   }
 
-  return { id: data.id, leadNumber: data.lead_number };
+  return { id: row.lead_id, leadNumber: row.lead_number };
 }
