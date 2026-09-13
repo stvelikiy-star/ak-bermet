@@ -84,6 +84,9 @@ jobs:
       - name: Supabase SECURITY DEFINER privilege contract
         run: npm run test:supabase-security-contract
 
+      - name: Web runtime publishable RPC contract
+        run: node --test supabase/migrations/web-runtime-publishable-rpc.contract.test.mjs
+
       - name: Manual booking transaction contract
         run: npm run test:manual-booking
 
