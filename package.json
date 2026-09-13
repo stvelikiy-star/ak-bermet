@@ -19,6 +19,7 @@
     "test:supabase-security-contract": "node --test supabase/migrations/security-definer-execute.contract.test.mjs",
     "test:manual-booking": "node --test supabase/migrations/manual-booking-transaction.contract.test.mjs src/app/api/manager/bookings/route.contract.test.mjs",
     "test:manual-payments": "node --test supabase/migrations/manual-payment-ledger.contract.test.mjs",
+    "test:guest-booking-qr": "node --test supabase/migrations/guest-booking-qr-lifecycle.contract.test.mjs",
     "test:site-content-cms": "node --test supabase/migrations/site-content-cms.contract.test.mjs",
     "test:manager-live-data": "node --test src/app/manager/manager-live-data.contract.test.mjs src/app/manager/manager-leads-authority.contract.test.mjs",
     "test:staff-auth-provisioner": "node --test scripts/staff-auth-provisioner.contract.test.mjs",
@@ -55,7 +56,7 @@
   "devDependencies": {
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@types/react-dom": "^18.3.3",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-config-next": "15.5.25",
