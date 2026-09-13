@@ -1,6 +1,6 @@
 -- AK BERMET web-runtime hardening.
--- Normal website/CRM requests must work with the publishable key + RLS/RPC.
--- The service role remains reserved for controlled background/maintenance jobs.
+-- Normal website/CRM requests use the public project key plus RLS/RPC.
+-- No service-role credential is required by normal request handlers.
 
 create or replace function public.fn_public_availability(
   p_check_in date,
@@ -66,7 +66,7 @@ as $$
 $$;
 
 revoke all on function public.fn_public_availability(date, date, integer, text) from public, anon, authenticated;
-grant execute on function public.fn_public_availability(date, date, integer, text) to anon, authenticated, service_role;
+grant execute on function public.fn_public_availability(date, date, integer, text) to anon, authenticated;
 
 create or replace function public.fn_public_create_lead(
   p_source public.lead_source,
@@ -100,10 +100,11 @@ declare
   v_category_count integer := 0;
   v_message text := nullif(btrim(p_message), '');
 begin
-  if length(btrim(coalesce(p_name, ''))) < 2 or length(p_name) > 120 then
+  if length(btrim(coalesce(p_name, ''))) < 2 or length(coalesce(p_name, '')) > 120 then
     raise exception using errcode = '22023', message = 'INVALID_NAME';
   end if;
-  if length(coalesce(p_phone, '')) > 40 or length(regexp_replace(coalesce(p_phone, ''), '[^0-9]', '', 'g')) not between 9 and 20 then
+  if length(coalesce(p_phone, '')) > 40
+     or length(regexp_replace(coalesce(p_phone, ''), '[^0-9]', '', 'g')) not between 9 and 20 then
     raise exception using errcode = '22023', message = 'INVALID_PHONE';
   end if;
   if p_check_in is not null and p_check_out is not null and p_check_out <= p_check_in then
@@ -127,21 +128,33 @@ begin
     raise exception using errcode = '22023', message = 'INPUT_TOO_LONG';
   end if;
 
+  -- Anonymous website submissions must not masquerade as staff/manual leads.
+  if auth.uid() is null and p_source = 'manual'::public.lead_source then
+    raise exception using errcode = '22023', message = 'INVALID_PUBLIC_SOURCE';
+  end if;
+
   if nullif(btrim(p_room_category_name), '') is not null then
-    select count(*), min(rc.id)
-      into v_category_count, v_category_id
+    select count(*)
+      into v_category_count
     from public.room_categories rc
     where rc.deleted_at is null
       and lower(rc.name) = lower(btrim(p_room_category_name));
 
-    if v_category_count <> 1 then
+    if v_category_count = 1 then
+      select rc.id
+        into v_category_id
+      from public.room_categories rc
+      where rc.deleted_at is null
+        and lower(rc.name) = lower(btrim(p_room_category_name))
+      limit 1;
+    else
       v_category_id := null;
       v_message := concat_ws(E'\n', 'Категория номера: ' || btrim(p_room_category_name), v_message);
     end if;
   end if;
 
   return query
-  insert into public.leads(
+  insert into public.leads as l(
     source, interest, status, name, phone,
     check_in, check_out, adults, children, children_ages,
     room_category_id, wants_double_bed, needs_extra_bed, needs_wifi, needs_lower_floor,
@@ -153,12 +166,12 @@ begin
     nullif(btrim(p_event_type), ''), p_guests_count, nullif(btrim(p_hall_size), ''),
     nullif(btrim(p_spa_service), ''), v_message, p_preferred_contact
   )
-  returning leads.id, leads.lead_number;
+  returning l.id, l.lead_number;
 end;
 $$;
 
 revoke all on function public.fn_public_create_lead(public.lead_source, public.lead_interest, text, text, date, date, integer, integer, text, text, boolean, boolean, boolean, boolean, text, integer, text, text, text, public.preferred_contact) from public, anon, authenticated;
-grant execute on function public.fn_public_create_lead(public.lead_source, public.lead_interest, text, text, date, date, integer, integer, text, text, boolean, boolean, boolean, boolean, text, integer, text, text, text, public.preferred_contact) to anon, authenticated, service_role;
+grant execute on function public.fn_public_create_lead(public.lead_source, public.lead_interest, text, text, date, date, integer, integer, text, text, boolean, boolean, boolean, boolean, text, integer, text, text, text, public.preferred_contact) to anon, authenticated;
 
 create or replace function public.fn_public_guest_room_context(p_token_hash text)
 returns table(
@@ -208,7 +221,7 @@ as $$
 $$;
 
 revoke all on function public.fn_public_guest_room_context(text) from public, anon, authenticated;
-grant execute on function public.fn_public_guest_room_context(text) to anon, authenticated, service_role;
+grant execute on function public.fn_public_guest_room_context(text) to anon, authenticated;
 
 create or replace function public.fn_public_create_guest_request(
   p_token_hash text,
@@ -234,7 +247,8 @@ begin
   if p_token_hash !~ '^[0-9a-f]{64}$' then
     raise exception using errcode = '22023', message = 'INVALID_TOKEN';
   end if;
-  if p_request_type is null or p_request_type <> all(array['housekeeping','towels','water','maintenance','restaurant','other']) then
+  if p_request_type is null
+     or not (p_request_type = any(array['housekeeping','towels','water','maintenance','restaurant','other']::text[])) then
     raise exception using errcode = '22023', message = 'INVALID_REQUEST_TYPE';
   end if;
   if length(coalesce(p_message, '')) > 2000 then
@@ -260,21 +274,17 @@ begin
   end if;
 
   return query
-  insert into public.guest_service_requests(
+  insert into public.guest_service_requests as g(
     guest_room_access_token_id, booking_id, room_unit_id, request_type, message
   ) values (
     v_token_id, v_booking_id, v_room_unit_id, p_request_type, nullif(btrim(p_message), '')
   )
-  returning guest_service_requests.id,
-            guest_service_requests.booking_id,
-            guest_service_requests.request_type,
-            guest_service_requests.status,
-            guest_service_requests.created_at;
+  returning g.id, g.booking_id, g.request_type, g.status, g.created_at;
 end;
 $$;
 
 revoke all on function public.fn_public_create_guest_request(text, text, text) from public, anon, authenticated;
-grant execute on function public.fn_public_create_guest_request(text, text, text) to anon, authenticated, service_role;
+grant execute on function public.fn_public_create_guest_request(text, text, text) to anon, authenticated;
 
 create or replace function public.fn_manager_rotate_guest_room_access_token(
   p_booking_id uuid,
@@ -313,7 +323,8 @@ begin
     raise exception using errcode = '22023', message = 'INVALID_LABEL';
   end if;
 
-  select b.check_out into v_check_out
+  select b.check_out
+    into v_check_out
   from public.bookings b
   where b.id = p_booking_id
     and b.deleted_at is null
@@ -329,7 +340,8 @@ begin
     raise exception using errcode = '22023', message = 'BOOKING_ROOM_MISMATCH';
   end if;
 
-  v_expires_at := (v_check_out + time '13:00') at time zone 'Asia/Bishkek';
+  -- Guest access never outlives the official 11:00 checkout boundary.
+  v_expires_at := (v_check_out + time '11:00') at time zone 'Asia/Bishkek';
   if v_expires_at <= now() then
     raise exception using errcode = '22023', message = 'BOOKING_EXPIRED';
   end if;
@@ -341,22 +353,17 @@ begin
      and t.revoked_at is null;
 
   return query
-  insert into public.guest_room_access_tokens(
+  insert into public.guest_room_access_tokens as t(
     booking_id, room_unit_id, token_hash, label, expires_at, created_by
   ) values (
     p_booking_id, p_room_unit_id, p_token_hash, btrim(p_label), v_expires_at, v_user_id
   )
-  returning guest_room_access_tokens.id,
-            guest_room_access_tokens.booking_id,
-            guest_room_access_tokens.room_unit_id,
-            guest_room_access_tokens.label,
-            guest_room_access_tokens.expires_at,
-            guest_room_access_tokens.created_at;
+  returning t.id, t.booking_id, t.room_unit_id, t.label, t.expires_at, t.created_at;
 end;
 $$;
 
 revoke all on function public.fn_manager_rotate_guest_room_access_token(uuid, uuid, text, text) from public, anon, authenticated;
-grant execute on function public.fn_manager_rotate_guest_room_access_token(uuid, uuid, text, text) to authenticated, service_role;
+grant execute on function public.fn_manager_rotate_guest_room_access_token(uuid, uuid, text, text) to authenticated;
 
 create or replace function public.fn_manager_revoke_guest_room_access_token(p_token_id uuid)
 returns boolean
@@ -381,7 +388,7 @@ end;
 $$;
 
 revoke all on function public.fn_manager_revoke_guest_room_access_token(uuid) from public, anon, authenticated;
-grant execute on function public.fn_manager_revoke_guest_room_access_token(uuid) to authenticated, service_role;
+grant execute on function public.fn_manager_revoke_guest_room_access_token(uuid) to authenticated;
 
 create or replace function public.fn_manager_update_lead(
   p_lead_id uuid,
@@ -423,4 +430,4 @@ end;
 $$;
 
 revoke all on function public.fn_manager_update_lead(uuid, public.lead_status, text, timestamptz) from public, anon, authenticated;
-grant execute on function public.fn_manager_update_lead(uuid, public.lead_status, text, timestamptz) to authenticated, service_role;
+grant execute on function public.fn_manager_update_lead(uuid, public.lead_status, text, timestamptz) to authenticated;
