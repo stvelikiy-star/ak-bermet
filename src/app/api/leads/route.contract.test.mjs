@@ -10,6 +10,19 @@ const persistenceSource = readFileSync(
   new URL("../../../lib/public-lead-persistence.ts", import.meta.url),
   "utf8",
 );
+const rpcMigrationSource = readFileSync(
+  new URL("../../../../supabase/migrations/20260913073000_remove_web_service_role_dependency.sql", import.meta.url),
+  "utf8",
+);
+const leadRpcStart = rpcMigrationSource.indexOf(
+  "create or replace function public.fn_public_create_lead",
+);
+const leadRpcEnd = rpcMigrationSource.indexOf(
+  "revoke all on function public.fn_public_create_lead",
+  leadRpcStart,
+);
+assert.ok(leadRpcStart >= 0 && leadRpcEnd > leadRpcStart);
+const leadRpcSource = rpcMigrationSource.slice(leadRpcStart, leadRpcEnd);
 
 test("lead API reports success only after authoritative Supabase persistence", () => {
   const persistIndex = routeSource.indexOf("await persistPublicLead(lead)");
@@ -37,19 +50,28 @@ test("lead persistence errors are not serialized into logs", () => {
   assert.doesNotMatch(routeSource, /console\.warn/);
 });
 
-test("public Supabase lead insert uses an explicit safe field allowlist", () => {
-  assert.match(persistenceSource, /\.from\("leads"\)/);
-  assert.match(persistenceSource, /\.insert\(payload\)/);
-  assert.match(persistenceSource, /\.select\("id, lead_number"\)/);
-  assert.match(persistenceSource, /\.single\(\)/);
-  assert.match(persistenceSource, /room_category_id:\s*roomCategoryId/);
-  assert.doesNotMatch(persistenceSource, /assigned_manager_id\s*:/);
-  assert.doesNotMatch(persistenceSource, /booking_id\s*:/);
-  assert.doesNotMatch(persistenceSource, /id:\s*lead\.id/);
+test("public lead persistence uses the narrow RPC instead of direct table insert", () => {
+  assert.match(persistenceSource, /\.rpc\("fn_public_create_lead"/);
+  assert.match(persistenceSource, /p_source:\s*lead\.source/);
+  assert.match(persistenceSource, /p_interest:\s*lead\.interest/);
+  assert.match(persistenceSource, /p_name:\s*lead\.name/);
+  assert.match(persistenceSource, /p_phone:\s*lead\.phone/);
+  assert.doesNotMatch(persistenceSource, /\.from\("leads"\)/);
+  assert.doesNotMatch(persistenceSource, /getSupabaseAdminClient/);
 });
 
-test("unresolved room category is preserved instead of losing the lead", () => {
-  assert.match(persistenceSource, /Категория номера:/);
-  assert.match(persistenceSource, /roomCategoryId:\s*null/);
-  assert.match(persistenceSource, /preserveUnresolvedRoomCategory\(lead\)/);
+test("lead RPC owns the safe allowlist and forces new status", () => {
+  assert.match(leadRpcSource, /insert into public\.leads as l\(/);
+  assert.match(leadRpcSource, /source, interest, status, name, phone,/);
+  assert.match(leadRpcSource, /p_source, p_interest, 'new', btrim\(p_name\), btrim\(p_phone\)/);
+  assert.doesNotMatch(leadRpcSource, /assigned_manager_id\s*,/);
+  assert.doesNotMatch(leadRpcSource, /booking_id\s*,/);
+  assert.doesNotMatch(leadRpcSource, /customer_id\s*,/);
+});
+
+test("unresolved room category is preserved by the RPC instead of losing the lead", () => {
+  assert.match(leadRpcSource, /Категория номера:/);
+  assert.match(leadRpcSource, /v_category_id := null/);
+  assert.match(leadRpcSource, /v_message := concat_ws/);
+  assert.match(leadRpcSource, /p_room_category_name/);
 });

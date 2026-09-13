@@ -1,24 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  getSupabasePublicConfig,
+  isSupabasePublicConfigAvailable,
+} from "@/lib/supabase/public-config";
 
-// Клиент Supabase Auth для middleware — обновляет access-токен по
-// refresh-токену из cookie и прокидывает Set-Cookie в ответ, чтобы
-// Server Components на следующем рендере видели свежую сессию.
-// Возвращает supabase=null, если переменные окружения не заданы —
-// вызывающий код (middleware.ts) обязан обработать это как «Supabase
-// Auth недоступен», не как ошибку.
+// Middleware Supabase Auth client. The publishable key is public; authorization
+// remains enforced by Auth + RLS/RPC policies.
 export function createSupabaseMiddlewareClient(request: NextRequest): {
   supabase: SupabaseClient | null;
   response: NextResponse;
 } {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) {
+  if (!isSupabasePublicConfigAvailable()) {
     return { supabase: null, response };
   }
+  const { url, key } = getSupabasePublicConfig();
 
   const supabase = createServerClient(url, key, {
     cookies: {

@@ -7,6 +7,7 @@ const read = (path) => readFileSync(resolve(path), "utf8");
 
 const lifecycle = read("supabase/migrations/20260913055407_guest_booking_qr_lifecycle.sql");
 const uniqueness = read("supabase/migrations/20260913055623_guest_booking_room_qr_uniqueness.sql");
+const hardening = read("supabase/migrations/20260913073000_remove_web_service_role_dependency.sql");
 const managerRoute = read("src/app/api/manager/guest-qr/route.ts");
 const guestLookup = read("src/lib/guest-qr.ts");
 const guestRequests = read("src/app/api/guest/requests/route.ts");
@@ -35,21 +36,55 @@ test("terminal booking statuses automatically revoke active QR tokens", () => {
   assert.match(lifecycle, /where booking_id = new\.id[\s\S]*revoked_at is null/i);
 });
 
-test("manager QR endpoint is booking-aware and fail-closed", () => {
-  assert.match(managerRoute, /GUEST_ACTIVE_BOOKING_STATUSES = new Set\(\["confirmed", "checked_in"\]\)/);
+test("manager QR endpoint uses authenticated RPC and database-enforced booking safety", () => {
+  assert.match(managerRoute, /createSupabaseServerClient/);
+  assert.match(managerRoute, /fn_manager_rotate_guest_room_access_token/);
+  assert.match(managerRoute, /p_booking_id:\s*bookingId/);
+  assert.match(managerRoute, /p_room_unit_id:\s*roomUnitId/);
   assert.match(managerRoute, /BOOKING_NOT_GUEST_ACTIVE/);
   assert.match(managerRoute, /BOOKING_EXPIRED/);
   assert.match(managerRoute, /BOOKING_ROOM_MISMATCH/);
-  assert.match(managerRoute, /\.eq\("booking_id", bookingId\)[\s\S]*\.eq\("room_unit_id", roomUnitId\)/);
-  assert.match(managerRoute, /booking_id: bookingId/);
-  assert.match(managerRoute, /expires_at: expiresAt\.toISOString\(\)/);
+  assert.doesNotMatch(managerRoute, /getSupabaseAdminClient|SUPABASE_SERVICE_ROLE_KEY/);
+
+  const start = hardening.indexOf("create or replace function public.fn_manager_rotate_guest_room_access_token");
+  const end = hardening.indexOf("revoke all on function public.fn_manager_rotate_guest_room_access_token", start);
+  assert.ok(start >= 0 && end > start);
+  const rotateRpc = hardening.slice(start, end);
+  assert.match(rotateRpc, /b\.status in \('confirmed', 'checked_in'\)/);
+  assert.match(rotateRpc, /where br\.booking_id = p_booking_id and br\.room_unit_id = p_room_unit_id/);
+  assert.match(rotateRpc, /BOOKING_NOT_GUEST_ACTIVE/);
+  assert.match(rotateRpc, /BOOKING_ROOM_MISMATCH/);
+  assert.match(rotateRpc, /BOOKING_EXPIRED/);
+  assert.match(rotateRpc, /time '11:00'/);
 });
 
-test("guest token lookup requires an active booking and guest requests preserve booking identity", () => {
-  assert.match(guestLookup, /if \(error \|\| !data \|\| !data\.booking_id\) return null/);
-  assert.match(guestLookup, /\.in\("status", \["confirmed", "checked_in"\]\)/);
-  assert.match(guestLookup, /bookingId: data\.booking_id/);
-  assert.match(guestRequests, /booking_id: guest\.bookingId/);
+test("guest token lookup and guest request use public RPCs that preserve booking-room identity", () => {
+  assert.match(guestLookup, /fn_public_guest_room_context/);
+  assert.match(guestLookup, /p_token_hash:\s*hashGuestToken\(token\)/);
+  assert.match(guestLookup, /bookingId:\s*row\.booking_id/);
+  assert.doesNotMatch(guestLookup, /getSupabaseAdminClient|SUPABASE_SERVICE_ROLE_KEY/);
+
+  assert.match(guestRequests, /fn_public_create_guest_request/);
+  assert.match(guestRequests, /p_token_hash:\s*hashGuestToken\(token\)/);
+  assert.match(guestRequests, /booking_id:\s*row\.booking_id/);
+  assert.match(guestRequests, /INVALID_OR_EXPIRED_QR/);
+  assert.doesNotMatch(guestRequests, /getSupabaseAdminClient|SUPABASE_SERVICE_ROLE_KEY/);
+
+  const contextStart = hardening.indexOf("create or replace function public.fn_public_guest_room_context");
+  const contextEnd = hardening.indexOf("revoke all on function public.fn_public_guest_room_context", contextStart);
+  const requestStart = hardening.indexOf("create or replace function public.fn_public_create_guest_request");
+  const requestEnd = hardening.indexOf("revoke all on function public.fn_public_create_guest_request", requestStart);
+  assert.ok(contextStart >= 0 && contextEnd > contextStart);
+  assert.ok(requestStart >= 0 && requestEnd > requestStart);
+  const contextRpc = hardening.slice(contextStart, contextEnd);
+  const requestRpc = hardening.slice(requestStart, requestEnd);
+  for (const rpc of [contextRpc, requestRpc]) {
+    assert.match(rpc, /b\.status in \('confirmed', 'checked_in'\)/);
+    assert.match(rpc, /booking_rooms/);
+    assert.match(rpc, /room_unit_id/);
+  }
+  assert.match(requestRpc, /insert into public\.guest_service_requests as g/);
+  assert.match(requestRpc, /v_booking_id, v_room_unit_id/);
 });
 
 test("manager UI creates and indexes QR by booking-room pair", () => {
