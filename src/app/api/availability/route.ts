@@ -5,6 +5,7 @@ import {
   filterRooms,
   createHold,
   listActiveHolds,
+  parseDateRange,
   parseGuests,
   AvailabilityError,
   AVAILABILITY_MESSAGE,
@@ -14,9 +15,12 @@ import {
   AvailabilityHoldRpcError,
   availabilityHoldRpcHttpStatus,
   createAvailabilityHoldRpc,
-  loadAuthoritativeAvailability,
 } from "@/lib/supabase-admin";
+import type { AvailabilityHoldRpcClient } from "@/lib/supabase-admin";
+import { getSupabasePublicClient } from "@/lib/supabase/public-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type {
+  AvailabilityItem,
   AvailabilityQuery,
   AvailabilityErrorCode,
   CreateHoldRequest,
@@ -25,6 +29,16 @@ import type {
 export const runtime = "nodejs";
 
 const HOLD_CREATOR_ROLES = ["owner", "administrator", "manager"] as const;
+
+type PublicAvailabilityRpcRow = {
+  category: string;
+  building: string;
+  capacity: number;
+  view: string | null;
+  has_wifi: boolean | null;
+  repair_level: string | null;
+  preliminary: boolean;
+};
 
 function availabilityHoldRpcErrorResponse(code: string | undefined): {
   status: number;
@@ -63,104 +77,99 @@ function errorStatus(code: AvailabilityErrorCode): number {
   }
 }
 
-// Mock availability is allowed only when explicitly selected in a local
-// development/test runtime. Any non-mock runtime uses Supabase authority.
 function isExplicitLocalMockAvailabilityAllowed(): boolean {
   const localRuntime =
     process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
   return localRuntime && process.env.AVAILABILITY_SOURCE === "mock";
 }
 
-// Production/non-mock availability is derived only from authoritative
-// Supabase room_units + occupancy_periods, with active durable holds verified
-// against their expiry. Any authority read failure fails closed.
-async function loadRoomsAndOccupancy(): Promise<{
-  rooms: typeof mockRooms;
-  occupancy: typeof mockOccupancy;
-  source: "supabase" | "mock";
-}> {
-  if (isExplicitLocalMockAvailabilityAllowed()) {
-    return { rooms: mockRooms, occupancy: mockOccupancy, source: "mock" };
-  }
-
-  try {
-    const { rooms, occupancy } = await loadAuthoritativeAvailability();
-    return { rooms, occupancy, source: "supabase" };
-  } catch {
-    console.error("[AVAILABILITY] Authoritative Supabase read failed");
-    throw new AvailabilityError(
-      "availability_unknown",
-      "Не удалось проверить доступность номеров. Повторите запрос позже."
-    );
-  }
+function availabilityErrorResponse(error: AvailabilityError) {
+  return NextResponse.json(
+    { ok: false, code: error.code, message: error.message },
+    { status: errorStatus(error.code) }
+  );
 }
 
-// Предварительная проверка наличия. Финальное наличие всегда подтверждает
-// администратор — отдаём только осторожные варианты, без статусов «свободно».
+// Public production availability is exposed by a narrow SECURITY DEFINER RPC.
+// The publishable key is safe to ship and cannot bypass the RPC/table ACLs.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   let guests: number | undefined;
-  try {
-    guests = parseGuests(searchParams.get("guests"));
-  } catch (error) {
-    if (error instanceof AvailabilityError) {
-      return NextResponse.json(
-        { ok: false, code: error.code, message: error.message },
-        { status: errorStatus(error.code) }
-      );
-    }
-    throw error;
-  }
-
   const query: AvailabilityQuery = {
     checkIn: searchParams.get("checkIn") ?? undefined,
     checkOut: searchParams.get("checkOut") ?? undefined,
-    guests,
     category: searchParams.get("category") ?? undefined,
   };
 
-  let rooms, occupancy, source;
   try {
-    ({ rooms, occupancy, source } = await loadRoomsAndOccupancy());
+    guests = parseGuests(searchParams.get("guests"));
+    query.guests = guests;
+    parseDateRange(query.checkIn, query.checkOut);
   } catch (error) {
-    if (error instanceof AvailabilityError) {
-      return NextResponse.json(
-        { ok: false, code: error.code, message: error.message },
-        { status: errorStatus(error.code) }
-      );
-    }
+    if (error instanceof AvailabilityError) return availabilityErrorResponse(error);
     throw error;
   }
-  // Process-local holds belong exclusively to the explicit mock source.
-  // Production occupancy already includes active durable Supabase holds.
-  const allOccupancy =
-    source === "mock" ? [...occupancy, ...listActiveHolds()] : occupancy;
 
-  let items;
-  try {
-    items = filterRooms(rooms, query, allOccupancy);
-  } catch (error) {
-    if (error instanceof AvailabilityError) {
-      return NextResponse.json(
-        { ok: false, code: error.code, message: error.message },
-        { status: errorStatus(error.code) }
-      );
+  if (isExplicitLocalMockAvailabilityAllowed()) {
+    const allOccupancy = [...mockOccupancy, ...listActiveHolds()];
+    try {
+      const items = filterRooms(mockRooms, query, allOccupancy);
+      return NextResponse.json({
+        ok: true,
+        message: AVAILABILITY_MESSAGE,
+        query,
+        items,
+        source: "mock",
+      });
+    } catch (error) {
+      if (error instanceof AvailabilityError) return availabilityErrorResponse(error);
+      throw error;
     }
-    throw error;
   }
+
+  const publicClient = getSupabasePublicClient();
+  const { data, error } = await publicClient.rpc("fn_public_availability", {
+    p_check_in: query.checkIn ?? null,
+    p_check_out: query.checkOut ?? null,
+    p_guests: guests ?? 1,
+    p_category: query.category?.trim() || null,
+  });
+
+  if (error || !data) {
+    console.error("[AVAILABILITY] Public Supabase RPC failed", error?.code ?? "unknown");
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "availability_unknown",
+        message: "Не удалось проверить доступность номеров. Повторите запрос позже.",
+      },
+      { status: 503 }
+    );
+  }
+
+  const items: AvailabilityItem[] = (data as PublicAvailabilityRpcRow[]).map((row) => ({
+    category: row.category,
+    building: row.building,
+    capacity: row.capacity,
+    view: row.view ?? undefined,
+    hasWifi: row.has_wifi ?? undefined,
+    repairLevel: row.repair_level ?? undefined,
+    preliminary: true,
+  }));
 
   return NextResponse.json({
     ok: true,
     message: AVAILABILITY_MESSAGE,
     query,
     items,
-    source,
+    source: "supabase",
   });
 }
 
-// Production создаёт hold атомарно в БД; process-local store остаётся
-// только для явного mock/test source.
+// Production creates a hold through the existing authenticated RPC. The RPC
+// receives the real staff JWT via the cookie-bound server client; service-role
+// bypass is intentionally not used.
 export async function POST(request: Request) {
   let body: Partial<CreateHoldRequest>;
   try {
@@ -180,17 +189,10 @@ export async function POST(request: Request) {
   }
   if (!body.checkIn || !body.checkOut) {
     return NextResponse.json(
-      {
-        ok: false,
-        code: "invalid_date_range",
-        message: "Нужно указать даты заезда и выезда.",
-      },
+      { ok: false, code: "invalid_date_range", message: "Нужно указать даты заезда и выезда." },
       { status: 400 }
     );
   }
-  // Ключ идемпотентности обязателен: без него повторный запрос (retry
-  // после таймаута, двойной клик) создаёт отдельное удержание вместо
-  // возврата уже созданного (см. Codex-аудит).
   if (
     typeof body.idempotencyKey !== "string" ||
     body.idempotencyKey.trim().length === 0 ||
@@ -206,20 +208,14 @@ export async function POST(request: Request) {
     );
   }
 
-  let rooms, occupancy, source;
   try {
-    ({ rooms, occupancy, source } = await loadRoomsAndOccupancy());
+    parseDateRange(body.checkIn, body.checkOut);
   } catch (error) {
-    if (error instanceof AvailabilityError) {
-      return NextResponse.json(
-        { ok: false, code: error.code, message: error.message },
-        { status: errorStatus(error.code) }
-      );
-    }
+    if (error instanceof AvailabilityError) return availabilityErrorResponse(error);
     throw error;
   }
 
-  if (source === "supabase") {
+  if (!isExplicitLocalMockAvailabilityAllowed()) {
     const staff = await getCurrentStaff();
     if (!staff) {
       return NextResponse.json(
@@ -234,15 +230,26 @@ export async function POST(request: Request) {
       );
     }
 
+    const serverClient = await createSupabaseServerClient();
+    if (!serverClient) {
+      return NextResponse.json(
+        { ok: false, code: "availability_unknown", message: "Сервис временно недоступен." },
+        { status: 503 }
+      );
+    }
+
     try {
-      const hold = await createAvailabilityHoldRpc({
-        roomUnitId: body.roomId,
-        checkIn: body.checkIn,
-        checkOut: body.checkOut,
-        heldBy: staff.userId,
-        leadId: null,
-        idempotencyKey: body.idempotencyKey.trim(),
-      });
+      const hold = await createAvailabilityHoldRpc(
+        {
+          roomUnitId: body.roomId,
+          checkIn: body.checkIn,
+          checkOut: body.checkOut,
+          heldBy: staff.userId,
+          leadId: null,
+          idempotencyKey: body.idempotencyKey.trim(),
+        },
+        serverClient as unknown as AvailabilityHoldRpcClient
+      );
       const { idempotency_key, ...publicHold } = hold;
       void idempotency_key;
       return NextResponse.json({ ok: true, hold: publicHold }, { status: 201 });
@@ -268,19 +275,14 @@ export async function POST(request: Request) {
         guestPhone: body.guestPhone,
         idempotencyKey: body.idempotencyKey.trim(),
       },
-      rooms,
-      occupancy
+      mockRooms,
+      mockOccupancy
     );
     const { idempotencyKey, ...publicHold } = hold;
     void idempotencyKey;
     return NextResponse.json({ ok: true, hold: publicHold }, { status: 201 });
   } catch (error) {
-    if (error instanceof AvailabilityError) {
-      return NextResponse.json(
-        { ok: false, code: error.code, message: error.message },
-        { status: errorStatus(error.code) }
-      );
-    }
+    if (error instanceof AvailabilityError) return availabilityErrorResponse(error);
     throw error;
   }
 }

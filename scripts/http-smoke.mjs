@@ -26,9 +26,11 @@ const serverEnv = {
   AI_ENABLE_REAL_CALLS: "false",
 };
 
-// The CI smoke intentionally runs without Supabase credentials. Public pages
-// must render from verified static fallbacks, while staff areas and data APIs
-// must fail closed rather than silently switching to mock data.
+// CI deliberately strips runtime Supabase/service-role secrets. Public
+// availability is still expected to work through the checked-in safe public
+// project URL + publishable key fallback and the narrow public RPC. Privileged
+// staff areas must remain authentication-gated; no service-role fallback is
+// permitted in ordinary web request paths.
 for (const key of [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -170,9 +172,16 @@ try {
   const availability = await get(
     "/api/availability?checkIn=2026-10-01&checkOut=2026-10-02&guests=2",
   );
-  assert.equal(availability.status, 503, "Production availability must fail closed without Supabase authority");
+  assert.equal(
+    availability.status,
+    200,
+    "Production availability must work through the public Supabase RPC without a service-role secret",
+  );
   const availabilityJson = await availability.json();
-  assert.equal(availabilityJson.code, "availability_unknown");
+  assert.equal(availabilityJson.ok, true, "Availability RPC must report success");
+  assert.equal(availabilityJson.source, "supabase", "Availability authority must remain Supabase");
+  assert.ok(Array.isArray(availabilityJson.items), "Availability response must contain an items array");
+  assert.ok(availabilityJson.items.length > 0, "Known future availability should return at least one preliminary option");
 
   const chatStatus = await get("/api/chat/status");
   assert.equal(chatStatus.status, 200, "Chat status endpoint must be available");

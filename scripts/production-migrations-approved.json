@@ -47,6 +47,7 @@
     "20260913055623_guest_booking_room_qr_uniqueness.sql",
     "20260913063233_booking_status_workflow_hardening.sql",
     "20260913064214_booking_checkin_1300_policy.sql",
-    "20260913064557_booking_termination_policy_snapshot.sql"
+    "20260913064557_booking_termination_policy_snapshot.sql",
+    "20260913073000_remove_web_service_role_dependency.sql"
   ]
 }

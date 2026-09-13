@@ -1,7 +1,8 @@
 import ManagerHeader from "@/components/manager/ManagerHeader";
 import ManagerQrPanel from "@/components/manager/ManagerQrPanel";
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
-import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+
 export const dynamic = "force-dynamic";
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
 
@@ -18,17 +19,44 @@ interface BookingRow {
   customers?: CustomerRelation | CustomerRelation[] | null;
   booking_rooms?: BookingRoomRow[] | null;
 }
+
 function relationFirst<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
 }
+
 export default async function ManagerQrPage() {
   const staff = await getCurrentStaff();
   const allowed = hasAnyRole(staff, [...MANAGER_ROLES]);
-  if (!allowed) return (<><ManagerHeader title="QR гостей" /><main className="p-4 lg:p-8"><p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Для управления QR нужна роль Собственник, Администратор или Менеджер.</p></main></>);
+  if (!allowed) {
+    return (
+      <>
+        <ManagerHeader title="QR гостей" />
+        <main className="p-4 lg:p-8">
+          <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Для управления QR нужна роль Собственник, Администратор или Менеджер.
+          </p>
+        </main>
+      </>
+    );
+  }
+
+  const client = await createSupabaseServerClient();
+  if (!client) {
+    return (
+      <>
+        <ManagerHeader title="QR гостей" />
+        <main className="p-4 lg:p-8">
+          <p className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Сервис авторизации временно недоступен.
+          </p>
+        </main>
+      </>
+    );
+  }
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await getSupabaseAdminClient()
+  const { data, error } = await client
     .from("bookings")
     .select("id, booking_number, status, check_in, check_out, customers ( full_name ), booking_rooms ( room_unit_id, room_units ( room_number, buildings ( name ) ) )")
     .is("deleted_at", null)
@@ -56,5 +84,22 @@ export default async function ManagerQrPage() {
     });
   });
 
-  return (<><ManagerHeader title="QR гостей" /><main className="space-y-6 p-4 lg:p-8"><div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft"><h1 className="font-display text-2xl font-semibold text-emerald-deep">Гостевой сервис по QR</h1><p className="mt-2 max-w-3xl text-sm text-muted">QR выпускается только для подтверждённой или заселённой брони. Он связан с гостем и номером и автоматически перестаёт действовать после выезда, отмены или no-show.</p></div>{error ? <p className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">Не удалось прочитать активные брони.</p> : <ManagerQrPanel stays={stays} />}</main></>);
+  return (
+    <>
+      <ManagerHeader title="QR гостей" />
+      <main className="space-y-6 p-4 lg:p-8">
+        <div className="rounded-xl border border-gold/15 bg-white p-5 shadow-soft">
+          <h1 className="font-display text-2xl font-semibold text-emerald-deep">Гостевой сервис по QR</h1>
+          <p className="mt-2 max-w-3xl text-sm text-muted">
+            QR выпускается только для подтверждённой или заселённой брони. Он связан с гостем и номером и автоматически перестаёт действовать после выезда, отмены или no-show.
+          </p>
+        </div>
+        {error ? (
+          <p className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">Не удалось прочитать активные брони.</p>
+        ) : (
+          <ManagerQrPanel stays={stays} />
+        )}
+      </main>
+    </>
+  );
 }
