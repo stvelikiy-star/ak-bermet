@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
     .from("guest_room_access_tokens")
     .update({ revoked_at: rotationTime })
     .eq("booking_id", bookingId)
+    .eq("room_unit_id", roomUnitId)
     .is("revoked_at", null)
     .select("id");
   if (revokeError) return NextResponse.json({ ok: false, code: "QR_ROTATION_FAILED" }, { status: 503 });
