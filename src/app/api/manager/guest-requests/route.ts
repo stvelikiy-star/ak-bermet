@@ -9,12 +9,20 @@ const STATUSES = new Set(["new", "acknowledged", "in_progress", "resolved", "can
 function forbidden() {
   return NextResponse.json({ ok: false, code: "ACCESS_DENIED" }, { status: 403 });
 }
-
+function relationFirst<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 function normalizeItem(item: any) {
-  const room = Array.isArray(item.room_units) ? item.room_units[0] : item.room_units;
-  const building = room && (Array.isArray(room.buildings) ? room.buildings[0] : room.buildings);
+  const room = relationFirst(item.room_units);
+  const building = room && relationFirst(room.buildings);
+  const booking = relationFirst(item.bookings);
+  const customer = booking && relationFirst(booking.customers);
   return {
     id: item.id,
+    bookingId: item.booking_id,
+    bookingNumber: booking?.booking_number ?? "—",
+    guestName: customer?.full_name ?? "Гость",
     roomNumber: room?.room_number ?? "—",
     buildingName: building?.name ?? "AK BERMET",
     requestType: item.request_type,
@@ -30,7 +38,7 @@ export async function GET() {
 
   const { data, error } = await getSupabaseAdminClient()
     .from("guest_service_requests")
-    .select("id, room_unit_id, request_type, message, status, created_at, room_units ( room_number, buildings ( name ) )")
+    .select("id, booking_id, room_unit_id, request_type, message, status, created_at, bookings ( booking_number, customers ( full_name ) ), room_units ( room_number, buildings ( name ) )")
     .not("status", "in", "(resolved,cancelled)")
     .order("created_at", { ascending: false })
     .limit(50);
