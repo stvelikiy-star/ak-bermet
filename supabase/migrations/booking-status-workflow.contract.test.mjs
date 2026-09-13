@@ -5,6 +5,7 @@ import test from "node:test";
 
 const read = (path) => readFileSync(resolve(path), "utf8");
 const migration = read("supabase/migrations/20260913063233_booking_status_workflow_hardening.sql");
+const timePolicy = read("supabase/migrations/20260913064214_booking_checkin_1300_policy.sql");
 const api = read("src/app/api/manager/bookings/route.ts");
 const actions = read("src/components/manager/BookingStatusActions.tsx");
 const page = read("src/app/manager/bookings/page.tsx");
@@ -15,20 +16,37 @@ test("confirmation is database-gated by the required prepayment", () => {
   assert.match(migration, /raise exception 'prepayment_required'/);
 });
 
-test("check-in is gated by arrival date and a ready sellable room", () => {
-  assert.match(migration, /time zone 'Asia\/Bishkek'\)::date < v_check_in/i);
-  assert.match(migration, /raise exception 'check_in_too_early'/);
-  assert.match(migration, /ru\.sellable_status <> 'active'/);
-  assert.match(migration, /ru\.operational_status <> 'ready'/);
-  assert.match(migration, /raise exception 'room_not_ready_for_check_in'/);
+test("check-in and no-show are blocked before 13:00 Bishkek time", () => {
+  assert.match(timePolicy, /time zone 'Asia\/Bishkek'\) < \(v_check_in::timestamp \+ time '13:00'\)/i);
+  assert.match(timePolicy, /raise exception 'check_in_too_early'/);
+  assert.match(timePolicy, /raise exception 'no_show_too_early'/);
+  assert.ok((timePolicy.match(/time '13:00'/gi) ?? []).length >= 2);
+});
+
+test("check-in requires a ready sellable room", () => {
+  assert.match(timePolicy, /ru\.sellable_status <> 'active'/);
+  assert.match(timePolicy, /ru\.operational_status <> 'ready'/);
+  assert.match(timePolicy, /raise exception 'room_not_ready_for_check_in'/);
 });
 
 test("cancel and no-show release room occupancy through booking_rooms lifecycle", () => {
-  assert.match(migration, /create or replace function public\.fn_terminate_booking/i);
-  assert.match(migration, /'cancelled'::public\.booking_status, 'no_show'::public\.booking_status/i);
-  assert.match(migration, /cancellation_reason_required/);
-  assert.match(migration, /no_show_too_early/);
-  assert.match(migration, /update public\.booking_rooms[\s\S]*set status = 'cancelled'[\s\S]*status = 'active'/i);
+  assert.match(timePolicy, /create or replace function public\.fn_terminate_booking/i);
+  assert.match(timePolicy, /'cancelled'::public\.booking_status, 'no_show'::public\.booking_status/i);
+  assert.match(timePolicy, /cancellation_reason_required/);
+  assert.match(timePolicy, /no_show_too_early/);
+  assert.match(timePolicy, /update public\.booking_rooms[\s\S]*set status = 'cancelled'[\s\S]*status = 'active'/i);
+});
+
+test("booking status SECURITY DEFINER functions are fixed-path and management-gated", () => {
+  for (const functionName of ["fn_advance_booking_status", "fn_terminate_booking"]) {
+    const definition = new RegExp(`create or replace function public\\.${functionName}[\\s\\S]*?security definer[\\s\\S]*?set search_path = public, pg_temp`, "i");
+    assert.match(timePolicy, definition);
+  }
+  assert.ok((timePolicy.match(/public\.has_role\('owner'\)/g) ?? []).length >= 2);
+  assert.ok((timePolicy.match(/public\.has_role\('administrator'\)/g) ?? []).length >= 2);
+  assert.ok((timePolicy.match(/public\.has_role\('manager'\)/g) ?? []).length >= 2);
+  assert.match(timePolicy, /revoke all on function public\.fn_terminate_booking\(uuid, public\.booking_status, text\)[\s\S]*from public, anon/i);
+  assert.match(timePolicy, /grant execute on function public\.fn_terminate_booking\(uuid, public\.booking_status, text\)[\s\S]*to authenticated/i);
 });
 
 test("manager API exposes only guarded status targets and delegates to RPCs", () => {
