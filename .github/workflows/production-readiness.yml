@@ -93,6 +93,9 @@ jobs:
       - name: Manual payment ledger contract
         run: npm run test:manual-payments
 
+      - name: Guest booking QR lifecycle contract
+        run: npm run test:guest-booking-qr
+
       - name: Site content CMS contract
         run: npm run test:site-content-cms
 
