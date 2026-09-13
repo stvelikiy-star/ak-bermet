@@ -14,6 +14,15 @@ const rpcMigrationSource = readFileSync(
   new URL("../../../../supabase/migrations/20260913073000_remove_web_service_role_dependency.sql", import.meta.url),
   "utf8",
 );
+const leadRpcStart = rpcMigrationSource.indexOf(
+  "create or replace function public.fn_public_create_lead",
+);
+const leadRpcEnd = rpcMigrationSource.indexOf(
+  "revoke all on function public.fn_public_create_lead",
+  leadRpcStart,
+);
+assert.ok(leadRpcStart >= 0 && leadRpcEnd > leadRpcStart);
+const leadRpcSource = rpcMigrationSource.slice(leadRpcStart, leadRpcEnd);
 
 test("lead API reports success only after authoritative Supabase persistence", () => {
   const persistIndex = routeSource.indexOf("await persistPublicLead(lead)");
@@ -52,18 +61,17 @@ test("public lead persistence uses the narrow RPC instead of direct table insert
 });
 
 test("lead RPC owns the safe allowlist and forces new status", () => {
-  assert.match(rpcMigrationSource, /create or replace function public\.fn_public_create_lead/);
-  assert.match(rpcMigrationSource, /insert into public\.leads as l\(/);
-  assert.match(rpcMigrationSource, /source, interest, status, name, phone,/);
-  assert.match(rpcMigrationSource, /p_source, p_interest, 'new', btrim\(p_name\), btrim\(p_phone\)/);
-  assert.doesNotMatch(rpcMigrationSource, /assigned_manager_id\s*,/);
-  assert.doesNotMatch(rpcMigrationSource, /booking_id\s*,/);
-  assert.doesNotMatch(rpcMigrationSource, /customer_id\s*,/);
+  assert.match(leadRpcSource, /insert into public\.leads as l\(/);
+  assert.match(leadRpcSource, /source, interest, status, name, phone,/);
+  assert.match(leadRpcSource, /p_source, p_interest, 'new', btrim\(p_name\), btrim\(p_phone\)/);
+  assert.doesNotMatch(leadRpcSource, /assigned_manager_id\s*,/);
+  assert.doesNotMatch(leadRpcSource, /booking_id\s*,/);
+  assert.doesNotMatch(leadRpcSource, /customer_id\s*,/);
 });
 
 test("unresolved room category is preserved by the RPC instead of losing the lead", () => {
-  assert.match(rpcMigrationSource, /Категория номера:/);
-  assert.match(rpcMigrationSource, /v_category_id := null/);
-  assert.match(rpcMigrationSource, /v_message := concat_ws/);
-  assert.match(rpcMigrationSource, /p_room_category_name/);
+  assert.match(leadRpcSource, /Категория номера:/);
+  assert.match(leadRpcSource, /v_category_id := null/);
+  assert.match(leadRpcSource, /v_message := concat_ws/);
+  assert.match(leadRpcSource, /p_room_category_name/);
 });
