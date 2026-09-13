@@ -2,6 +2,9 @@ name: Deploy AK BERMET to Vercel
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Production Readiness"]
+    types: [completed]
 
 concurrency:
   group: ak-bermet-production-deploy
@@ -13,14 +16,21 @@ permissions:
 jobs:
   deploy:
     name: Build and deploy production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment: production
     env:
       VERCEL_ORG_ID: team_7GagNlblg6wDAIOoF44H7dFN
       VERCEL_PROJECT_ID: prj_b3kaGYbW8gVtJg4o5PlP6K4kxaIV
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_7cDXEzFLEL41Rr9FCEqQUQ_b_5mBOQK
+      PRODUCTION_ALIAS: https://ak-bermet-functional-preview-v2-202.vercel.app
     steps:
-      - name: Checkout main
+      - name: Checkout current main
         uses: actions/checkout@v4
         with:
           ref: main
@@ -31,22 +41,90 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Verify protected deploy configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in VERCEL_TOKEN NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "MISSING_SECRET_NAME: ${name}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "BLOCKED: production deployment credentials are incomplete. Secret values were not printed."
+            exit 2
+          fi
+
       - name: Install dependencies
         run: npm ci
 
       - name: Verify lint
         run: npm run lint
 
-      - name: Verify production build
-        run: npm run build
-
       - name: Link Vercel project
+        shell: bash
         run: |
           mkdir -p .vercel
           printf '{"projectId":"%s","orgId":"%s"}\n' "$VERCEL_PROJECT_ID" "$VERCEL_ORG_ID" > .vercel/project.json
 
+      - name: Align Vercel runtime to Node 22
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}?teamId=${VERCEL_ORG_ID}" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"nodeVersion":"22.x"}' \
+            >/dev/null
+
+      - name: Upsert Supabase production environment in Vercel
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg url "$NEXT_PUBLIC_SUPABASE_URL" \
+            --arg publishable "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            --arg service "$SUPABASE_SERVICE_ROLE_KEY" \
+            '[
+              {key:"NEXT_PUBLIC_SUPABASE_URL",value:$url,type:"plain",target:["production"]},
+              {key:"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",value:$publishable,type:"plain",target:["production"]},
+              {key:"SUPABASE_SERVICE_ROLE_KEY",value:$service,type:"sensitive",target:["production"]}
+            ]')"
+          curl --fail --silent --show-error \
+            --request POST \
+            --url "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?teamId=${VERCEL_ORG_ID}&upsert=true" \
+            --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "$payload" \
+            >/dev/null
+          unset payload
+
       - name: Pull Vercel production settings
-        run: npx vercel pull --yes --environment=production
+        run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel production output
+        run: npx vercel build --prod --token="$VERCEL_TOKEN"
 
       - name: Deploy prebuilt output
-        run: npx vercel deploy --prebuilt --prod --yes
+        run: npx vercel deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN"
+
+      - name: Smoke public site and authoritative availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          root_status="$(curl --silent --show-error --output /tmp/root.html --write-out '%{http_code}' "$PRODUCTION_ALIAS/")"
+          availability_status="$(curl --silent --show-error --output /tmp/availability.json --write-out '%{http_code}' "$PRODUCTION_ALIAS/api/availability?checkIn=2026-10-03&checkOut=2026-10-06")"
+          if [ "$root_status" != "200" ]; then
+            echo "PUBLIC_ROOT_SMOKE_FAILED: HTTP ${root_status}"
+            exit 2
+          fi
+          if [ "$availability_status" != "200" ]; then
+            echo "AVAILABILITY_SMOKE_FAILED: HTTP ${availability_status}"
+            cat /tmp/availability.json
+            exit 2
+          fi
+          echo "PRODUCTION_SMOKE_PASS: root=200 availability=200"
