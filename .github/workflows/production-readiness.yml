@@ -87,6 +87,9 @@ jobs:
       - name: Web runtime publishable RPC contract
         run: node --test supabase/migrations/web-runtime-publishable-rpc.contract.test.mjs
 
+      - name: Vercel production deploy contract
+        run: node --test scripts/vercel-production-deploy.contract.test.mjs
+
       - name: Manual booking transaction contract
         run: npm run test:manual-booking
 
