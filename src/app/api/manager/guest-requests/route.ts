@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentStaff, hasAnyRole } from "@/lib/auth/current-staff";
-import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 const MANAGER_ROLES = ["owner", "administrator", "manager"] as const;
 const STATUSES = new Set(["new", "acknowledged", "in_progress", "resolved", "cancelled"]);
@@ -32,11 +32,17 @@ function normalizeItem(item: any) {
   };
 }
 
-export async function GET() {
+async function getManagerClient() {
   const staff = await getCurrentStaff();
-  if (!hasAnyRole(staff, [...MANAGER_ROLES])) return forbidden();
+  if (!hasAnyRole(staff, [...MANAGER_ROLES])) return null;
+  return createSupabaseServerClient();
+}
 
-  const { data, error } = await getSupabaseAdminClient()
+export async function GET() {
+  const client = await getManagerClient();
+  if (!client) return forbidden();
+
+  const { data, error } = await client
     .from("guest_service_requests")
     .select("id, booking_id, room_unit_id, request_type, message, status, created_at, bookings ( booking_number, customers ( full_name ) ), room_units ( room_number, buildings ( name ) )")
     .not("status", "in", "(resolved,cancelled)")
@@ -48,11 +54,15 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const staff = await getCurrentStaff();
-  if (!hasAnyRole(staff, [...MANAGER_ROLES])) return forbidden();
+  const client = await getManagerClient();
+  if (!client) return forbidden();
 
   let payload: Record<string, unknown>;
-  try { payload = await request.json(); } catch { return NextResponse.json({ ok: false, code: "INVALID_JSON" }, { status: 400 }); }
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, code: "INVALID_JSON" }, { status: 400 });
+  }
 
   const id = typeof payload.id === "string" ? payload.id.trim() : "";
   const status = typeof payload.status === "string" ? payload.status : "";
@@ -73,11 +83,14 @@ export async function PATCH(request: NextRequest) {
     patch.resolved_at = null;
   }
 
-  const { error } = await getSupabaseAdminClient()
+  const { data, error } = await client
     .from("guest_service_requests")
     .update(patch)
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
   if (error) return NextResponse.json({ ok: false, code: "GUEST_REQUEST_UPDATE_FAILED" }, { status: 503 });
+  if (!data) return NextResponse.json({ ok: false, code: "GUEST_REQUEST_NOT_FOUND" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
