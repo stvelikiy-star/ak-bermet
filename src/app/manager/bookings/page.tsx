@@ -37,6 +37,8 @@ interface BookingRow {
   prepayment_required_kgs: number | string;
   source: string;
   created_at: string;
+  termination_policy_code: string | null;
+  termination_days_before: number | null;
   customers: CustomerRelation | CustomerRelation[] | null;
   booking_rooms: BookingRoomRelation[] | null;
 }
@@ -64,6 +66,12 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: "Не заехал",
 };
 
+const TERMINATION_POLICY_LABELS: Record<string, string> = {
+  refund_review_7_plus: "≥7 дней · возврат/штраф — на проверку",
+  non_refundable_under_7: "<7 дней · без возврата",
+  non_refundable_no_show: "No-show · без возврата",
+};
+
 function AccessPanel({ text }: { text: string }) {
   return <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{text}</div>;
 }
@@ -86,7 +94,7 @@ export default async function ManagerBookingsPage() {
         .eq("sellable_status", "active"),
       supabase
         .from("bookings")
-        .select("id, booking_number, status, check_in, check_out, adults, children, total_amount_kgs, prepayment_required_kgs, source, created_at, customers ( full_name, phone ), booking_rooms ( status, room_units ( room_number, buildings ( name ) ) )")
+        .select("id, booking_number, status, check_in, check_out, adults, children, total_amount_kgs, prepayment_required_kgs, source, created_at, termination_policy_code, termination_days_before, customers ( full_name, phone ), booking_rooms ( status, room_units ( room_number, buildings ( name ) ) )")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(100),
@@ -130,7 +138,7 @@ export default async function ManagerBookingsPage() {
               <div className="flex flex-wrap items-end justify-between gap-2 border-b border-gold/10 p-4">
                 <div>
                   <h2 className="font-display text-lg font-semibold text-emerald-deep">Брони в CRM</h2>
-                  <p className="mt-1 text-xs text-muted">Последние 100 записей. Подтверждение требует зафиксированной предоплаты не меньше 20%; заселение возможно только в готовый номер.</p>
+                  <p className="mt-1 text-xs text-muted">Последние 100 записей. Подтверждение требует минимум 20% предоплаты; заселение — с 13:00 и только в готовый номер. При отмене CRM фиксирует правило возврата, но деньги автоматически не списывает и не возвращает.</p>
                 </div>
                 <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-emerald-deep ring-1 ring-gold/15">{bookings.length} броней</span>
               </div>
@@ -159,6 +167,7 @@ export default async function ManagerBookingsPage() {
                         const activeRoom = (booking.booking_rooms ?? []).find((room) => room.status === "active") ?? booking.booking_rooms?.[0] ?? null;
                         const roomUnit = first(activeRoom?.room_units ?? null);
                         const building = first(roomUnit?.buildings ?? null)?.name ?? "—";
+                        const policy = booking.termination_policy_code ? TERMINATION_POLICY_LABELS[booking.termination_policy_code] ?? booking.termination_policy_code : null;
                         return (
                           <tr key={booking.id} className="align-top">
                             <td className="px-4 py-3 font-semibold text-emerald-deep">{booking.booking_number}</td>
@@ -169,7 +178,10 @@ export default async function ManagerBookingsPage() {
                             <td className="px-4 py-3 text-emerald-deep">{roomUnit?.room_number ? `${building} · № ${roomUnit.room_number}` : "—"}</td>
                             <td className="px-4 py-3 text-emerald-deep">{date(booking.check_in)} — {date(booking.check_out)}</td>
                             <td className="px-4 py-3 text-emerald-deep">{booking.adults} взр. · {booking.children} дет.</td>
-                            <td className="px-4 py-3"><span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800 ring-1 ring-amber-100">{STATUS_LABELS[booking.status] ?? booking.status}</span></td>
+                            <td className="px-4 py-3">
+                              <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800 ring-1 ring-amber-100">{STATUS_LABELS[booking.status] ?? booking.status}</span>
+                              {policy ? <p className="mt-2 max-w-52 text-[11px] leading-4 text-muted">{policy}{booking.termination_days_before !== null ? ` · ${booking.termination_days_before} дн. до заезда` : ""}</p> : null}
+                            </td>
                             <td className="px-4 py-3 font-medium text-emerald-deep">{money(booking.total_amount_kgs)} сом</td>
                             <td className="px-4 py-3 text-emerald-deep">{money(booking.prepayment_required_kgs)} сом</td>
                             <td className="px-4 py-3"><BookingStatusActions bookingId={booking.id} bookingNumber={booking.booking_number} status={booking.status} /></td>
