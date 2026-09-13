@@ -1,5 +1,23 @@
 -- Canonical public accommodation labels for website availability and guest portal.
--- Keep the approved V6 staging/raw category names untouched in room_categories.
+-- Keep the approved V6 staging/raw category and building names untouched in source tables.
+
+create or replace function public.fn_public_building_label(p_building text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case p_building
+    when 'Corpus 1' then 'Корпус №1'
+    when 'Corpus 2' then 'Корпус №2'
+    when 'Corpus 3' then 'Корпус №3'
+    when 'Brick Cottage' then 'Кирпичные коттеджи'
+    when 'Log House' then 'Срубы'
+    else coalesce(nullif(btrim(p_building), ''), 'AK BERMET')
+  end;
+$$;
+
+revoke all on function public.fn_public_building_label(text) from public, anon, authenticated;
 
 create or replace function public.fn_public_room_category_label(
   p_building text,
@@ -50,7 +68,7 @@ set search_path = ''
 as $$
   select
     public.fn_public_room_category_label(b.name, rc.name),
-    b.name::text,
+    public.fn_public_building_label(b.name),
     ru.max_capacity,
     case
       when ru.view_side = 'preferred_nature' then 'forest'
@@ -133,7 +151,7 @@ as $$
     c.full_name,
     ru.id,
     ru.room_number,
-    coalesce(bl.name, 'AK BERMET'),
+    public.fn_public_building_label(bl.name),
     public.fn_public_room_category_label(bl.name, rc.name),
     t.expires_at,
     t.label
