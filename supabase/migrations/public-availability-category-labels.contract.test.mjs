@@ -13,6 +13,19 @@ const searchUi = readFileSync(
   "utf8",
 );
 
+test("public building labels hide staging names", () => {
+  for (const [raw, label] of [
+    ["Corpus 1", "Корпус №1"],
+    ["Corpus 2", "Корпус №2"],
+    ["Corpus 3", "Корпус №3"],
+    ["Brick Cottage", "Кирпичные коттеджи"],
+    ["Log House", "Срубы"],
+  ]) {
+    assert.ok(migration.includes(`when '${raw}' then '${label}'`), `missing building mapping: ${raw}`);
+  }
+  assert.match(migration, /public\.fn_public_building_label\(b\.name\)/);
+});
+
 test("public category labels normalize the approved V6 staging names", () => {
   for (const label of [
     "Garden Rooms",
@@ -52,10 +65,11 @@ test("availability filter uses canonical exact matching and keeps legacy aliases
   assert.match(migration, /or lower\(rc\.name\) = lower\(btrim\(p_category\)\)/);
 });
 
-test("guest portal also receives canonical category labels", () => {
+test("guest portal receives canonical building and category labels", () => {
   const guestFnStart = migration.indexOf("create or replace function public.fn_public_guest_room_context");
   assert.ok(guestFnStart >= 0);
   const guestFn = migration.slice(guestFnStart);
+  assert.match(guestFn, /public\.fn_public_building_label\(bl\.name\)/);
   assert.match(guestFn, /public\.fn_public_room_category_label\(bl\.name, rc\.name\)/);
 });
 
