@@ -42,6 +42,7 @@
     "20260909050000_enforce_ready_for_manual_booking_and_move.sql",
     "20260911050000_guest_qr_access_and_requests.sql",
     "20260911051000_guest_qr_fk_indexes.sql",
-    "20260913054412_guest_room_token_rls_policy_cleanup.sql"
+    "20260913054412_guest_room_token_rls_policy_cleanup.sql",
+    "20260913055407_guest_booking_qr_lifecycle.sql"
   ]
 }
