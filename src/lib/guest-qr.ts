@@ -17,25 +17,59 @@ export function hashGuestToken(token: string): string {
 export function isGuestRequestType(value: unknown): value is GuestRequestType {
   return typeof value === "string" && (GUEST_REQUEST_TYPES as readonly string[]).includes(value);
 }
-export interface GuestRoomAccess { id: string; roomUnitId: string; roomNumber: string; buildingName: string; categoryName: string; expiresAt: string; label: string; }
+export interface GuestRoomAccess {
+  id: string;
+  bookingId: string;
+  bookingNumber: string;
+  guestName: string;
+  roomUnitId: string;
+  roomNumber: string;
+  buildingName: string;
+  categoryName: string;
+  expiresAt: string;
+  label: string;
+}
 function relationFirst<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 export async function findGuestRoomByToken(token: string): Promise<GuestRoomAccess | null> {
   if (!/^[A-Za-z0-9_-]{20,80}$/.test(token)) return null;
-  const { data, error } = await getSupabaseAdminClient()
+  const admin = getSupabaseAdminClient();
+  const { data, error } = await admin
     .from("guest_room_access_tokens")
-    .select("id, room_unit_id, expires_at, label, room_units ( room_number, buildings ( name ), room_categories ( name ) )")
+    .select("id, room_unit_id, booking_id, expires_at, label, room_units ( room_number, buildings ( name ), room_categories ( name ) )")
     .eq("token_hash", hashGuestToken(token))
     .is("revoked_at", null)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
-  if (error || !data) return null;
+  if (error || !data || !data.booking_id) return null;
+
+  const { data: booking, error: bookingError } = await admin
+    .from("bookings")
+    .select("id, booking_number, status, check_in, check_out, customers ( full_name )")
+    .eq("id", data.booking_id)
+    .is("deleted_at", null)
+    .in("status", ["confirmed", "checked_in"])
+    .maybeSingle();
+  if (bookingError || !booking) return null;
+
   const room = relationFirst(data.room_units as { room_number?: string; buildings?: unknown; room_categories?: unknown } | { room_number?: string; buildings?: unknown; room_categories?: unknown }[] | null);
   const building = relationFirst(room?.buildings as { name?: string } | { name?: string }[] | null);
   const category = relationFirst(room?.room_categories as { name?: string } | { name?: string }[] | null);
-  return { id: data.id, roomUnitId: data.room_unit_id, roomNumber: room?.room_number ?? "—", buildingName: building?.name ?? "AK BERMET", categoryName: category?.name ?? "Номер", expiresAt: data.expires_at, label: data.label };
+  const customer = relationFirst(booking.customers as { full_name?: string } | { full_name?: string }[] | null);
+  return {
+    id: data.id,
+    bookingId: data.booking_id,
+    bookingNumber: booking.booking_number,
+    guestName: customer?.full_name ?? "Гость",
+    roomUnitId: data.room_unit_id,
+    roomNumber: room?.room_number ?? "—",
+    buildingName: building?.name ?? "AK BERMET",
+    categoryName: category?.name ?? "Номер",
+    expiresAt: data.expires_at,
+    label: data.label,
+  };
 }
 export function guestPortalUrl(origin: string, token: string): string {
   return new URL("/guest/" + token, origin).toString();
