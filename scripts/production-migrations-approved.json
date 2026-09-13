@@ -44,6 +44,7 @@
     "20260911051000_guest_qr_fk_indexes.sql",
     "20260913054412_guest_room_token_rls_policy_cleanup.sql",
     "20260913055407_guest_booking_qr_lifecycle.sql",
-    "20260913055623_guest_booking_room_qr_uniqueness.sql"
+    "20260913055623_guest_booking_room_qr_uniqueness.sql",
+    "20260913063233_booking_status_workflow_hardening.sql"
   ]
 }
