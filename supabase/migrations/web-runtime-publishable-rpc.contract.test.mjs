@@ -23,6 +23,7 @@ const runtimeFiles = [
 
 const publicFunctions = [
   "public.fn_public_availability(date, date, integer, text)",
+  "public.fn_public_create_lead(public.lead_source, public.lead_interest, text, text, date, date, integer, integer, text, text, boolean, boolean, boolean, boolean, text, integer, text, text, text, public.preferred_contact)",
   "public.fn_public_guest_room_context(text)",
   "public.fn_public_create_guest_request(text, text, text)",
 ];
