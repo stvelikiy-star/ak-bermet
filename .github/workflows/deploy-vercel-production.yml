@@ -25,8 +25,7 @@ jobs:
       VERCEL_ORG_ID: team_7GagNlblg6wDAIOoF44H7dFN
       VERCEL_PROJECT_ID: prj_b3kaGYbW8gVtJg4o5PlP6K4kxaIV
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: https://ednqgzgjhnalsiiuekmw.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_7cDXEzFLEL41Rr9FCEqQUQ_b_5mBOQK
       PRODUCTION_ALIAS: https://ak-bermet-functional-preview-v2-202.vercel.app
     steps:
@@ -45,15 +44,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          missing=0
-          for name in VERCEL_TOKEN NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
-            if [ -z "${!name:-}" ]; then
-              echo "MISSING_SECRET_NAME: ${name}"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "BLOCKED: production deployment credentials are incomplete. Secret values were not printed."
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "MISSING_SECRET_NAME: VERCEL_TOKEN"
+            echo "BLOCKED: production deployment credential is incomplete. Secret values were not printed."
             exit 2
           fi
 
@@ -81,18 +74,16 @@ jobs:
             --data '{"nodeVersion":"22.x"}' \
             >/dev/null
 
-      - name: Upsert Supabase production environment in Vercel
+      - name: Upsert public Supabase production configuration in Vercel
         shell: bash
         run: |
           set -euo pipefail
           payload="$(jq -n \
             --arg url "$NEXT_PUBLIC_SUPABASE_URL" \
             --arg publishable "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
-            --arg service "$SUPABASE_SERVICE_ROLE_KEY" \
             '[
               {key:"NEXT_PUBLIC_SUPABASE_URL",value:$url,type:"plain",target:["production"]},
-              {key:"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",value:$publishable,type:"plain",target:["production"]},
-              {key:"SUPABASE_SERVICE_ROLE_KEY",value:$service,type:"sensitive",target:["production"]}
+              {key:"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",value:$publishable,type:"plain",target:["production"]}
             ]')"
           curl --fail --silent --show-error \
             --request POST \
