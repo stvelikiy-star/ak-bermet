@@ -20,6 +20,7 @@
     "test:manual-booking": "node --test supabase/migrations/manual-booking-transaction.contract.test.mjs src/app/api/manager/bookings/route.contract.test.mjs",
     "test:manual-payments": "node --test supabase/migrations/manual-payment-ledger.contract.test.mjs",
     "test:guest-booking-qr": "node --test supabase/migrations/guest-booking-qr-lifecycle.contract.test.mjs",
+    "test:booking-status": "node --test supabase/migrations/booking-status-workflow.contract.test.mjs",
     "test:site-content-cms": "node --test supabase/migrations/site-content-cms.contract.test.mjs",
     "test:manager-live-data": "node --test src/app/manager/manager-live-data.contract.test.mjs src/app/manager/manager-leads-authority.contract.test.mjs",
     "test:staff-auth-provisioner": "node --test scripts/staff-auth-provisioner.contract.test.mjs",
