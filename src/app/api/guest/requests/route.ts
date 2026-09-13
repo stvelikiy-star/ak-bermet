@@ -11,7 +11,13 @@ export async function POST(request: NextRequest) {
   if (!isGuestRequestType(requestType) || message.length > MAX_MESSAGE_LENGTH) return NextResponse.json({ ok: false, code: "INVALID_REQUEST" }, { status: 400 });
   const guest = await findGuestRoomByToken(token);
   if (!guest) return NextResponse.json({ ok: false, code: "INVALID_OR_EXPIRED_QR" }, { status: 403 });
-  const { data, error } = await getSupabaseAdminClient().from("guest_service_requests").insert({ guest_room_access_token_id: guest.id, room_unit_id: guest.roomUnitId, request_type: requestType, message: message || null }).select("id, request_type, status, created_at").single();
+  const { data, error } = await getSupabaseAdminClient().from("guest_service_requests").insert({
+    guest_room_access_token_id: guest.id,
+    booking_id: guest.bookingId,
+    room_unit_id: guest.roomUnitId,
+    request_type: requestType,
+    message: message || null,
+  }).select("id, booking_id, request_type, status, created_at").single();
   if (error || !data) return NextResponse.json({ ok: false, code: "REQUEST_CREATE_FAILED" }, { status: 503 });
   return NextResponse.json({ ok: true, request: data }, { status: 201 });
 }
