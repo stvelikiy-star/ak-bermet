@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type { LeadInterest, LeadSource, LeadStatus } from "@/types/lead";
 import type { ManagerLead } from "@/types/manager";
 
@@ -62,10 +62,16 @@ function optional<T>(value: T | null): T | undefined {
   return value === null ? undefined : value;
 }
 
-export async function loadManagerLeads(
-  client: SupabaseClient = getSupabaseAdminClient(),
-): Promise<ManagerLead[]> {
-  const { data, error } = await client
+async function requireClient(client?: SupabaseClient): Promise<SupabaseClient> {
+  if (client) return client;
+  const serverClient = await createSupabaseServerClient();
+  if (!serverClient) throw new ManagerLeadsReadError();
+  return serverClient;
+}
+
+export async function loadManagerLeads(client?: SupabaseClient): Promise<ManagerLead[]> {
+  const db = await requireClient(client);
+  const { data, error } = await db
     .from("leads")
     .select(
       "id, lead_number, created_at, updated_at, source, interest, status, name, phone, check_in, check_out, adults, children, children_ages, room_category_id, wants_double_bed, needs_extra_bed, needs_wifi, needs_lower_floor, event_type, guests_count, hall_size, spa_service, message, preferred_contact, assigned_manager_id, manager_comment",
@@ -81,10 +87,10 @@ export async function loadManagerLeads(
 
   const [profilesResult, categoriesResult] = await Promise.all([
     managerIds.length
-      ? client.from("profiles").select("id, full_name, email").in("id", managerIds)
+      ? db.from("profiles").select("id, full_name, email").in("id", managerIds)
       : Promise.resolve({ data: [] as ProfileRow[], error: null }),
     categoryIds.length
-      ? client.from("room_categories").select("id, name").in("id", categoryIds)
+      ? db.from("room_categories").select("id, name").in("id", categoryIds)
       : Promise.resolve({ data: [] as CategoryRow[], error: null }),
   ]);
 
@@ -138,28 +144,23 @@ export async function updateManagerLead(
     managerUserId: string;
     expectedUpdatedAt: string;
   },
-  client: SupabaseClient = getSupabaseAdminClient(),
+  client?: SupabaseClient,
 ): Promise<string> {
-  // This server-only Service Role write is deliberately narrow. The route must
-  // authenticate owner/admin/manager before calling it. Only workflow fields
-  // are writable; identity, customer, booking, source and financial fields are
-  // never accepted from the HTTP request.
-  const { data, error } = await client
-    .from("leads")
-    .update({
-      status: input.status,
-      manager_comment: input.managerComment,
-      assigned_manager_id: input.managerUserId,
-    })
-    .eq("id", input.leadId)
-    .is("deleted_at", null)
-    .eq("updated_at", input.expectedUpdatedAt)
-    .select("updated_at")
-    .maybeSingle();
+  const db = await requireClient(client);
+
+  // Ownership is derived inside the database from auth.uid(); managerUserId is
+  // retained in the input contract for compatibility but cannot override it.
+  void input.managerUserId;
+  const { data, error } = await db.rpc("fn_manager_update_lead", {
+    p_lead_id: input.leadId,
+    p_status: input.status,
+    p_manager_comment: input.managerComment,
+    p_expected_updated_at: input.expectedUpdatedAt,
+  });
 
   if (error) throw new ManagerLeadUpdateError("failed");
-  if (!data || typeof data.updated_at !== "string") {
+  if (typeof data !== "string" || data.length === 0) {
     throw new ManagerLeadUpdateError("stale");
   }
-  return data.updated_at;
+  return data;
 }
