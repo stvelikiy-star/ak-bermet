@@ -96,6 +96,9 @@ jobs:
       - name: Guest booking QR lifecycle contract
         run: npm run test:guest-booking-qr
 
+      - name: Booking status workflow contract
+        run: npm run test:booking-status
+
       - name: Site content CMS contract
         run: npm run test:site-content-cms
 
