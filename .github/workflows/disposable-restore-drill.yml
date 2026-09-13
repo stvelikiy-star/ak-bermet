@@ -1,6 +1,13 @@
 name: Disposable Restore Drill
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/disposable-restore-drill.yml"
+      - "scripts/restore-drill-workflow.contract.test.mjs"
+      - "supabase/migrations/**"
+      - "scripts/production-migrations-approved.json"
   pull_request:
     branches: [main]
     paths:
@@ -105,10 +112,6 @@ jobs:
           FRESH_COUNT="$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc 'select count(*) from supabase_migrations.schema_migrations')"
           test "$FRESH_COUNT" = "$APPROVED_COUNT"
 
-          # The dump is already scoped to public.customers and verified above
-          # to contain exactly one TABLE DATA entry. Restoring the whole tiny
-          # archive avoids pattern-matching differences between pg_dump and
-          # pg_restore table selectors across PostgreSQL versions.
           docker exec "$DB_CONTAINER" pg_restore \
             -U postgres \
             -d postgres \
