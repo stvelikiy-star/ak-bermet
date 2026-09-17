@@ -81,14 +81,12 @@ npm run preflight:cutover
 
 The command must remain blocked until every external release attestation is backed by evidence. Do not set any gate to `YES` by assumption.
 
-## Current accepted release state
+## Current accepted release state (verified 2026-09-17)
 
-- Current `main` tip: `173ddaa3ff875fc5f320ce509403f7a2bd124711` (`docs: add current AK BERMET delivery status`).
-- Production Readiness workflow for this release commit: PASS (run `34614442708`).
-- Repository approved migration chain: 40 migrations.
-- Live AK BERMET Supabase ledger: 40 migrations; latest live migration is `20260911150916` (Supabase-assigned timestamp for the guest QR foreign-key indexes).
-- Live inventory: 169 total / 137 `active + ready` / 32 `inactive + blocked`.
-- Current live counts at the latest audit: 1 booking, 0 availability holds, 0 active guest QR tokens, 0 guest service requests, 0 leads.
+- Audited application revision: `98bc9b5304680da7722510525330b5f256d302b6` (`Merge PR #80: fix public availability categories`).
+- The local production preflight passes with 48 approved migrations; the live `ak-bermet-dev` ledger also lists 48 migrations. This does not establish a separate production database.
+- `ak-bermet-dev` inventory: 169 total / 137 `active + ready` / 32 `inactive + blocked`.
+- Current `ak-bermet-dev` counts at this audit: 1 cancelled booking, 0 availability holds, 0 leads, 0 cleaning tasks and 0 maintenance requests.
 - Current production deployment: Vercel `dpl_J5RhvHAYZmdn8oBk4FeaE1mCiwzH`, state `READY`, production alias `ak-bermet-functional-preview-v2-202.vercel.app`.
 - The custom domain `akbermet.kg` is not attached to this Vercel project; domain cutover remains intentionally separate.
 
@@ -99,9 +97,9 @@ The command must remain blocked until every external release attestation is back
 - No guest QR has been issued yet. QR creation, printing and guest-request handling require a real manager-session UAT before handover.
 - Payment gateway, WhatsApp/Telegram automation, Google Sheets mirror, physical lock/TTLock/TTHotel and email/SMS delivery are **UNKNOWN / NOT VERIFIED** for production; credentials and real E2E evidence are not present in the audit sources.
 - A fresh recoverable database dump/restore drill is **NOT VERIFIED**. The owner has explicitly accepted this as a release risk; no production backup was claimed or published.
-- Supabase security advisor currently reports 28 existing `SECURITY DEFINER` functions executable by authenticated users. These are operational RPCs and were not revoked blindly; each should be reviewed against its role policy before final handover. Performance advisor reports 76 INFO unused-index notices and 6 multiple-permissive-policy notices.
+- Supabase security advisor currently reports 4 anonymous and 36 authenticated `SECURITY DEFINER` execute notices. Public RPCs are intentionally callable, but their input bounds and role checks still require targeted review. Performance advisor reports 71 INFO unused-index notices.
 - GitHub branch protection and required checks are **NOT VERIFIED** in the current audit.
-- The latest known production build is healthy and runtime errors were absent in the last 7 days, but it still predates the latest main-branch UI/docs hardening commits. A fresh deployment and public custom-domain browser/mobile UAT are **NOT VERIFIED**.
+- The Vercel preview still serves an older deployment. On 2026-09-17 its home page returned HTTP 200, but `GET /api/availability` returned HTTP 503; the runtime log shows the older `Authoritative Supabase read failed` path. The same date-range RPC succeeds directly against `ak-bermet-dev`. Vercel project Node `24.x` also differs from the repository and Docker Node `22.x` contract. A fresh deployment and public custom-domain browser/mobile UAT are **NOT VERIFIED**.
 
 Supabase Leaked Password Protection / HIBP is **optional Pro+ defense in depth**, not a required blocker for the current Free-plan release. The repository enforces a strict staff-password policy as compensating hardening.
 
