@@ -58,7 +58,7 @@ export default async function RootLayout({
   const locale = await getLocale();
 
   return (
-    <html lang={htmlLangFor(locale)}>
+    <html lang={htmlLangFor(locale)} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
