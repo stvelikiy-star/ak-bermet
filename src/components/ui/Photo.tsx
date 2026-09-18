@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Photo({
   src,
@@ -13,8 +13,11 @@ export default function Photo({
   className?: string;
   imgClassName?: string;
 }) {
-  const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   return (
     <div
@@ -26,11 +29,8 @@ export default function Photo({
           src={src}
           alt={alt}
           loading="lazy"
-          onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
-          className={`h-full w-full object-cover transition-all duration-700 ${
-            loaded ? "scale-100 opacity-100" : "scale-105 opacity-0"
-          } ${imgClassName}`}
+          className={`h-full w-full object-cover transition-transform duration-700 ${imgClassName}`}
         />
       )}
       {failed && (
