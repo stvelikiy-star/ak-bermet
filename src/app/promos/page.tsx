@@ -90,6 +90,7 @@ export default async function PromosPage() {
             interest="promo"
             anchorId="promo-form"
             title={t("Заявка по акции", locale)}
+            locale={locale}
             subtitle={t("Оставьте контакты — администратор подтвердит актуальность и условия акции.", locale)}
           />
         </Container>
