@@ -9,6 +9,8 @@ import type { LeadInput, LeadInterest } from "@/types/lead";
 import { createSpaWhatsAppText, whatsAppToMain } from "@/lib/whatsapp";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import LegalConsent from "@/components/legal/LegalConsent";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
 const SERVICES = ["SPA", "Горячие источники", "Бассейн", "Тренажёрный зал"];
 
@@ -25,10 +27,12 @@ export default function SpaLeadForm({
   interest = "spa",
   defaultService = "",
   anchorId = "spa-form",
+  locale = "ru",
 }: {
   interest?: LeadInterest;
   defaultService?: string;
   anchorId?: string;
+  locale?: Locale;
 }) {
   const [form, setForm] = useState({ ...empty, spaService: defaultService });
   const { status, errors, serverMessage, submit, reset } = useLeadForm();
@@ -57,7 +61,8 @@ export default function SpaLeadForm({
     return (
       <section id={anchorId} className="scroll-mt-28">
         <FormSuccess
-          message="Заявка принята. Администратор уточнит условия посещения и свободное время."
+          message={t("Заявка принята. Администратор уточнит условия посещения и свободное время.", locale)}
+          locale={locale}
           whatsappUrl={whatsAppToMain(createSpaWhatsAppText(toLead()))}
           onReset={() => {
             setForm({ ...empty, spaService: defaultService });
@@ -72,23 +77,23 @@ export default function SpaLeadForm({
     <section id={anchorId} className="scroll-mt-28">
       <div className="rounded-2xl border border-gold/20 bg-milk p-6 shadow-soft sm:p-8">
         <h3 className="font-display text-2xl font-semibold text-emerald-deep">
-          Заявка на посещение
+          {t("Заявка на посещение", locale)}
         </h3>
         <p className="mt-2 text-sm text-muted">
-          Оставьте контакты — администратор подскажет свободное время и условия.
+          {t("Оставьте контакты — администратор подскажет свободное время и условия.", locale)}
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Имя" htmlFor="s-name" required error={errors.name}>
+            <Field label={t("Имя", locale)} htmlFor="s-name" required error={errors.name}>
               <TextInput
                 id="s-name"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="Ваше имя"
+                placeholder={t("Ваше имя", locale)}
               />
             </Field>
-            <Field label="Телефон" htmlFor="s-phone" required error={errors.phone}>
+            <Field label={t("Телефон", locale)} htmlFor="s-phone" required error={errors.phone}>
               <TextInput
                 id="s-phone"
                 type="tel"
@@ -99,23 +104,23 @@ export default function SpaLeadForm({
             </Field>
           </div>
 
-          <Field label="Что интересует" htmlFor="s-service">
+          <Field label={t("Что интересует", locale)} htmlFor="s-service">
             <Select
               id="s-service"
               value={form.spaService}
               onChange={(e) => set("spaService", e.target.value)}
             >
-              <option value="">Выберите услугу</option>
+              <option value="">{t("Выберите услугу", locale)}</option>
               {SERVICES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {t(s, locale)}
                 </option>
               ))}
             </Select>
           </Field>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Дата визита" htmlFor="s-date">
+            <Field label={t("Дата визита", locale)} htmlFor="s-date">
               <TextInput
                 id="s-date"
                 type="date"
@@ -124,7 +129,7 @@ export default function SpaLeadForm({
               />
             </Field>
             <Field
-              label="Количество гостей"
+              label={t("Количество гостей", locale)}
               htmlFor="s-guests"
               error={errors.guestsCount}
             >
@@ -138,16 +143,16 @@ export default function SpaLeadForm({
             </Field>
           </div>
 
-          <Field label="Комментарий" htmlFor="s-msg">
+          <Field label={t("Комментарий", locale)} htmlFor="s-msg">
             <TextArea
               id="s-msg"
               value={form.message}
               onChange={(e) => set("message", e.target.value)}
-              placeholder="Пожелания по времени, услугам…"
+              placeholder={t("Пожелания по времени, услугам…", locale)}
             />
           </Field>
 
-          {status === "error" && <FormError message={serverMessage} />}
+          {status === "error" && <FormError message={t(serverMessage, locale)} />}
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
@@ -155,7 +160,7 @@ export default function SpaLeadForm({
               disabled={status === "submitting"}
               className="inline-flex flex-1 items-center justify-center rounded-full bg-emerald-deep px-6 py-3.5 text-sm font-semibold text-gold-soft transition-colors hover:bg-emerald-800 disabled:opacity-60"
             >
-              {status === "submitting" ? "Отправляем…" : "Отправить заявку"}
+              {status === "submitting" ? t("Отправляем…", locale) : t("Отправить заявку", locale)}
             </button>
             <a
               href={whatsAppToMain(createSpaWhatsAppText(toLead()))}
@@ -164,16 +169,15 @@ export default function SpaLeadForm({
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-6 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
             >
               <WhatsAppIcon size={16} className="shrink-0" />
-              Продолжить в WhatsApp
+              {t("Продолжить в WhatsApp", locale)}
             </a>
           </div>
 
           <p className="text-xs leading-relaxed text-muted">
-            При наличии заболеваний рекомендуем проконсультироваться с врачом.
-            Точное свободное время подтверждает администратор.
+            {t("При наличии заболеваний рекомендуем проконсультироваться с врачом. Точное свободное время подтверждает администратор.", locale)}
           </p>
 
-          <LegalConsent />
+          <LegalConsent locale={locale} />
         </form>
       </div>
     </section>
