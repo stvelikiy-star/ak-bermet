@@ -52,7 +52,7 @@ export default async function Footer() {
           {/* Контакты */}
           <div>
             <h4 className="mb-4 text-[11px] font-semibold uppercase tracking-wider2 text-gold-soft">
-              Бронирование и вопросы
+              {t("Бронирование и вопросы", locale)}
             </h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2.5">
@@ -94,7 +94,7 @@ export default async function Footer() {
           {/* Меню */}
           <div>
             <h4 className="mb-4 text-[11px] font-semibold uppercase tracking-wider2 text-gold-soft">
-              Меню
+              {t("Меню", locale)}
             </h4>
             <ul className="grid grid-cols-1 gap-2.5 text-sm">
               {FOOTER_NAV.map((item) => (
@@ -113,11 +113,11 @@ export default async function Footer() {
           {/* Карта */}
           <div>
             <h4 className="mb-4 text-[11px] font-semibold uppercase tracking-wider2 text-gold-soft">
-              Как нас найти
+              {t("Как нас найти", locale)}
             </h4>
             <p className="mb-4 flex items-start gap-2.5 text-sm leading-relaxed text-white/65">
               <IconPin className="mt-0.5 h-4 w-4 shrink-0 text-gold-soft" />
-              {SITE.address}
+              {t(SITE.address, locale)}
             </p>
             <a
               href={SITE.mapUrl}
@@ -150,7 +150,7 @@ export default async function Footer() {
         {/* Документы — отдельный блок (рабочие ссылки, без "#") */}
         <div className="border-t border-white/10 py-6">
           <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider2 text-gold-soft">
-            Документы
+            {t("Документы", locale)}
           </h4>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {LEGAL_PAGES.map((doc) => (
