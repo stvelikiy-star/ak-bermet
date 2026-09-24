@@ -186,7 +186,7 @@ export default async function EventsPage() {
       {/* Форма заявки */}
       <section className="bg-cream py-16 sm:py-24">
         <Container className="max-w-3xl">
-          <EventLeadForm anchorId="event-form" />
+          <EventLeadForm anchorId="event-form" locale={locale} />
         </Container>
       </section>
 
