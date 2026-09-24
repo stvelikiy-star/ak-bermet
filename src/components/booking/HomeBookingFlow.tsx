@@ -6,8 +6,10 @@ import PublicAvailabilitySearch, {
   type AvailabilitySelection,
 } from "@/components/availability/PublicAvailabilitySearch";
 import BookingLeadForm from "@/components/forms/BookingLeadForm";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
-export default function HomeBookingFlow() {
+export default function HomeBookingFlow({ locale = "ru" }: { locale?: Locale }) {
   const [selection, setSelection] = useState<AvailabilitySelection | null>(null);
 
   const selectionKey = selection
@@ -25,18 +27,18 @@ export default function HomeBookingFlow() {
       <Container className="max-w-6xl">
         <div className="mx-auto mb-8 max-w-3xl text-center">
           <p className="text-[11px] font-semibold uppercase tracking-wider2 text-gold-dark">
-            Бронирование
+            {t("Бронирование", locale)}
           </p>
           <h2 className="mt-2 font-display text-3xl font-semibold text-emerald-deep sm:text-4xl">
-            Найдите подходящий вариант на ваши даты
+            {t("Найдите подходящий вариант на ваши даты", locale)}
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
-            Укажите даты и количество гостей. Система покажет доступные категории,
-            после выбора перенесёт данные в заявку, которая поступит администратору в CRM.
+            {t("Укажите даты и количество гостей. Система покажет доступные категории, после выбора перенесёт данные в заявку, которая поступит администратору в CRM.", locale)}
           </p>
         </div>
 
         <PublicAvailabilitySearch
+          locale={locale}
           onSelect={setSelection}
           bookingAnchorId="home-booking-form"
         />
@@ -51,19 +53,20 @@ export default function HomeBookingFlow() {
             initialAdults={selection?.guests ?? 2}
             initialMessage={
               selection
-                ? `Выбран предварительный вариант: ${selection.category}, ${selection.building}.`
+                ? `${t("Выбран предварительный вариант", locale)}: ${t(selection.category, locale)}, ${t(selection.building, locale)}.`
                 : ""
             }
             title={
               selection
-                ? "Завершить заявку на выбранный вариант"
-                : "Оставить заявку на бронирование"
+                ? t("Завершить заявку на выбранный вариант", locale)
+                : t("Оставить заявку на бронирование", locale)
             }
             subtitle={
               selection
-                ? "Даты, количество гостей и категория уже перенесены из поиска. Добавьте контакты и отправьте заявку."
-                : "Можно сразу оставить заявку — администратор проверит наличие и предложит подходящий вариант."
+                ? t("Даты, количество гостей и категория уже перенесены из поиска. Добавьте контакты и отправьте заявку.", locale)
+                : t("Можно сразу оставить заявку — администратор проверит наличие и предложит подходящий вариант.", locale)
             }
+            locale={locale}
           />
         </div>
       </Container>
