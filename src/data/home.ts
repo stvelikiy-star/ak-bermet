@@ -57,7 +57,7 @@ export const quickDirections = [
     icon: IconLeaf,
     title: "Garden Rooms 2026",
     href: "/garden",
-    img: "/images/garden/garden-01.png",
+    img: "/images/garden/garden-03.png",
     alt: "Garden Rooms AK BERMET",
   },
   {
