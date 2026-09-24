@@ -7,14 +7,13 @@ import Logo from "@/components/ui/Logo";
 import LanguageSwitcher from "@/components/ui/LanguageSwitcher";
 import { t } from "@/i18n/dictionary";
 import type { Locale } from "@/i18n/locale";
-import { SITE, WA } from "@/data/site";
+import { SITE } from "@/data/site";
 import { MAIN_NAV } from "@/data/navigation";
 import {
 
   IconMenu,
   IconClose,
 } from "@/components/ui/icons";
-import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
 export default function Header({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
@@ -71,31 +70,20 @@ export default function Header({ locale }: { locale: Locale }) {
 
         {/* Правый блок */}
         <div className="flex items-center gap-2.5">
-          <a
-            href={WA.booking}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-2.5 text-[13px] font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5 sm:flex"
+          <Link
+            href="/#home-booking"
+            className="hidden items-center justify-center rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3 text-[13px] font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5 sm:flex"
           >
-            <WhatsAppIcon size={16} className="shrink-0" />
-            <span className="leading-tight">
-              {t("Забронировать", locale)}
-              <span className="block text-[10px] font-medium opacity-80">
-                WhatsApp
-              </span>
-            </span>
-          </a>
+            {t("Забронировать", locale)}
+          </Link>
 
           {/* Короткая кнопка «Бронь» — мобайл */}
-          <a
-            href={WA.booking}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-b from-gold-soft to-gold px-4 py-2 text-xs font-semibold text-emerald-deep sm:hidden"
+          <Link
+            href="/#home-booking"
+            className="flex items-center rounded-full bg-gradient-to-b from-gold-soft to-gold px-4 py-2.5 text-xs font-semibold text-emerald-deep sm:hidden"
           >
-            <WhatsAppIcon size={16} className="shrink-0" />
             {t("Бронь", locale)}
-          </a>
+          </Link>
 
           {/* Переключатель языка */}
           <div className="hidden lg:block">
@@ -137,15 +125,12 @@ export default function Header({ locale }: { locale: Locale }) {
               {t(item.label, locale)}
             </Link>
           ))}
-          <a
-            href={WA.booking}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3 text-sm font-semibold text-emerald-deep"
+          <Link
+            href="/#home-booking"
+            className="mt-2 flex items-center justify-center rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3 text-sm font-semibold text-emerald-deep"
           >
-            <WhatsAppIcon size={16} className="shrink-0" />
-            {t("Забронировать через WhatsApp", locale)}
-          </a>
+            {t("Забронировать", locale)}
+          </Link>
           <p className="px-4 pt-3 text-xs text-white/50">{SITE.phoneDisplay}</p>
           <div className="mt-3 border-t border-white/10 px-4 pt-4">
             <LanguageSwitcher locale={locale} variant="mobile" />
