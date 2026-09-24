@@ -1,5 +1,6 @@
 ﻿import HeroSection from "@/components/sections/HeroSection";
 import MiniBenefitsSection from "@/components/sections/MiniBenefitsSection";
+import HomeBookingFlow from "@/components/booking/HomeBookingFlow";
 import QuickDirectionsSection from "@/components/sections/QuickDirectionsSection";
 import WhyChooseSection from "@/components/sections/WhyChooseSection";
 import TerritorySection from "@/components/sections/TerritorySection";
@@ -20,6 +21,7 @@ export default async function Home() {
     <main>
       <HeroSection />
       <MiniBenefitsSection />
+      <HomeBookingFlow />
       <QuickDirectionsSection />
       <WhyChooseSection />
       <TerritorySection />
