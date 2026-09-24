@@ -10,6 +10,8 @@ import type { LeadInput } from "@/types/lead";
 import { createEventWhatsAppText, whatsAppToMain } from "@/lib/whatsapp";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import LegalConsent from "@/components/legal/LegalConsent";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
 const empty = {
   name: "",
@@ -24,7 +26,13 @@ const empty = {
   message: "",
 };
 
-export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: string }) {
+export default function EventLeadForm({
+  anchorId = "event-form",
+  locale = "ru",
+}: {
+  anchorId?: string;
+  locale?: Locale;
+}) {
   const [form, setForm] = useState(empty);
   const { status, errors, serverMessage, submit, reset } = useLeadForm();
 
@@ -33,10 +41,10 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
 
   const composedMessage = () => {
     const extras: string[] = [];
-    if (form.needsAccommodation) extras.push("нужно проживание");
-    if (form.needsFood) extras.push("нужно питание");
-    if (form.needsCoffeeBreak) extras.push("нужен кофе-брейк");
-    const tail = extras.length ? `Доп.: ${extras.join(", ")}.` : "";
+    if (form.needsAccommodation) extras.push(t("нужно проживание", locale));
+    if (form.needsFood) extras.push(t("нужно питание", locale));
+    if (form.needsCoffeeBreak) extras.push(t("нужен кофе-брейк", locale));
+    const tail = extras.length ? `${t("Доп.", locale)}: ${extras.join(", ")}.` : "";
     return [form.message, tail].filter(Boolean).join(" ").trim() || undefined;
   };
 
@@ -62,7 +70,8 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
     return (
       <section id={anchorId} className="scroll-mt-28">
         <FormSuccess
-          message="Заявка на мероприятие принята. Администратор уточнит зал, питание, проживание и условия."
+          message={t("Заявка на мероприятие принята. Администратор уточнит зал, питание, проживание и условия.", locale)}
+          locale={locale}
           whatsappUrl={whatsAppToMain(createEventWhatsAppText(toLead()))}
           onReset={() => {
             setForm(empty);
@@ -77,24 +86,23 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
     <section id={anchorId} className="scroll-mt-28">
       <div className="rounded-2xl border border-gold/20 bg-milk p-6 shadow-soft sm:p-8">
         <h3 className="font-display text-2xl font-semibold text-emerald-deep">
-          Заявка на мероприятие
+          {t("Заявка на мероприятие", locale)}
         </h3>
         <p className="mt-2 text-sm text-muted">
-          Расскажите про формат — подготовим условия по залу, питанию и
-          проживанию.
+          {t("Расскажите про формат — подготовим условия по залу, питанию и проживанию.", locale)}
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Имя" htmlFor="e-name" required error={errors.name}>
+            <Field label={t("Имя", locale)} htmlFor="e-name" required error={errors.name}>
               <TextInput
                 id="e-name"
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="Ваше имя"
+                placeholder={t("Ваше имя", locale)}
               />
             </Field>
-            <Field label="Телефон" htmlFor="e-phone" required error={errors.phone}>
+            <Field label={t("Телефон", locale)} htmlFor="e-phone" required error={errors.phone}>
               <TextInput
                 id="e-phone"
                 type="tel"
@@ -106,7 +114,7 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Дата мероприятия" htmlFor="e-date">
+            <Field label={t("Дата мероприятия", locale)} htmlFor="e-date">
               <TextInput
                 id="e-date"
                 type="date"
@@ -114,19 +122,19 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
                 onChange={(e) => set("date", e.target.value)}
               />
             </Field>
-            <Field label="Тип мероприятия" htmlFor="e-type">
+            <Field label={t("Тип мероприятия", locale)} htmlFor="e-type">
               <TextInput
                 id="e-type"
                 value={form.eventType}
                 onChange={(e) => set("eventType", e.target.value)}
-                placeholder="семинар, тренинг, корпоратив…"
+                placeholder={t("семинар, тренинг, корпоратив…", locale)}
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field
-              label="Количество гостей"
+              label={t("Количество гостей", locale)}
               htmlFor="e-guests"
               error={errors.guestsCount}
             >
@@ -138,13 +146,13 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
                 onChange={(e) => set("guestsCount", e.target.value)}
               />
             </Field>
-            <Field label="Нужный зал" htmlFor="e-hall">
+            <Field label={t("Нужный зал", locale)} htmlFor="e-hall">
               <Select
                 id="e-hall"
                 value={form.hallSize}
                 onChange={(e) => set("hallSize", e.target.value)}
               >
-                <option value="">Подобрать зал</option>
+                <option value="">{t("Подобрать зал", locale)}</option>
                 {halls.map((h) => (
                   <option key={h.capacity} value={h.capacity}>
                     {h.capacity}
@@ -157,34 +165,34 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Checkbox
               id="e-acc"
-              label="Нужно проживание"
+              label={t("Нужно проживание", locale)}
               checked={form.needsAccommodation}
               onChange={(e) => set("needsAccommodation", e.target.checked)}
             />
             <Checkbox
               id="e-food"
-              label="Нужно питание"
+              label={t("Нужно питание", locale)}
               checked={form.needsFood}
               onChange={(e) => set("needsFood", e.target.checked)}
             />
             <Checkbox
               id="e-coffee"
-              label="Нужен кофе-брейк"
+              label={t("Нужен кофе-брейк", locale)}
               checked={form.needsCoffeeBreak}
               onChange={(e) => set("needsCoffeeBreak", e.target.checked)}
             />
           </div>
 
-          <Field label="Комментарий" htmlFor="e-msg">
+          <Field label={t("Комментарий", locale)} htmlFor="e-msg">
             <TextArea
               id="e-msg"
               value={form.message}
               onChange={(e) => set("message", e.target.value)}
-              placeholder="Детали мероприятия, оборудование, тайминг…"
+              placeholder={t("Детали мероприятия, оборудование, тайминг…", locale)}
             />
           </Field>
 
-          {status === "error" && <FormError message={serverMessage} />}
+          {status === "error" && <FormError message={t(serverMessage, locale)} />}
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
@@ -193,8 +201,8 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
               className="inline-flex flex-1 items-center justify-center rounded-full bg-emerald-deep px-6 py-3.5 text-sm font-semibold text-gold-soft transition-colors hover:bg-emerald-800 disabled:opacity-60"
             >
               {status === "submitting"
-                ? "Отправляем…"
-                : "Отправить заявку на мероприятие"}
+                ? t("Отправляем…", locale)
+                : t("Отправить заявку на мероприятие", locale)}
             </button>
             <a
               href={whatsAppToMain(createEventWhatsAppText(toLead()))}
@@ -203,15 +211,15 @@ export default function EventLeadForm({ anchorId = "event-form" }: { anchorId?: 
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-6 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
             >
               <WhatsAppIcon size={16} className="shrink-0" />
-              Продолжить в WhatsApp
+              {t("Продолжить в WhatsApp", locale)}
             </a>
           </div>
 
           <p className="text-xs leading-relaxed text-muted">
-            Условия и доступность залов подтверждает администратор после проверки.
+            {t("Условия и доступность залов подтверждает администратор после проверки.", locale)}
           </p>
 
-          <LegalConsent />
+          <LegalConsent locale={locale} />
         </form>
       </div>
     </section>
