@@ -38,12 +38,12 @@ const verifiedRoomGallery = (
   }));
 
 const verifiedGardenGallery = [
-  { src: "/images/garden/garden-02.png", alt: "Garden Rooms AK BERMET" },
-  { src: "/images/garden/garden-03.png", alt: "Garden Rooms AK BERMET" },
-  { src: "/images/garden/garden-04.png", alt: "Garden Rooms AK BERMET" },
-  { src: "/images/garden/garden-06.png", alt: "Garden Rooms AK BERMET" },
-  { src: "/images/garden/garden-07.png", alt: "Garden Rooms AK BERMET" },
-  { src: "/images/garden/garden-08.png", alt: "Garden Rooms AK BERMET" },
+  { src: "/images/garden/garden-03.png", alt: "Garden Rooms AK BERMET — интерьер комнаты" },
+  { src: "/images/garden/garden-04.png", alt: "Garden Rooms AK BERMET — интерьер комнаты" },
+  { src: "/images/garden/garden-06.png", alt: "Garden Rooms AK BERMET — интерьер комнаты" },
+  { src: "/images/garden/garden-07.png", alt: "Garden Rooms AK BERMET — интерьер комнаты" },
+  { src: "/images/garden/garden-08.png", alt: "Garden Rooms AK BERMET — интерьер комнаты" },
+  { src: "/images/garden/garden-02.png", alt: "Garden Rooms AK BERMET — санузел" },
 ];
 
 export const roomDetails: RoomDetail[] = [
