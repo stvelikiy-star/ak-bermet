@@ -24,7 +24,7 @@ export const spa = {
   points: ["Бассейн", "Тренажёрный зал", "Релакс-зоны", "Wellness-процедуры"],
   button: { label: "Подробнее о SPA", href: "/spa" },
   waButton: { label: "Уточнить услуги", href: WA.spa },
-  img: "/images/hero/spa-hero.png",
+  img: "/images/spa/gallery-02-spa-reception.webp.png",
   alt: "SPA-комплекс AK BERMET",
 };
 
