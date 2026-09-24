@@ -21,7 +21,7 @@ export default async function Home() {
     <main>
       <HeroSection />
       <MiniBenefitsSection />
-      <HomeBookingFlow />
+      <HomeBookingFlow locale={locale} />
       <QuickDirectionsSection />
       <WhyChooseSection />
       <TerritorySection />
