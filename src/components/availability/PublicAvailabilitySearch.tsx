@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
-type AvailabilityItem = {
+export type AvailabilityItem = {
   category: string;
   building: string;
   capacity: number;
@@ -10,6 +10,14 @@ type AvailabilityItem = {
   hasWifi?: boolean;
   repairLevel?: string;
   preliminary: true;
+};
+
+export type AvailabilitySelection = {
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  category: string;
+  building: string;
 };
 
 type AvailabilityResponse = {
@@ -32,7 +40,15 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function PublicAvailabilitySearch() {
+type Props = {
+  onSelect?: (selection: AvailabilitySelection) => void;
+  bookingAnchorId?: string;
+};
+
+export default function PublicAvailabilitySearch({
+  onSelect,
+  bookingAnchorId = "booking-form",
+}: Props = {}) {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("2");
@@ -169,7 +185,7 @@ export default function PublicAvailabilitySearch() {
               {items.length ? `Подходящих вариантов: ${items.length}` : "Подходящих вариантов не найдено"}
             </h3>
             <a
-              href="#booking-form"
+              href={`#${bookingAnchorId}`}
               className="text-sm font-semibold text-emerald-700 underline-offset-4 hover:underline"
             >
               Оставить заявку
@@ -186,6 +202,21 @@ export default function PublicAvailabilitySearch() {
                     Предварительный вариант. Администратор подтвердит конкретный номер,
                     тариф и возможность бронирования.
                   </p>
+                  <a
+                    href={`#${bookingAnchorId}`}
+                    onClick={() =>
+                      onSelect?.({
+                        checkIn,
+                        checkOut,
+                        guests: Math.max(1, Number(guests) || 1),
+                        category: item.category,
+                        building: item.building,
+                      })
+                    }
+                    className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-emerald-deep px-4 py-2.5 text-sm font-semibold text-gold-soft transition-colors hover:bg-emerald-800"
+                  >
+                    Выбрать этот вариант
+                  </a>
                 </article>
               ))}
             </div>
