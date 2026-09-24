@@ -52,7 +52,7 @@ export default async function SpaPage() {
         badge={t("SPA & Wellness", locale)}
         title={t("SPA & Wellness", locale)}
         subtitle={t("Бассейн, тренажёрный зал, источники и wellness-формат для восстановления и отдыха.", locale)}
-        image="/images/hero/spa-hero.png"
+        image="/images/spa/gallery-02-spa-reception.webp.png"
         cta={{ label: t("Уточнить услуги SPA", locale), href: WA.spa }}
       />
 
