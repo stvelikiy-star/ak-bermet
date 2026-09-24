@@ -5,6 +5,7 @@ import Footer from "@/components/layout/Footer";
 import AiChat from "@/components/AiChat";
 import BrandIntro from "@/components/BrandIntro";
 import ConditionalSiteChrome from "@/components/layout/ConditionalSiteChrome";
+import PremiumMotion from "@/components/ui/PremiumMotion";
 import { htmlLangFor } from "@/i18n/locale";
 import { getLocale } from "@/i18n/locale.server";
 import { SITE } from "@/data/site";
@@ -81,6 +82,7 @@ export default async function RootLayout({
           aiChat={<AiChat />}
         >
           {children}
+          <PremiumMotion />
         </ConditionalSiteChrome>
       </body>
     </html>
