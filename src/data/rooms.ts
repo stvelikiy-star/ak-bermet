@@ -13,7 +13,7 @@ export const rooms: Room[] = [
     title: "Garden Rooms",
     badge: "2026",
     text: "32 подтверждённых двухместных номера: по 16 в Garden 1 и Garden 2.",
-    img: "/images/garden/garden-01.png",
+    img: "/images/garden/garden-03.png",
     alt: "Garden Rooms AK BERMET",
   },
   {
@@ -62,7 +62,7 @@ export const garden = {
     "3-разовое питание по тарифу проживания",
     "Конкретная конфигурация — по выбранному номеру",
   ],
-  img: "/images/garden/garden-01.png",
+  img: "/images/garden/garden-03.png",
   alt: "Garden Rooms AK BERMET",
 };
 
