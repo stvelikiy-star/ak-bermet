@@ -160,6 +160,7 @@ export default async function HotSpringsPage() {
             interest="hot_springs"
             defaultService="Горячие источники"
             anchorId="springs-form"
+            locale={locale}
           />
         </Container>
       </section>
