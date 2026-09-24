@@ -131,6 +131,7 @@ export default async function GardenPage() {
             defaultCategory="Garden Rooms"
             anchorId="booking-form"
             title={t("Заявка на Garden Rooms", locale)}
+            locale={locale}
           />
         </Container>
       </section>
