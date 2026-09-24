@@ -98,6 +98,7 @@ export default function BookingLeadForm({
         <FormSuccess
           message={t("Заявка принята предварительно. Администратор проверит наличие и свяжется с вами для подтверждения.", locale)}
           whatsappUrl={whatsAppToMain(createBookingWhatsAppText(toLead()))}
+          locale={locale}
           onReset={() => {
             setForm(initialForm());
             reset();
@@ -262,7 +263,7 @@ export default function BookingLeadForm({
             {t("Финальное наличие и бронь подтверждает администратор после проверки системы и предоплаты 20%.", locale)}
           </p>
 
-          <LegalConsent />
+          <LegalConsent locale={locale} />
         </form>
       </div>
     </section>
