@@ -175,13 +175,13 @@ export default async function RoomsPage() {
 
       <section className="bg-cream py-16 sm:py-24">
         <Container className="max-w-5xl">
-          <PublicAvailabilitySearch />
+          <PublicAvailabilitySearch locale={locale} />
         </Container>
       </section>
 
       <section className="bg-beige py-16 sm:py-24">
         <Container className="max-w-3xl">
-          <BookingLeadForm interest="rooms" anchorId="booking-form" />
+          <BookingLeadForm interest="rooms" anchorId="booking-form" locale={locale} />
         </Container>
       </section>
 
