@@ -50,7 +50,7 @@ export const quickDirections = [
     icon: IconLotus,
     title: "SPA-комплекс",
     href: "/spa",
-    img: "/images/hero/spa-hero.png",
+    img: "/images/spa/gallery-02-spa-reception.webp.png",
     alt: "SPA-комплекс",
   },
   {
