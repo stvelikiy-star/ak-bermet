@@ -157,7 +157,7 @@ export default async function ContactsPage() {
       {/* Форма вопроса */}
       <section className="bg-beige py-16 sm:py-24">
         <Container className="max-w-3xl">
-          <GeneralLeadForm anchorId="general-form" />
+          <GeneralLeadForm anchorId="general-form" locale={locale} />
         </Container>
       </section>
 
