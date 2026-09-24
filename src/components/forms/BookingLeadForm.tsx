@@ -17,6 +17,10 @@ type Props = {
   anchorId?: string;
   title?: string;
   subtitle?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+  initialAdults?: number;
+  initialMessage?: string;
 };
 
 const empty = {
@@ -41,8 +45,20 @@ export default function BookingLeadForm({
   anchorId = "booking-form",
   title = "Оставить заявку на бронирование",
   subtitle = "Администратор проверит наличие и свяжется с вами для подтверждения.",
+  initialCheckIn = "",
+  initialCheckOut = "",
+  initialAdults = 2,
+  initialMessage = "",
 }: Props) {
-  const [form, setForm] = useState({ ...empty, roomCategory: defaultCategory });
+  const initialForm = () => ({
+    ...empty,
+    checkIn: initialCheckIn,
+    checkOut: initialCheckOut,
+    adults: String(Math.max(1, initialAdults || 1)),
+    roomCategory: defaultCategory,
+    message: initialMessage,
+  });
+  const [form, setForm] = useState(initialForm);
   const { status, errors, serverMessage, submit, reset } = useLeadForm();
 
   const set = (k: keyof typeof form, v: string | boolean) =>
@@ -79,7 +95,7 @@ export default function BookingLeadForm({
           message="Заявка принята предварительно. Администратор проверит наличие и свяжется с вами для подтверждения."
           whatsappUrl={whatsAppToMain(createBookingWhatsAppText(toLead()))}
           onReset={() => {
-            setForm({ ...empty, roomCategory: defaultCategory });
+            setForm(initialForm());
             reset();
           }}
         />
