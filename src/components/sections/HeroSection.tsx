@@ -1,5 +1,4 @@
 import Link from "next/link";
-﻿import { WA } from "@/data/site";
 import { heroFacts } from "@/data/home";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
@@ -61,9 +60,7 @@ export default async function HeroSection() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <a
-              href={WA.booking}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#home-booking"
               className="inline-flex items-center justify-center gap-2.5 rounded-full bg-gradient-to-b from-gold-soft to-gold px-7 py-4 text-sm font-semibold uppercase tracking-wide text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5"
             >
               <WhatsAppIcon size={16} className="shrink-0" />
