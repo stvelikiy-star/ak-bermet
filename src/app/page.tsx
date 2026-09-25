@@ -1,6 +1,5 @@
 ﻿import HeroSection from "@/components/sections/HeroSection";
 import MiniBenefitsSection from "@/components/sections/MiniBenefitsSection";
-import HomeBookingSection from "@/components/sections/HomeBookingSection";
 import HomeBookingFlow from "@/components/booking/HomeBookingFlow";
 import QuickDirectionsSection from "@/components/sections/QuickDirectionsSection";
 import WhyChooseSection from "@/components/sections/WhyChooseSection";
