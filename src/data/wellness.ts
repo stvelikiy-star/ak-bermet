@@ -1,4 +1,4 @@
-// TODO: заменить Unsplash-плейсхолдеры (поля img) на реальные фото из /public/images/.
+// Публичные изображения wellness-раздела используют локальные материалы AK BERMET.
 import { WA, SITE } from "./site";
 
 export const springs = {
