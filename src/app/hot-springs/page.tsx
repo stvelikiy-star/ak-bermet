@@ -6,7 +6,7 @@ import PageCTA from "@/components/sections/PageCTA";
 import Photo from "@/components/ui/Photo";
 import SpaLeadForm from "@/components/forms/SpaLeadForm";
 import PriceCard from "@/components/ui/PriceCard";
-import { SITE, WA } from "@/data/site";
+import { SITE, waFor } from "@/data/site";
 import { getLocale } from "@/i18n/locale.server";
 import { t } from "@/i18n/dictionary";
 import {
