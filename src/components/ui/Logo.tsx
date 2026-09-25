@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SITE } from "@/data/site";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
 /**
  * Логотип AK BERMET.
@@ -24,8 +26,10 @@ const LOGO_SRC = "/images/brand/logo-ak-bermet.png";
 
 export default function Logo({
   variant = "light",
+  locale = "ru",
 }: {
   variant?: "light" | "dark";
+  locale?: Locale;
 }) {
   const [imgError, setImgError] = useState(false);
 
@@ -36,7 +40,7 @@ export default function Logo({
     <Link
       href="/"
       className="group flex items-center gap-3"
-      aria-label="AK BERMET — на главную"
+      aria-label={t("AK BERMET — на главную", locale)}
     >
       {!imgError ? (
         // eslint-disable-next-line @next/next/no-img-element
