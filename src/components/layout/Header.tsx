@@ -34,6 +34,15 @@ export default function Header({ locale }: { locale: Locale }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   // Закрываем мобильное меню при переходе
   useEffect(() => {
     setOpen(false);
@@ -51,7 +60,7 @@ export default function Header({ locale }: { locale: Locale }) {
       }`}
     >
       <div className="mx-auto flex max-w-site items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Logo variant="light" />
+        <Logo variant="light" locale={locale} />
 
         {/* Навигация — десктоп */}
         <nav className="hidden items-center gap-5 xl:flex">
@@ -59,6 +68,7 @@ export default function Header({ locale }: { locale: Locale }) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive(item.href) ? "page" : undefined}
               className={`text-[13px] font-medium uppercase tracking-wide transition-colors hover:text-gold-soft ${
                 isActive(item.href) ? "text-gold-soft" : "text-white/80"
               }`}
@@ -97,6 +107,7 @@ export default function Header({ locale }: { locale: Locale }) {
             className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white xl:hidden"
             aria-label={open ? t("Закрыть меню", locale) : t("Открыть меню", locale)}
             aria-expanded={open}
+            aria-controls="mobile-site-menu"
           >
             {open ? (
               <IconClose className="h-5 w-5" />
@@ -109,15 +120,19 @@ export default function Header({ locale }: { locale: Locale }) {
 
       {/* Мобильное меню */}
       <div
-        className={`overflow-hidden border-t border-white/10 bg-emerald-deep transition-[max-height] duration-300 xl:hidden ${
-          open ? "max-h-[88vh]" : "max-h-0"
+        id="mobile-site-menu"
+        className={`border-t border-white/10 bg-emerald-deep transition-[max-height] duration-300 xl:hidden ${
+          open
+            ? "max-h-[calc(100dvh-64px)] overflow-y-auto overscroll-contain"
+            : "max-h-0 overflow-hidden"
         }`}
       >
-        <nav className="flex flex-col gap-1 px-4 py-4">
+        <nav className="flex flex-col gap-1 px-4 py-4 pb-8">
           {MAIN_NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive(item.href) ? "page" : undefined}
               className={`rounded-xl px-4 py-3 text-sm font-medium uppercase tracking-wide transition-colors hover:bg-white/5 hover:text-gold-soft ${
                 isActive(item.href) ? "text-gold-soft" : "text-white/85"
               }`}

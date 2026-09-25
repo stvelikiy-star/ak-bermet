@@ -39,7 +39,7 @@ export default async function ContactsSection() {
             <ul className="space-y-5 text-sm">
               <li className="flex items-start gap-3">
                 <IconPin className="mt-0.5 h-5 w-5 shrink-0 text-gold-dark" />
-                <span className="leading-relaxed text-ink/80">{SITE.address}</span>
+                <span className="leading-relaxed text-ink/80">{t(SITE.address, locale)}</span>
               </li>
               <li className="flex items-center gap-3">
                 <IconWhatsApp className="h-5 w-5 shrink-0 text-gold-dark" />
