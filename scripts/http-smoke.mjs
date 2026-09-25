@@ -211,7 +211,28 @@ try {
 
   const robots = await get("/robots.txt");
   assert.equal(robots.status, 200, "robots.txt must exist");
-  assert.match(await robots.text(), /User-Agent:/i, "robots.txt must contain crawler rules");
+  const robotsText = await robots.text();
+  assert.match(robotsText, /User-Agent:/i, "robots.txt must contain crawler rules");
+  for (const blockedPath of [
+    "/api/",
+    "/manager",
+    "/staff",
+    "/housekeeping",
+    "/technician",
+    "/auth",
+    "/guest",
+  ]) {
+    assert.ok(
+      robotsText.includes(`Disallow: ${blockedPath}`),
+      `robots.txt must disallow ${blockedPath}`,
+    );
+  }
+
+  const missingPage = await get("/this-page-must-not-exist-ak-bermet");
+  assert.equal(missingPage.status, 404, "Unknown public route must return HTTP 404");
+  const missingHtml = await missingPage.text();
+  assert.match(missingHtml, /404\\s*·\\s*AK BERMET/i, "Branded 404 page must render");
+  assert.match(missingHtml, /Страница не найдена/i, "Default-locale 404 copy must render");
 
   const sitemap = await get("/sitemap.xml");
   assert.equal(sitemap.status, 200, "sitemap.xml must exist");
@@ -221,7 +242,7 @@ try {
   assert.equal(favicon.status, 200, "favicon compatibility URL must resolve");
 
   console.log(
-    `HTTP_SMOKE_PASS public=${publicPages.length} locales=4 protected=7 api=6 seo=2 headers=4 artifact=standalone`,
+    `HTTP_SMOKE_PASS public=${publicPages.length} locales=4 protected=7 api=6 seo=3 headers=4 privacy=7 artifact=standalone`,
   );
 } finally {
   if (server.exitCode === null) {
