@@ -27,7 +27,7 @@ export default async function Footer() {
         <div className="grid grid-cols-1 gap-10 pb-12 sm:grid-cols-2 lg:grid-cols-4">
           {/* Бренд */}
           <div>
-            <Logo variant="light" />
+            <Logo variant="light" locale={locale} />
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/60">
               {t(SITE.footerText, locale)}
             </p>
