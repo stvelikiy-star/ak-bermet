@@ -21,12 +21,14 @@ import {
   IconArrowRight,
 } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  title: "Номера и коттеджи",
-  description:
-    "Подтверждённый номерной фонд AK BERMET 2026: Garden Rooms, люксы, полулюксы, стандарты, семейные номера, коттеджи и срубы.",
-  alternates: { canonical: "/rooms" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Номера и коттеджи", locale),
+    description: t("Подтверждённый номерной фонд AK BERMET 2026: Garden Rooms, люксы, полулюксы, стандарты, семейные номера, коттеджи и срубы.", locale),
+    alternates: { canonical: "/rooms" },
+  };
+}
 
 export default async function RoomsPage() {
   const locale = await getLocale();
