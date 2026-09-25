@@ -164,7 +164,7 @@ export default function AiChat({ locale }: { locale: Locale }) {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
-    const userMsg: Msg = { id: uid(), role: "user", content: trimmed, time: now() };
+    const userMsg: Msg = { id: uid(), role: "user", content: trimmed, time: now(locale) };
     const history = [...messages, userMsg];
     setMessages(history);
     setInput("");
