@@ -9,13 +9,6 @@ import { getLocale } from "@/i18n/locale.server";
 import type { Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dictionary";
 
-export const metadata: Metadata = {
-  title: "Возврат и отмена бронирования",
-  description:
-    "Условия отмены бронирования и возврата предоплаты в AK BERMET: сроки, возврат, комиссии и порядок обращения.",
-  alternates: { canonical: "/legal/refund" },
-};
-
 type RefundTierCopy = {
   term: string;
   result: string;
@@ -242,6 +235,16 @@ const COPY: Record<Locale, RefundCopy> = {
     addressLabel: "Мекенжай",
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const copy = COPY[locale];
+  return {
+    title: copy.title,
+    description: copy.intro,
+    alternates: { canonical: "/legal/refund" },
+  };
+}
 
 export default async function RefundPage() {
   const locale = await getLocale();
