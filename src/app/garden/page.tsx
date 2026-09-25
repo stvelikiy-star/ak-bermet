@@ -6,7 +6,7 @@ import PageCTA from "@/components/sections/PageCTA";
 import BookingLeadForm from "@/components/forms/BookingLeadForm";
 import FeatureGrid from "@/components/ui/FeatureGrid";
 import Photo from "@/components/ui/Photo";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { garden, gardenIncluded, gardenBestFor } from "@/data/rooms";
 import { getLocale } from "@/i18n/locale.server";
 import { t } from "@/i18n/dictionary";
@@ -46,7 +46,7 @@ export default async function GardenPage() {
         title={t("Garden Rooms 2026", locale)}
         subtitle={t("Подтверждённый фонд: 32 двухместных номера — по 16 в Garden 1 и Garden 2. Конкретную конфигурацию кроватей и наличие подтверждает администратор.", locale)}
         image="/images/garden/garden-05.png"
-        cta={{ label: t("Узнать наличие Garden Rooms", locale), href: WA.garden }}
+        cta={{ label: t("Узнать наличие Garden Rooms", locale), href: waFor("garden", locale) }}
       />
 
       <section className="bg-cream py-16 sm:py-24">
@@ -139,7 +139,7 @@ export default async function GardenPage() {
       <PageCTA
         title={t("Забронировать Garden Rooms", locale)}
         text={t("Напишите нам — администратор проверит конкретный номер, конфигурацию и наличие на ваши даты.", locale)}
-        cta={{ label: t("Узнать наличие Garden Rooms", locale), href: WA.garden }}
+        cta={{ label: t("Узнать наличие Garden Rooms", locale), href: waFor("garden", locale) }}
       />
     </main>
   );

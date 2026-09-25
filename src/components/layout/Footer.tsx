@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/ui/Logo";
-import { SITE, WA } from "@/data/site";
+import { SITE, waFor } from "@/data/site";
 import { FOOTER_NAV } from "@/data/navigation";
 import { LEGAL_PAGES } from "@/data/legal";
 import { t } from "@/i18n/dictionary";
@@ -81,7 +81,7 @@ export default async function Footer() {
               </li>
             </ul>
             <a
-              href={WA.booking}
+              href={waFor("booking", locale)}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-5 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-2.5 text-sm font-semibold text-emerald-deep transition-transform hover:-translate-y-0.5"

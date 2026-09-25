@@ -1,6 +1,6 @@
 ﻿import SectionHeading from "@/components/ui/SectionHeading";
 import { halls, equipmentNote, coffeeBreak, eventsIntro } from "@/data/events";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import {
@@ -64,7 +64,7 @@ export default async function EventsSection() {
 
         <div className="mt-10 text-center">
           <a
-            href={WA.events}
+            href={waFor("events", locale)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-7 py-3.5 text-sm font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5"

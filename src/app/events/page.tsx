@@ -6,7 +6,7 @@ import PageCTA from "@/components/sections/PageCTA";
 import Photo from "@/components/ui/Photo";
 import EventLeadForm from "@/components/forms/EventLeadForm";
 import PriceCard from "@/components/ui/PriceCard";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import {
@@ -56,7 +56,7 @@ export default async function EventsPage() {
         title={t("Корпоративы и мероприятия на Иссык-Куле", locale)}
         subtitle={t("Конференц-залы, проживание, питание, кофе-брейки, SPA и горячие источники в одном комплексе.", locale)}
         image="/images/events/conference-hall-big-02.png"
-        cta={{ label: t("Рассчитать мероприятие", locale), href: WA.events }}
+        cta={{ label: t("Рассчитать мероприятие", locale), href: waFor("events", locale) }}
       />
 
       {/* Кому подходит */}
@@ -193,7 +193,7 @@ export default async function EventsPage() {
       <PageCTA
         title={t("Организуем ваше мероприятие", locale)}
         text={t("Расскажите про формат, даты и число участников — подготовим условия по залам, проживанию и питанию.", locale)}
-        cta={{ label: t("Рассчитать мероприятие", locale), href: WA.events }}
+        cta={{ label: t("Рассчитать мероприятие", locale), href: waFor("events", locale) }}
       />
     </main>
   );

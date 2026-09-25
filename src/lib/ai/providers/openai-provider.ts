@@ -47,7 +47,7 @@ export async function openaiProvider(
     max_tokens: Number(process.env.AI_MAX_TOKENS ?? "700"),
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: buildSystemPrompt() },
+      { role: "system", content: buildSystemPrompt(input.locale ?? "ru") },
       ...history,
       { role: "user", content: input.message },
     ],
@@ -77,9 +77,16 @@ export async function openaiProvider(
     // не JSON — используем как обычный текст
   }
 
+  const fallback = {
+    ru: "Уточню детали у администратора.",
+    kg: "Маалыматты администратордон тактайм.",
+    en: "I’ll confirm the details with the administrator.",
+    kz: "Ақпаратты әкімшіден нақтылаймын.",
+  } as const;
+
   return {
     ok: true,
-    message: raw || "Уточню детали у администратора.",
+    message: raw || fallback[input.locale ?? "ru"],
     topic: "general",
     shouldHandoff: false,
   };

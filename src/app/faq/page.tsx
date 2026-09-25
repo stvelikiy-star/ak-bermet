@@ -4,7 +4,7 @@ import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
 import FaqAccordion from "@/components/ui/FaqAccordion";
 import { allFaqs, faqAnswer } from "@/data/faq";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 
@@ -25,7 +25,7 @@ export default async function FaqPage() {
           "Бронирование, проживание, источники, SPA и условия пребывания — собрали ответы в одном месте.",
           locale
         )}
-        cta={{ label: t("Задать вопрос в WhatsApp", locale), href: WA.booking }}
+        cta={{ label: t("Задать вопрос в WhatsApp", locale), href: waFor("booking", locale) }}
       />
 
       <section className="bg-cream py-16 sm:py-24">
@@ -45,7 +45,7 @@ export default async function FaqPage() {
           "Напишите нам в WhatsApp — администратор ответит на любые вопросы по отдыху в Ак-Бермет.",
           locale
         )}
-        cta={{ label: t("Написать в WhatsApp", locale), href: WA.booking }}
+        cta={{ label: t("Написать в WhatsApp", locale), href: waFor("booking", locale) }}
       />
     </main>
   );

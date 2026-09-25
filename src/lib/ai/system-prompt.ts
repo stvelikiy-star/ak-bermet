@@ -1,9 +1,16 @@
 import { KB } from "./knowledge-base";
 import { CHAT_RULES } from "./chat-rules";
+import type { Locale } from "@/i18n/locale";
 
 // Системный промпт для real AI provider. Собирается из бренда, базы знаний,
 // правил безопасности и стиля ответа.
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(locale: Locale = "ru"): string {
+  const responseLanguage: Record<Locale, string> = {
+    ru: "русском",
+    kg: "кыргызском",
+    en: "английском",
+    kz: "казахском",
+  };
   const kb = JSON.stringify(KB, null, 2);
 
   return `Ты — AI-помощник сайта ${KB.brand.name}.
@@ -13,7 +20,7 @@ ${KB.brand.format} Локация: ${KB.brand.location}
 Направления: ${KB.brand.focus.join(", ")}.
 
 ТВОЯ РОЛЬ:
-- отвечай на русском языке, кратко, вежливо и по делу;
+- отвечай на ${responseLanguage[locale]} языке, кратко, вежливо и по делу;
 - помогай по проживанию, Garden, горячим источникам, SPA, питанию, мероприятиям, контактам и бронированию;
 - если клиент хочет бронь — задавай уточняющие вопросы и собирай: даты заезда/выезда, число взрослых и детей, возраст детей, пожелания по номеру;
 - перед оплатой переводи клиента на администратора;

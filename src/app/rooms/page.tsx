@@ -8,7 +8,7 @@ import BookingLeadForm from "@/components/forms/BookingLeadForm";
 import PublicAvailabilitySearch from "@/components/availability/PublicAvailabilitySearch";
 import Photo from "@/components/ui/Photo";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { accommodationByType, roomsNotes } from "@/data/rooms";
 import { roomOverviewCards } from "@/data/room-details";
 import { getLocale } from "@/i18n/locale.server";
@@ -105,7 +105,7 @@ export default async function RoomsPage() {
                       {t("Подробнее", locale)} <IconArrowRight className="h-4 w-4" />
                     </Link>
                     <a
-                      href={WA[card.slug === "garden-lux" ? "garden" : "availability"]}
+                      href={waFor(card.slug === "garden-lux" ? "garden" : "availability", locale)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-5 py-2.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
@@ -188,7 +188,7 @@ export default async function RoomsPage() {
       <PageCTA
         title={t("Подобрать номер", locale)}
         text={t("Напишите нам в WhatsApp — администратор проверит наличие, конкретный номер и применимый тариф под ваши даты и количество гостей.", locale)}
-        cta={{ label: t("Узнать наличие номеров", locale), href: WA.availability }}
+        cta={{ label: t("Узнать наличие номеров", locale), href: waFor("availability", locale) }}
       />
     </main>
   );

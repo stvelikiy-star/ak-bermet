@@ -3,7 +3,7 @@ import Container from "@/components/ui/Container";
 import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
 import GeneralLeadForm from "@/components/forms/GeneralLeadForm";
-import { SITE, WA } from "@/data/site";
+import { SITE, waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import {
@@ -31,7 +31,7 @@ export default async function ContactsPage() {
         title={t("Контакты Ак-Бермет", locale)}
         subtitle={t("Свяжитесь с нами для бронирования, вопросов по источникам, SPA и мероприятиям.", locale)}
         image="/images/hero/contact-hero.png"
-        cta={{ label: t("Написать в WhatsApp", locale), href: WA.booking }}
+        cta={{ label: t("Написать в WhatsApp", locale), href: waFor("booking", locale) }}
       />
 
       <section className="bg-cream py-16 sm:py-24">
@@ -47,7 +47,7 @@ export default async function ContactsPage() {
                   <li className="flex items-start gap-3">
                     <IconPin className="mt-0.5 h-5 w-5 shrink-0 text-gold-dark" />
                     <span className="leading-relaxed text-ink/80">
-                      {SITE.address}
+                      {t(SITE.address, locale)}
                     </span>
                   </li>
                   <li className="flex items-center gap-3">
@@ -107,7 +107,7 @@ export default async function ContactsPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <a
-                  href={WA.booking}
+                  href={waFor("booking", locale)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-5 py-3.5 text-sm font-semibold text-emerald-deep shadow-gold transition-transform hover:-translate-y-0.5"
@@ -116,7 +116,7 @@ export default async function ContactsPage() {
                   {t("Написать в WhatsApp", locale)}
                 </a>
                 <a
-                  href={WA.availability}
+                  href={waFor("availability", locale)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-milk px-5 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
@@ -164,7 +164,7 @@ export default async function ContactsPage() {
       <PageCTA
         title={t("Готовы помочь с бронированием", locale)}
         text={t("Напишите нам в WhatsApp — ответим на вопросы по номерам, источникам, SPA и мероприятиям.", locale)}
-        cta={{ label: t("Написать в WhatsApp", locale), href: WA.booking }}
+        cta={{ label: t("Написать в WhatsApp", locale), href: waFor("booking", locale) }}
       />
     </main>
   );

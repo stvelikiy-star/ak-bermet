@@ -6,7 +6,7 @@ import Photo from "@/components/ui/Photo";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import PageCTA from "@/components/sections/PageCTA";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import {
@@ -50,7 +50,7 @@ export default async function RoomDetailPage({
   if (!room) notFound();
   const locale = await getLocale();
 
-  const waHref = WA[room.whatsappKey];
+  const waHref = waFor(room.whatsappKey, locale);
   const hasPendingPhotos = room.gallery.some((g) => g.src.endsWith("/photo-pending.svg"));
 
   return (

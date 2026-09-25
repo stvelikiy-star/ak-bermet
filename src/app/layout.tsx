@@ -79,7 +79,7 @@ export default async function RootLayout({
           intro={<BrandIntro />}
           header={<Header locale={locale} />}
           footer={<Footer />}
-          aiChat={<AiChat />}
+          aiChat={<AiChat locale={locale} />}
         >
           {children}
           <PremiumMotion />

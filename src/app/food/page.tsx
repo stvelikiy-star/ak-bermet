@@ -10,7 +10,7 @@ import {
   menuHighlights,
   venues,
 } from "@/data/food";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { getLocale } from "@/i18n/locale.server";
 import { t } from "@/i18n/dictionary";
 import { IconClock, IconDish, IconCheck } from "@/components/ui/icons";
@@ -42,7 +42,7 @@ export default async function FoodPage() {
         title={t("Питание и рестораны", locale)}
         subtitle={t("Трёхразовое комплексное питание для проживающих гостей и кафе на территории комплекса.", locale)}
         image="/images/hero/food-hero.png"
-        cta={{ label: t("Уточнить меню", locale), href: WA.food }}
+        cta={{ label: t("Уточнить меню", locale), href: waFor("food", locale) }}
       />
 
       {/* Включённое питание + расписание */}
@@ -160,7 +160,7 @@ export default async function FoodPage() {
       <PageCTA
         title={t("Вопросы по питанию?", locale)}
         text={t("Напишите нам — расскажем про меню, режим питания и возможности для гостей без проживания.", locale)}
-        cta={{ label: t("Уточнить меню", locale), href: WA.food }}
+        cta={{ label: t("Уточнить меню", locale), href: waFor("food", locale) }}
       />
     </main>
   );

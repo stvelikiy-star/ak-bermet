@@ -1,6 +1,6 @@
 ﻿import Photo from "@/components/ui/Photo";
 import { garden } from "@/data/rooms";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import {
@@ -50,7 +50,7 @@ export default async function GardenSection() {
               </ul>
 
               <a
-                href={WA.availability}
+                href={waFor("availability", locale)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-7 inline-flex w-fit items-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-6 py-3 text-sm font-semibold text-emerald-deep transition-transform hover:-translate-y-0.5"

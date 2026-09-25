@@ -1,5 +1,5 @@
 import { featuredPromo as promo } from "@/data/promos";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
@@ -47,7 +47,7 @@ export default async function PromoSection() {
                   {t("Смотреть акции", locale)} <IconArrowRight className="h-4 w-4" />
                 </a>
                 <a
-                  href={WA.promo}
+                  href={waFor("promo", locale)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-colors hover:border-gold/60 hover:text-gold-soft"

@@ -1,57 +1,71 @@
 import type { ChatSuggestedAction, ChatTopic } from "@/types/chat";
+import type { Locale } from "@/i18n/locale";
+import { t } from "@/i18n/dictionary";
 import { actions } from "./chat-utils";
 
 // Возвращает suggested actions по теме ответа.
-export function actionsForTopic(topic?: ChatTopic): ChatSuggestedAction[] {
+export function actionsForTopic(
+  topic?: ChatTopic,
+  locale: Locale = "ru"
+): ChatSuggestedAction[] {
+  const whatsapp = () =>
+    actions.whatsapp(t("Написать в WhatsApp", locale), undefined, locale);
+
   switch (topic) {
     case "rooms":
     case "booking":
       return [
-        actions.leadForm("Оставить заявку", "/rooms#booking-form"),
-        actions.whatsapp("WhatsApp администратору"),
+        actions.leadForm(t("Оставить заявку", locale), "/rooms#booking-form"),
+        actions.whatsapp(t("WhatsApp администратору", locale), undefined, locale),
       ];
     case "garden":
       return [
-        actions.leadForm("Узнать Garden Rooms", "/garden#booking-form"),
-        actions.whatsapp(),
+        actions.leadForm(t("Узнать Garden Rooms", locale), "/garden#booking-form"),
+        whatsapp(),
       ];
     case "hot_springs":
       return [
-        actions.page("Цены источников", "/hot-springs"),
-        actions.whatsapp(),
+        actions.page(t("Цены источников", locale), "/hot-springs"),
+        whatsapp(),
       ];
     case "spa":
       return [
-        actions.leadForm("Записаться в SPA", "/spa#spa-form"),
-        actions.whatsapp(),
+        actions.leadForm(t("Записаться в SPA", locale), "/spa#spa-form"),
+        whatsapp(),
       ];
     case "events":
       return [
-        actions.leadForm("Заявка на мероприятие", "/events#event-form"),
-        actions.whatsapp(),
+        actions.leadForm(t("Заявка на мероприятие", locale), "/events#event-form"),
+        whatsapp(),
       ];
     case "food":
-      return [actions.page("Питание и рестораны", "/food"), actions.whatsapp()];
+      return [actions.page(t("Питание и рестораны", locale), "/food"), whatsapp()];
     case "promos":
-      return [actions.page("Смотреть акции", "/promos"), actions.whatsapp()];
+      return [actions.page(t("Смотреть акции", locale), "/promos"), whatsapp()];
     case "contacts":
-      return [actions.page("Открыть контакты", "/contacts"), actions.whatsapp()];
+      return [actions.page(t("Открыть контакты", locale), "/contacts"), whatsapp()];
     case "payment":
     case "cancellation":
-      return [actions.handoff()];
+      return [
+        actions.handoff(
+          undefined,
+          locale,
+          t("Перейти в WhatsApp к администратору", locale)
+        ),
+      ];
     case "legal":
       return [
-        actions.page("Публичная оферта", "/legal/public-offer"),
-        actions.page("Возврат и отмена", "/legal/refund"),
-        actions.whatsapp(),
+        actions.page(t("Публичная оферта", locale), "/legal/public-offer"),
+        actions.page(t("Возврат и отмена", locale), "/legal/refund"),
+        whatsapp(),
       ];
     default:
       return [
-        actions.page("Номера", "/rooms"),
-        actions.page("Источники", "/hot-springs"),
+        actions.page(t("Номера", locale), "/rooms"),
+        actions.page(t("Источники", locale), "/hot-springs"),
         actions.page("SPA", "/spa"),
-        actions.page("Мероприятия", "/events"),
-        actions.whatsapp(),
+        actions.page(t("Мероприятия", locale), "/events"),
+        whatsapp(),
       ];
   }
 }
