@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
 const SESSION_KEY = "akbermet_brand_intro_seen";
 
-export default function BrandIntro() {
+export default function BrandIntro({ locale = "ru" }: { locale?: Locale }) {
   const [closing, setClosing] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -79,7 +81,7 @@ export default function BrandIntro() {
           </p>
 
           <p className="mt-2 text-xs tracking-[0.18em] text-white/65">
-            ИССЫК-КУЛЬ
+            {t("Иссык-Куль", locale).toUpperCase()}
           </p>
         </div>
       </div>
