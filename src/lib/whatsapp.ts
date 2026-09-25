@@ -177,10 +177,28 @@ export function whatsAppToMain(text: string): string {
 // Текст для передачи диалога администратору из AI-чата.
 // AI-чат пока сохраняет русский служебный handoff по умолчанию; пользовательские
 // формы выше полностью следуют выбранной локали.
-export function createChatHandoffText(question?: string): string {
+export function createChatHandoffText(
+  question?: string,
+  locale: Locale = "ru"
+): string {
   const q = (question ?? "").trim();
-  return (
-    "Здравствуйте! Я общался с AI-помощником на сайте Ак-Бермет и хочу уточнить вопрос.\n\n" +
-    `Мой вопрос:\n${q || "—"}`
-  );
+  const copy: Record<Locale, { intro: string; question: string }> = {
+    ru: {
+      intro: "Здравствуйте! Я общался с AI-помощником на сайте Ак-Бермет и хочу уточнить вопрос.",
+      question: "Мой вопрос",
+    },
+    kg: {
+      intro: "Саламатсызбы! Мен Ак-Берметтин сайтындагы AI-жардамчы менен сүйлөштүм жана суроомду тактагым келет.",
+      question: "Менин суроом",
+    },
+    en: {
+      intro: "Hello! I used the AI assistant on the Ak-Bermet website and would like to clarify a question.",
+      question: "My question",
+    },
+    kz: {
+      intro: "Сәлеметсіз бе! Мен Ак-Бермет сайтындағы AI-көмекшімен сөйлестім және сұрағымды нақтылағым келеді.",
+      question: "Менің сұрағым",
+    },
+  };
+  return `${copy[locale].intro}\n\n${copy[locale].question}:\n${q || "—"}`;
 }
