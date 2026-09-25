@@ -47,7 +47,7 @@ export default async function ContactsPage() {
                   <li className="flex items-start gap-3">
                     <IconPin className="mt-0.5 h-5 w-5 shrink-0 text-gold-dark" />
                     <span className="leading-relaxed text-ink/80">
-                      {SITE.address}
+                      {t(SITE.address, locale)}
                     </span>
                   </li>
                   <li className="flex items-center gap-3">
@@ -116,7 +116,7 @@ export default async function ContactsPage() {
                   {t("Написать в WhatsApp", locale)}
                 </a>
                 <a
-                  href={WA.availability}
+                  href={waFor("availability", locale)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-milk px-5 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
