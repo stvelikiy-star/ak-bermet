@@ -8,11 +8,14 @@ import { waFor } from "@/data/site";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 
-export const metadata: Metadata = {
-  title: "Частые вопросы",
-  description:
-    "Ответы на частые вопросы о бронировании, проживании, источниках, Wi-Fi, парковке и трансфере в комплексе AK BERMET.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Частые вопросы", locale),
+    description: t("Ответы на частые вопросы о бронировании, проживании, источниках, Wi-Fi, парковке и трансфере в комплексе AK BERMET.", locale),
+    alternates: { canonical: "/faq" },
+  };
+}
 
 export default async function FaqPage() {
   const locale = await getLocale();
