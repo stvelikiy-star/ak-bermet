@@ -1120,6 +1120,7 @@ const DICT: Record<string, Translations> = {
   "Для этой категории подтверждённая фотография ещё не загружена. Конкретный номер и фото уточняйте у администратора.": { kg: "Бул категория үчүн ырасталган сүрөт азырынча жүктөлө элек. Конкреттүү номерди жана сүрөттү администратордон тактаңыз.", en: "A verified photo has not yet been uploaded for this category. Ask the administrator for the specific room and photos.", kz: "Бұл санат үшін расталған фотосурет әлі жүктелмеген. Нақты нөмір мен фотосуретті әкімшіден нақтылаңыз." },
   "В галерее используются подтверждённые фотографии AK BERMET для этой категории.": { kg: "Бул категориянын галереясында AK BERMETтин ырасталган сүрөттөрү колдонулат.", en: "This gallery uses verified AK BERMET photos for this category.", kz: "Бұл санаттың галереясында AK BERMET-тің расталған фотосуреттері пайдаланылады." },
   "32 подтверждённых двухместных номера в Garden 1 и Garden 2.": { kg: "Garden 1 жана Garden 2 корпустарында 32 ырасталган эки орундуу номер.", en: "32 verified double rooms in Garden 1 and Garden 2.", kz: "Garden 1 және Garden 2 корпустарында 32 расталған екі орындық нөмір." },
+  "Смотреть акции": { kg: "Акцияларды көрүү", en: "View promotions", kz: "Акцияларды көру" },
 };
 
 const BLOCKED_BUSINESS_TRANSLATIONS = new Set<string>([
