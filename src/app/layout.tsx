@@ -9,42 +9,39 @@ import PremiumMotion from "@/components/ui/PremiumMotion";
 import { htmlLangFor } from "@/i18n/locale";
 import { getLocale } from "@/i18n/locale.server";
 import { SITE } from "@/data/site";
+import { t } from "@/i18n/dictionary";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE.url),
-  title: {
-    default: "AK BERMET — отдых, SPA и горячие источники на Иссык-Куле",
-    template: "%s — AK BERMET SPA & WELLNESS",
-  },
-  description:
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const title = t("AK BERMET — отдых, SPA и горячие источники на Иссык-Куле", locale);
+  const description = t(
     "Оздоровительный SPA & Wellness комплекс на Иссык-Куле: горячие минеральные источники, SPA, номера и коттеджи, трёхразовое питание и площадки для мероприятий рядом с Чолпон-Атой.",
-  keywords: [
-    "Ак-Бермет",
-    "Иссык-Куль",
-    "SPA",
-    "горячие источники",
-    "термальные источники",
-    "курорт Кыргызстан",
-    "отдых на Иссык-Куле",
-  ],
-  applicationName: "AK BERMET",
-  alternates: { canonical: "/" },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true },
-  },
-  openGraph: {
-    title: "AK BERMET — SPA & Wellness на Иссык-Куле",
-    description:
-      "Премиальный курорт с термальными источниками и SPA-комплексом на берегу Иссык-Куля.",
-    type: "website",
-    locale: "ru_RU",
-    url: SITE.url,
-    siteName: "AK BERMET — SPA & WELLNESS",
-  },
-};
+    locale,
+  );
 
+  return {
+    metadataBase: new URL(SITE.url),
+    title: {
+      default: title,
+      template: "%s — AK BERMET SPA & WELLNESS",
+    },
+    description,
+    applicationName: "AK BERMET",
+    alternates: { canonical: "/" },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true },
+    },
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      url: SITE.url,
+      siteName: "AK BERMET — SPA & WELLNESS",
+    },
+  };
+}
 export const viewport: Viewport = {
   themeColor: "#0A312C",
   width: "device-width",
