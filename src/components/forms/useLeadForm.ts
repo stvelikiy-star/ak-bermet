@@ -3,10 +3,12 @@
 import { useState } from "react";
 import type { LeadInput } from "@/types/lead";
 import { validateLead } from "@/lib/lead-schema";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
-export function useLeadForm() {
+export function useLeadForm(locale: Locale = "ru") {
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverMessage, setServerMessage] = useState<string>("");
@@ -17,7 +19,11 @@ export function useLeadForm() {
     // Клиентская валидация до запроса
     const { ok, errors: vErrors } = validateLead(input);
     if (!ok) {
-      setErrors(vErrors);
+      setErrors(
+        Object.fromEntries(
+          Object.entries(vErrors).map(([field, message]) => [field, t(message, locale)]),
+        ),
+      );
       setStatus("error");
       return false;
     }
