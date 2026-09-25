@@ -22,12 +22,14 @@ import {
   IconShield,
 } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/spa" },
-  title: "SPA & Wellness",
-  description:
-    "Бассейн, тренажёрный зал, источники и wellness-программы в комплексе AK BERMET на Иссык-Куле. Цены и условия посещения.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("SPA & Wellness", locale),
+    description: t("Бассейн, тренажёрный зал, источники и wellness-программы в комплексе AK BERMET на Иссык-Куле. Цены и условия посещения.", locale),
+    alternates: { canonical: "/spa" },
+  };
+}
 
 
 const spaGallery = [
