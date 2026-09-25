@@ -1127,6 +1127,10 @@ const DICT: Record<string, Translations> = {
   "Цены источников": { kg: "Булактардын баалары", en: "Hot springs prices", kz: "Бұлақтар бағалары" },
   "Открыть контакты": { kg: "Байланыштарды ачуу", en: "Open contacts", kz: "Байланыстарды ашу" },
   "Перейти в WhatsApp к администратору": { kg: "Администраторго WhatsApp аркылуу өтүү", en: "Continue with the administrator on WhatsApp", kz: "Әкімшіге WhatsApp арқылы өту" },
+  // ── Legal shell ──
+  "Все документы": { kg: "Бардык документтер", en: "All documents", kz: "Барлық құжаттар" },
+  "Вопросы по документам": { kg: "Документтер боюнча суроолор", en: "Questions about documents", kz: "Құжаттар бойынша сұрақтар" },
+  "Актуальная редакция: 2026": { kg: "Актуалдуу редакция: 2026", en: "Current version: 2026", kz: "Өзекті редакция: 2026" },
 };
 
 const BLOCKED_BUSINESS_TRANSLATIONS = new Set<string>([
