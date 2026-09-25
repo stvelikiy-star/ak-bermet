@@ -77,9 +77,16 @@ export async function openaiProvider(
     // не JSON — используем как обычный текст
   }
 
+  const fallback = {
+    ru: "Уточню детали у администратора.",
+    kg: "Маалыматты администратордон тактайм.",
+    en: "I’ll confirm the details with the administrator.",
+    kz: "Ақпаратты әкімшіден нақтылаймын.",
+  } as const;
+
   return {
     ok: true,
-    message: raw || "Уточню детали у администратора.",
+    message: raw || fallback[input.locale ?? "ru"],
     topic: "general",
     shouldHandoff: false,
   };
