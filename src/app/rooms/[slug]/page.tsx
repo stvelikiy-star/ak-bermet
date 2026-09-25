@@ -68,6 +68,7 @@ export default async function RoomDetailPage({
         </div>
         <Container className="relative pb-12 pt-28 sm:pb-16 sm:pt-36">
           <Breadcrumbs
+            locale={locale}
             items={[
               { label: t("Главная", locale), href: "/" },
               { label: t("Номера", locale), href: "/rooms" },
