@@ -7,13 +7,6 @@ import { getLocale } from "@/i18n/locale.server";
 import type { Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dictionary";
 
-export const metadata: Metadata = {
-  title: "Условия использования сайта",
-  description:
-    "Условия использования сайта AK BERMET: назначение сайта, заявки и формы, AI-ассистент, ограничение ответственности и внешние сервисы.",
-  alternates: { canonical: "/legal/terms" },
-};
-
 type TermsCopy = {
   title: string;
   intro: string;
@@ -212,6 +205,16 @@ const COPY: Record<Locale, TermsCopy> = {
     addressLabel: "Мекенжай",
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const copy = COPY[locale];
+  return {
+    title: copy.title,
+    description: copy.intro,
+    alternates: { canonical: "/legal/terms" },
+  };
+}
 
 export default async function TermsPage() {
   const locale = await getLocale();
