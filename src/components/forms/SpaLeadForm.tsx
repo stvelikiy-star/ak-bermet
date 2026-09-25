@@ -35,7 +35,7 @@ export default function SpaLeadForm({
   locale?: Locale;
 }) {
   const [form, setForm] = useState({ ...empty, spaService: defaultService });
-  const { status, errors, serverMessage, submit, reset } = useLeadForm();
+  const { status, errors, serverMessage, submit, reset } = useLeadForm(locale);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
