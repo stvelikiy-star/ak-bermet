@@ -7,13 +7,6 @@ import { getLocale } from "@/i18n/locale.server";
 import type { Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dictionary";
 
-export const metadata: Metadata = {
-  title: "Политика конфиденциальности",
-  description:
-    "Политика конфиденциальности AK BERMET: какие данные собираются, для чего используются, где хранятся и какие права есть у гостя.",
-  alternates: { canonical: "/legal/privacy" },
-};
-
 const COPY: Record<
   Locale,
   {
@@ -268,6 +261,16 @@ const COPY: Record<
     addressLabel: "Мекенжай",
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const copy = COPY[locale];
+  return {
+    title: copy.title,
+    description: copy.intro,
+    alternates: { canonical: "/legal/privacy" },
+  };
+}
 
 export default async function PrivacyPage() {
   const locale = await getLocale();
