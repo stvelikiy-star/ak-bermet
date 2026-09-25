@@ -7,13 +7,6 @@ import { getLocale } from "@/i18n/locale.server";
 import type { Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dictionary";
 
-export const metadata: Metadata = {
-  title: "Публичная оферта",
-  description:
-    "Публичная оферта AK BERMET — SPA & WELLNESS: порядок оформления заявки, подтверждение бронирования, предоплата, проживание, отмена и возврат.",
-  alternates: { canonical: "/legal/public-offer" },
-};
-
 type OfferCopy = {
   title: string;
   intro: string;
@@ -488,6 +481,16 @@ const COPY: Record<Locale, OfferCopy> = {
     },
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const copy = COPY[locale];
+  return {
+    title: copy.title,
+    description: copy.intro,
+    alternates: { canonical: "/legal/public-offer" },
+  };
+}
 
 export default async function PublicOfferPage() {
   const locale = await getLocale();
