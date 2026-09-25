@@ -9,6 +9,7 @@ const INTERNAL_PREFIXES = [
   "/housekeeping",
   "/technician",
   "/auth",
+  "/guest",
 ];
 
 function isInternalPath(pathname: string): boolean {
