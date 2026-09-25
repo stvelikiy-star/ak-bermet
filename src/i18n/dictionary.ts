@@ -1121,6 +1121,12 @@ const DICT: Record<string, Translations> = {
   "В галерее используются подтверждённые фотографии AK BERMET для этой категории.": { kg: "Бул категориянын галереясында AK BERMETтин ырасталган сүрөттөрү колдонулат.", en: "This gallery uses verified AK BERMET photos for this category.", kz: "Бұл санаттың галереясында AK BERMET-тің расталған фотосуреттері пайдаланылады." },
   "32 подтверждённых двухместных номера в Garden 1 и Garden 2.": { kg: "Garden 1 жана Garden 2 корпустарында 32 ырасталган эки орундуу номер.", en: "32 verified double rooms in Garden 1 and Garden 2.", kz: "Garden 1 және Garden 2 корпустарында 32 расталған екі орындық нөмір." },
   "Смотреть акции": { kg: "Акцияларды көрүү", en: "View promotions", kz: "Акцияларды көру" },
+  // ── AI chat localized actions ──
+  "WhatsApp администратору": { kg: "Администраторго WhatsApp", en: "WhatsApp administrator", kz: "Әкімшіге WhatsApp" },
+  "Узнать Garden Rooms": { kg: "Garden Rooms тууралуу билүү", en: "Check Garden Rooms", kz: "Garden Rooms туралы білу" },
+  "Цены источников": { kg: "Булактардын баалары", en: "Hot springs prices", kz: "Бұлақтар бағалары" },
+  "Открыть контакты": { kg: "Байланыштарды ачуу", en: "Open contacts", kz: "Байланыстарды ашу" },
+  "Перейти в WhatsApp к администратору": { kg: "Администраторго WhatsApp аркылуу өтүү", en: "Continue with the administrator on WhatsApp", kz: "Әкімшіге WhatsApp арқылы өту" },
 };
 
 const BLOCKED_BUSINESS_TRANSLATIONS = new Set<string>([
