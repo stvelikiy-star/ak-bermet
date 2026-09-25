@@ -1289,6 +1289,9 @@ const DICT: Record<string, Translations> = {
   "Сроки обработки": { kg: "Иштетүү мөөнөттөрү", en: "Processing time", kz: "Өңдеу мерзімі" },
   "Запрос на возврат рассматривается администрацией в разумные сроки. Фактический срок зачисления зависит от правил банка или платёжной системы.": { kg: "Кайтаруу сурамын администрация негиздүү мөөнөттө карайт. Каражаттын иш жүзүндө түшүү мөөнөтү банктын же төлөм системасынын эрежелерине жараша болот.", en: "Refund requests are reviewed by the administration within a reasonable period. The actual crediting time depends on the bank or payment-system rules.", kz: "Қайтару өтінішін әкімшілік ақылға қонымды мерзімде қарайды. Қаражаттың нақты түсу мерзімі банк немесе төлем жүйесі ережелеріне байланысты." },
   "Спорные ситуации": { kg: "Талаштуу жагдайлар", en: "Disputed situations", kz: "Даулы жағдайлар" },
+  // ── Public accessibility ──
+  "Хлебные крошки": { kg: "Навигация жолу", en: "Breadcrumbs", kz: "Навигация жолы" },
+  "AK BERMET — на главную": { kg: "AK BERMET — башкы бетке", en: "AK BERMET — home", kz: "AK BERMET — басты бетке" },
 };
 
 const BLOCKED_BUSINESS_TRANSLATIONS = new Set<string>([
