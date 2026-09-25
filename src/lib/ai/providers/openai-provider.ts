@@ -47,7 +47,7 @@ export async function openaiProvider(
     max_tokens: Number(process.env.AI_MAX_TOKENS ?? "700"),
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: buildSystemPrompt() },
+      { role: "system", content: buildSystemPrompt(input.locale ?? "ru") },
       ...history,
       { role: "user", content: input.message },
     ],
