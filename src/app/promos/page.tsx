@@ -3,7 +3,7 @@ import Container from "@/components/ui/Container";
 import PageHero from "@/components/sections/PageHero";
 import PageCTA from "@/components/sections/PageCTA";
 import BookingLeadForm from "@/components/forms/BookingLeadForm";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { promos, promosPlaceholder } from "@/data/promos";
 import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
@@ -26,7 +26,7 @@ export default async function PromosPage() {
         title={t("Акции и специальные предложения", locale)}
         subtitle={t("Сезонные предложения для отдыха, номеров и корпоративных заездов.", locale)}
         image="/images/hero/home-hero.png"
-        cta={{ label: t("Уточнить актуальные акции", locale), href: WA.promo31 }}
+        cta={{ label: t("Уточнить актуальные акции", locale), href: waFor("promo31", locale) }}
       />
 
       <section className="bg-cream py-16 sm:py-24">
@@ -99,7 +99,7 @@ export default async function PromosPage() {
       <PageCTA
         title={t("Уточнить актуальную акцию", locale)}
         text={t("Актуальность предложения и условия подтверждает администратор. Напишите нам в WhatsApp.", locale)}
-        cta={{ label: t("Уточнить актуальные акции", locale), href: WA.promo31 }}
+        cta={{ label: t("Уточнить актуальные акции", locale), href: waFor("promo31", locale) }}
       />
     </main>
   );
