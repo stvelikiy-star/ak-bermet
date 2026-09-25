@@ -9,12 +9,14 @@ import { t } from "@/i18n/dictionary";
 import { getLocale } from "@/i18n/locale.server";
 import { IconGift, IconArrowRight } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/promos" },
-  title: "Акции и предложения",
-  description:
-    "Сезонные предложения для отдыха, номеров и корпоративных заездов в комплексе AK BERMET на Иссык-Куле.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Акции и предложения", locale),
+    description: t("Сезонные предложения для отдыха, номеров и корпоративных заездов в комплексе AK BERMET на Иссык-Куле.", locale),
+    alternates: { canonical: "/promos" },
+  };
+}
 
 export default async function PromosPage() {
   const locale = await getLocale();
