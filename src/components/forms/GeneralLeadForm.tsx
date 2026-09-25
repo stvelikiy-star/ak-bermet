@@ -49,7 +49,7 @@ export default function GeneralLeadForm({
         <FormSuccess
           message={t("Спасибо! Ваш вопрос принят. Администратор свяжется с вами.", locale)}
           locale={locale}
-          whatsappUrl={whatsAppToMain(createGeneralWhatsAppText(toLead()))}
+          whatsappUrl={whatsAppToMain(createGeneralWhatsAppText(toLead(), locale))}
           onReset={() => {
             setForm(empty);
             reset();
@@ -119,7 +119,7 @@ export default function GeneralLeadForm({
               {status === "submitting" ? t("Отправляем…", locale) : t("Отправить вопрос", locale)}
             </button>
             <a
-              href={whatsAppToMain(createGeneralWhatsAppText(toLead()))}
+              href={whatsAppToMain(createGeneralWhatsAppText(toLead(), locale))}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-6 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
