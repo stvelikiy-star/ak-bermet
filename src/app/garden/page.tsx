@@ -20,12 +20,14 @@ import {
   IconCheck,
 } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/garden" },
-  title: "Garden Rooms 2026",
-  description:
-    "Garden 1 и Garden 2 AK BERMET: 32 подтверждённых двухместных номера, по 16 в каждом корпусе.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Garden Rooms 2026", locale),
+    description: t("Garden 1 и Garden 2 AK BERMET: 32 подтверждённых двухместных номера, по 16 в каждом корпусе.", locale),
+    alternates: { canonical: "/garden" },
+  };
+}
 
 const featureItems = [
   { icon: IconLeaf, label: "Garden 1 и Garden 2" },

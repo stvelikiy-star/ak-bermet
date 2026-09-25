@@ -22,12 +22,14 @@ import {
   IconPhone,
 } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/hot-springs" },
-  title: "Горячие источники",
-  description:
-    "Круглогодичные горячие минеральные источники Ак-Бермет на Иссык-Куле: бассейны, цены и условия посещения.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Горячие источники", locale),
+    description: t("Круглогодичные горячие минеральные источники Ак-Бермет на Иссык-Куле: бассейны, цены и условия посещения.", locale),
+    alternates: { canonical: "/hot-springs" },
+  };
+}
 
 
 const springsGallery = [

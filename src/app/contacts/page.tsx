@@ -15,11 +15,14 @@ import {
 } from "@/components/ui/icons";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 
-export const metadata: Metadata = {
-  title: "Контакты",
-  description:
-    "Контакты комплекса AK BERMET на Иссык-Куле: адрес, WhatsApp, телефон по источникам, карта 2GIS и как добраться.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Контакты", locale),
+    description: t("Контакты комплекса AK BERMET на Иссык-Куле: адрес, WhatsApp, телефон по источникам, карта 2GIS и как добраться.", locale),
+    alternates: { canonical: "/contacts" },
+  };
+}
 
 export default async function ContactsPage() {
   const locale = await getLocale();

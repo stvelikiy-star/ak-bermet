@@ -15,12 +15,14 @@ import { getLocale } from "@/i18n/locale.server";
 import { t } from "@/i18n/dictionary";
 import { IconClock, IconDish, IconCheck } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/food" },
-  title: "Питание и рестораны",
-  description:
-    "Трёхразовое комплексное питание для проживающих гостей и кафе на территории комплекса AK BERMET на Иссык-Куле.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Питание и рестораны", locale),
+    description: t("Трёхразовое комплексное питание для проживающих гостей и кафе на территории комплекса AK BERMET на Иссык-Куле.", locale),
+    alternates: { canonical: "/food" },
+  };
+}
 
 
 const foodGallery = [

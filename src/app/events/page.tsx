@@ -25,12 +25,14 @@ import {
   IconGift,
 } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/events" },
-  title: "Корпоративы и конференц-залы",
-  description:
-    "Конференц-залы, проживание, питание, кофе-брейки и SPA для корпоративов, семинаров и тренингов на Иссык-Куле.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: t("Корпоративы и конференц-залы", locale),
+    description: t("Конференц-залы, проживание, питание, кофе-брейки и SPA для корпоративов, семинаров и тренингов на Иссык-Куле.", locale),
+    alternates: { canonical: "/events" },
+  };
+}
 
 
 const eventsGallery = [
