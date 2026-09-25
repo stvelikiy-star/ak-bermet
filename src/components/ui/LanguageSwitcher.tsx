@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LOCALES, LOCALE_COOKIE, type Locale } from "@/i18n/locale";
 import { IconGlobe, IconChevronDown } from "@/components/ui/icons";
+import { t } from "@/i18n/dictionary";
 
 function setLocaleCookie(locale: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`;
@@ -52,7 +53,7 @@ export default function LanguageSwitcher({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Сменить язык"
+        aria-label={t("Сменить язык", locale)}
         aria-expanded={open}
         className="flex items-center gap-1 rounded-full border border-white/20 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:border-gold/60 hover:text-gold-soft"
       >

@@ -34,7 +34,7 @@ export default function EventLeadForm({
   locale?: Locale;
 }) {
   const [form, setForm] = useState(empty);
-  const { status, errors, serverMessage, submit, reset } = useLeadForm();
+  const { status, errors, serverMessage, submit, reset } = useLeadForm(locale);
 
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));

@@ -63,7 +63,7 @@ export default function BookingLeadForm({
     message: initialMessage,
   });
   const [form, setForm] = useState(initialForm);
-  const { status, errors, serverMessage, submit, reset } = useLeadForm();
+  const { status, errors, serverMessage, submit, reset } = useLeadForm(locale);
 
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
