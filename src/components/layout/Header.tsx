@@ -34,6 +34,15 @@ export default function Header({ locale }: { locale: Locale }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   // Закрываем мобильное меню при переходе
   useEffect(() => {
     setOpen(false);
