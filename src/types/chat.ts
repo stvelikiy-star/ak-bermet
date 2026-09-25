@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/locale";
+
 // Типы AI-чата (архитектура Stage 06).
 
 export type ChatRole = "user" | "assistant" | "system";
@@ -29,6 +31,7 @@ export interface ChatRequest {
   message: string;
   history?: ChatMessage[];
   page?: string;
+  locale?: Locale;
 }
 
 export interface ChatSuggestedAction {
@@ -51,4 +54,5 @@ export interface AIProviderInput {
   message: string;
   history?: ChatMessage[];
   page?: string;
+  locale?: Locale;
 }
