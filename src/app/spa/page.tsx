@@ -6,7 +6,7 @@ import PageCTA from "@/components/sections/PageCTA";
 import Photo from "@/components/ui/Photo";
 import SpaLeadForm from "@/components/forms/SpaLeadForm";
 import PriceCard from "@/components/ui/PriceCard";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import { getLocale } from "@/i18n/locale.server";
 import { t } from "@/i18n/dictionary";
 import {
@@ -53,7 +53,7 @@ export default async function SpaPage() {
         title={t("SPA & Wellness", locale)}
         subtitle={t("Бассейн, тренажёрный зал, источники и wellness-формат для восстановления и отдыха.", locale)}
         image="/images/spa/gallery-02-spa-reception.webp.png"
-        cta={{ label: t("Уточнить услуги SPA", locale), href: WA.spa }}
+        cta={{ label: t("Уточнить услуги SPA", locale), href: waFor("spa", locale) }}
       />
 
       {/* Что входит для проживающих */}
@@ -152,7 +152,7 @@ export default async function SpaPage() {
       <PageCTA
         title={t("Записаться в SPA", locale)}
         text={t("Напишите нам в WhatsApp, чтобы уточнить расписание и записаться на посещение SPA & Wellness.", locale)}
-        cta={{ label: t("Уточнить услуги SPA", locale), href: WA.spa }}
+        cta={{ label: t("Уточнить услуги SPA", locale), href: waFor("spa", locale) }}
       />
     </main>
   );
