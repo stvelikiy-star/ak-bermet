@@ -48,7 +48,7 @@ export default async function HotSpringsPage() {
         title={t("Горячие источники Ак-Бермет", locale)}
         subtitle={t("Круглогодичный термальный комплекс с минеральной хлоридно-натриевой водой, 7 бассейнами и температурой воды до +44 °C.", locale)}
         image="/images/hot-springs/hot-springs-main.png"
-        cta={{ label: t("Уточнить посещение источников", locale), href: WA.springs }}
+        cta={{ label: t("Уточнить посещение источников", locale), href: waFor("springs", locale) }}
       />
 
       {/* Факты */}
@@ -168,7 +168,7 @@ export default async function HotSpringsPage() {
       <PageCTA
         title={t("Запланировать визит", locale)}
         text={t("Напишите нам, чтобы уточнить часы работы и условия посещения горячих источников.", locale)}
-        cta={{ label: t("Уточнить посещение источников", locale), href: WA.springs }}
+        cta={{ label: t("Уточнить посещение источников", locale), href: waFor("springs", locale) }}
       />
     </main>
   );
