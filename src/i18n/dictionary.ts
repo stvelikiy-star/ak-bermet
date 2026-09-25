@@ -1141,6 +1141,17 @@ const DICT: Record<string, Translations> = {
   "Сезонные предложения для отдыха, номеров и корпоративных заездов в комплексе AK BERMET на Иссык-Куле.": { kg: "Ысык-Көлдөгү AK BERMET комплексинде эс алуу, номерлер жана корпоративдик келүүлөр үчүн сезондук сунуштар.", en: "Seasonal offers for holidays, rooms and corporate stays at AK BERMET on Issyk-Kul.", kz: "Ыстықкөлдегі AK BERMET кешенінде демалыс, нөмірлер және корпоративтік келулерге арналған маусымдық ұсыныстар." },
   "Контакты комплекса AK BERMET на Иссык-Куле: адрес, WhatsApp, телефон по источникам, карта 2GIS и как добраться.": { kg: "Ысык-Көлдөгү AK BERMET комплексинин байланыштары: дарек, WhatsApp, булактар боюнча телефон, 2GIS картасы жана жетүү жолу.", en: "AK BERMET contacts on Issyk-Kul: address, WhatsApp, hot springs phone, 2GIS map and directions.", kz: "Ыстықкөлдегі AK BERMET кешенінің байланыстары: мекенжай, WhatsApp, бұлақтар телефоны, 2GIS картасы және жету жолы." },
   "Ответы на частые вопросы о бронировании, проживании, источниках, Wi-Fi, парковке и трансфере в комплексе AK BERMET.": { kg: "AK BERMET комплексиндеги брондоо, жайгашуу, булактар, Wi-Fi, парковка жана трансфер боюнча көп берилүүчү суроолорго жооптор.", en: "Answers to frequently asked questions about booking, accommodation, hot springs, Wi-Fi, parking and transfers at AK BERMET.", kz: "AK BERMET кешеніндегі брондау, тұру, бұлақтар, Wi-Fi, тұрақ және трансфер туралы жиі қойылатын сұрақтарға жауаптар." },
+  // ── Public form validation ──
+  "Укажите корректное имя": { kg: "Туура атты жазыңыз", en: "Enter a valid name", kz: "Дұрыс атты енгізіңіз" },
+  "Укажите корректный номер телефона": { kg: "Туура телефон номерин жазыңыз", en: "Enter a valid phone number", kz: "Дұрыс телефон нөмірін енгізіңіз" },
+  "Не указано направление заявки": { kg: "Өтүнмөнүн багыты көрсөтүлгөн жок", en: "Request category is not specified", kz: "Өтінім бағыты көрсетілмеген" },
+  "Не указан источник заявки": { kg: "Өтүнмөнүн булагы көрсөтүлгөн жок", en: "Request source is not specified", kz: "Өтінім көзі көрсетілмеген" },
+  "Некорректное значение": { kg: "Туура эмес маани", en: "Invalid value", kz: "Қате мән" },
+  "Некорректное количество": { kg: "Туура эмес сан", en: "Invalid quantity", kz: "Қате сан" },
+  "Некорректная дата заезда": { kg: "Келүү датасы туура эмес", en: "Invalid check-in date", kz: "Келу күні қате" },
+  "Некорректная дата выезда": { kg: "Чыгуу датасы туура эмес", en: "Invalid check-out date", kz: "Шығу күні қате" },
+  "Дата выезда должна быть позже даты заезда": { kg: "Чыгуу датасы келүү датасынан кийин болушу керек", en: "Check-out date must be later than check-in date", kz: "Шығу күні келу күнінен кейін болуы керек" },
+  "Некорректный способ связи": { kg: "Байланыш ыкмасы туура эмес", en: "Invalid contact method", kz: "Байланыс тәсілі қате" },
 };
 
 const BLOCKED_BUSINESS_TRANSLATIONS = new Set<string>([
