@@ -3,6 +3,7 @@ import type { ChatMessage, ChatRequest } from "@/types/chat";
 import { generateAIResponse } from "@/lib/ai/providers";
 import { shouldForceHandoff } from "@/lib/ai/handoff";
 import { actionsForTopic } from "@/lib/ai/suggested-actions";
+import { isLocale } from "@/i18n/locale";
 
 export const runtime = "nodejs";
 
@@ -107,6 +108,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const locale =
+    typeof raw.locale === "string" && isLocale(raw.locale) ? raw.locale : "ru";
+
   const history = normalizeHistory(raw.history);
   if (history === null) {
     return NextResponse.json(
@@ -119,6 +123,7 @@ export async function POST(request: Request) {
     message,
     history,
     page: raw.page as string | undefined,
+    locale,
   };
 
   try {
@@ -132,9 +137,9 @@ export async function POST(request: Request) {
 
     // Если провайдер не вернул действия — добавляем по теме.
     const suggestedActions =
-      base.suggestedActions && base.suggestedActions.length
+      locale === "ru" && base.suggestedActions && base.suggestedActions.length
         ? base.suggestedActions
-        : actionsForTopic(base.topic ?? "general");
+        : actionsForTopic(base.topic ?? "general", locale);
 
     return NextResponse.json({
       ok: true,
