@@ -331,6 +331,7 @@ export default function AiChat({ locale }: { locale: Locale }) {
                         topic={m.topic}
                         page={pathname}
                         lastUserMessage={lastUserMessage}
+                        locale={locale}
                       />
                     )}
                     {!m.shouldHandoff &&
