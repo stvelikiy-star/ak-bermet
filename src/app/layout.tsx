@@ -76,7 +76,7 @@ export default async function RootLayout({
       </head>
       <body>
         <ConditionalSiteChrome
-          intro={<BrandIntro />}
+          intro={<BrandIntro locale={locale} />}
           header={<Header locale={locale} />}
           footer={<Footer />}
           aiChat={<AiChat locale={locale} />}
