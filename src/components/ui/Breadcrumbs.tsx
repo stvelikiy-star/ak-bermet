@@ -1,12 +1,16 @@
 import Link from "next/link";
+import { t } from "@/i18n/dictionary";
+import type { Locale } from "@/i18n/locale";
 
 export default function Breadcrumbs({
   items,
+  locale = "ru",
 }: {
   items: { label: string; href?: string }[];
+  locale?: Locale;
 }) {
   return (
-    <nav aria-label="Хлебные крошки" className="text-xs text-white/60">
+    <nav aria-label={t("Хлебные крошки", locale)} className="text-xs text-white/60">
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((item, i) => {
           const last = i === items.length - 1;
