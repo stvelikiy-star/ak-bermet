@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ChatSuggestedAction, ChatTopic } from "@/types/chat";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
+import type { Locale } from "@/i18n/locale";
 import { whatsAppToMain, createChatHandoffText } from "@/lib/whatsapp";
 import AiChatLeadHandoff from "@/components/AiChatLeadHandoff";
 import {
@@ -25,19 +26,112 @@ type Msg = {
   isError?: boolean;
 };
 
-const now = () =>
-  new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-const uid = () => `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+const TIME_LOCALE: Record<Locale, string> = {
+  ru: "ru-RU",
+  kg: "ky-KG",
+  en: "en-US",
+  kz: "kk-KZ",
+};
 
-// Быстрые кнопки (отправляют сообщение движку)
-const QUICK = [
-  "Подобрать номер",
-  "Горячие источники",
-  "SPA",
-  "Мероприятие",
-];
+const CHAT_COPY: Record<
+  Locale,
+  {
+    greeting: string;
+    close: string;
+    open: string;
+    title: string;
+    online: string;
+    admin: string;
+    handoff: string;
+    quick: string[];
+    placeholder: string;
+    inputAria: string;
+    send: string;
+    footer: string;
+    error: string;
+  }
+> = {
+  ru: {
+    greeting:
+      "Здравствуйте! Я помогу с номерами, SPA, горячими источниками и бронированием. Финальное наличие и бронь подтверждает администратор.",
+    close: "Закрыть чат",
+    open: "Открыть AI-чат",
+    title: "AI-помощник Ак-Бермет",
+    online: "AI-помощник онлайн",
+    admin: "Связь с администратором",
+    handoff: "Перейти в WhatsApp к администратору",
+    quick: ["Подобрать номер", "Горячие источники", "SPA", "Мероприятие"],
+    placeholder: "Напишите сообщение...",
+    inputAria: "Сообщение помощнику",
+    send: "Отправить",
+    footer: "Ответы предварительные · бронь подтверждает администратор",
+    error:
+      "Не удалось получить ответ. Попробуйте ещё раз или напишите администратору в WhatsApp.",
+  },
+  kg: {
+    greeting:
+      "Саламатсызбы! Номерлер, SPA, ысык булактар жана брондоо боюнча жардам берем. Акыркы бош орунду жана бронду администратор ырастайт.",
+    close: "Чатты жабуу",
+    open: "AI-чатты ачуу",
+    title: "Ак-Бермет AI-жардамчысы",
+    online: "AI-жардамчы онлайн",
+    admin: "Администратор менен байланыш",
+    handoff: "Администраторго WhatsApp аркылуу өтүү",
+    quick: ["Номер тандоо", "Ысык булактар", "SPA", "Иш-чара"],
+    placeholder: "Билдирүү жазыңыз...",
+    inputAria: "Жардамчыга билдирүү",
+    send: "Жөнөтүү",
+    footer: "Жооптор алдын ала · бронду администратор ырастайт",
+    error:
+      "Жооп алуу мүмкүн болгон жок. Кайра аракет кылыңыз же администраторго WhatsApp аркылуу жазыңыз.",
+  },
+  en: {
+    greeting:
+      "Hello! I can help with rooms, SPA, hot springs and booking. Final availability and booking are confirmed by the administrator.",
+    close: "Close chat",
+    open: "Open AI chat",
+    title: "Ak-Bermet AI assistant",
+    online: "AI assistant online",
+    admin: "Contact administrator",
+    handoff: "Continue with the administrator on WhatsApp",
+    quick: ["Find a room", "Hot springs", "SPA", "Event"],
+    placeholder: "Type a message...",
+    inputAria: "Message to assistant",
+    send: "Send",
+    footer: "Answers are preliminary · booking is confirmed by the administrator",
+    error:
+      "Could not get a response. Please try again or message the administrator on WhatsApp.",
+  },
+  kz: {
+    greeting:
+      "Сәлеметсіз бе! Нөмірлер, SPA, ыстық бұлақтар және брондау бойынша көмектесемін. Соңғы қолжетімділік пен брондауды әкімші растайды.",
+    close: "Чатты жабу",
+    open: "AI-чатын ашу",
+    title: "Ак-Бермет AI-көмекшісі",
+    online: "AI-көмекші онлайн",
+    admin: "Әкімшімен байланыс",
+    handoff: "Әкімшіге WhatsApp арқылы өту",
+    quick: ["Нөмір таңдау", "Ыстық бұлақтар", "SPA", "Іс-шара"],
+    placeholder: "Хабарлама жазыңыз...",
+    inputAria: "Көмекшіге хабарлама",
+    send: "Жіберу",
+    footer: "Жауаптар алдын ала · брондауды әкімші растайды",
+    error:
+      "Жауап алу мүмкін болмады. Қайта көріңіз немесе әкімшіге WhatsApp арқылы жазыңыз.",
+  },
+};
 
-export default function AiChat() {
+const now = (locale: Locale) =>
+  new Date().toLocaleTimeString(TIME_LOCALE[locale], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const uid = () =>
+  `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
+export default function AiChat({ locale }: { locale: Locale }) {
+  const copy = CHAT_COPY[locale];
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,9 +140,8 @@ export default function AiChat() {
     {
       id: uid(),
       role: "assistant",
-      content:
-        "Здравствуйте! Я помогу с номерами, SPA, горячими источниками и бронированием. Финальное наличие и бронь подтверждает администратор.",
-      time: now(),
+      content: copy.greeting,
+      time: now(locale),
     },
   ]);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -84,6 +177,7 @@ export default function AiChat() {
         body: JSON.stringify({
           message: trimmed,
           page: pathname,
+          locale,
           history: history.slice(-8).map((m) => ({
             id: m.id,
             role: m.role,
@@ -104,7 +198,7 @@ export default function AiChat() {
           id: uid(),
           role: "assistant",
           content: data.message,
-          time: now(),
+          time: now(locale),
           actions: data.suggestedActions,
           topic: data.topic,
           shouldHandoff: data.shouldHandoff,
@@ -116,9 +210,8 @@ export default function AiChat() {
         {
           id: uid(),
           role: "assistant",
-          content:
-            "Не удалось получить ответ. Попробуйте ещё раз или напишите администратору в WhatsApp.",
-          time: now(),
+          content: copy.error,
+          time: now(locale),
           topic: "handoff",
           isError: true,
           shouldHandoff: true,
@@ -133,7 +226,7 @@ export default function AiChat() {
     const fromAction = m.actions?.find((a) => a.type === "whatsapp")?.href;
     if (fromAction) return fromAction;
     const lastUser = [...messages].reverse().find((x) => x.role === "user");
-    return whatsAppToMain(createChatHandoffText(lastUser?.content));
+    return whatsAppToMain(createChatHandoffText(lastUser?.content, locale));
   };
 
   const isExternal = (a: ChatSuggestedAction) => a.type === "whatsapp" || a.type === "link";
@@ -148,7 +241,7 @@ export default function AiChat() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Закрыть чат" : "Открыть AI-чат"}
+        aria-label={open ? copy.close : copy.open}
         className="fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-emerald-800 to-emerald-deep text-gold-soft shadow-float ring-2 ring-gold/50 transition-transform hover:scale-105"
       >
         {!open && (
@@ -167,17 +260,17 @@ export default function AiChat() {
             </span>
             <div className="flex-1">
               <p className="font-display text-sm font-semibold text-white">
-                AI-помощник Ак-Бермет
+                {copy.title}
               </p>
               <p className="flex items-center gap-1.5 text-[11px] text-gold-soft">
                 <span className={`h-1.5 w-1.5 rounded-full ${realCallsEnabled ? "bg-emerald-400" : "bg-gold"}`} />
-                {realCallsEnabled ? "AI-помощник онлайн" : "Связь с администратором"}
+                {realCallsEnabled ? copy.online : copy.admin}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Закрыть чат"
+              aria-label={copy.close}
               className="text-white/60 transition-colors hover:text-white"
             >
               <IconClose className="h-5 w-5" />
@@ -230,7 +323,7 @@ export default function AiChat() {
                         className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold-soft to-gold px-3 py-2 text-[12px] font-semibold text-emerald-deep"
                       >
                         <WhatsAppIcon size={16} className="shrink-0" />
-                        Перейти в WhatsApp к администратору
+                        {copy.handoff}
                       </a>
                     )}
                     {m.shouldHandoff && m.id === latestHandoffMessageId && (
@@ -279,7 +372,7 @@ export default function AiChat() {
 
           {/* Быстрые кнопки */}
           <div className="flex flex-wrap gap-2 border-t border-white/10 px-4 pt-3">
-            {QUICK.map((q) => (
+            {copy.quick.map((q) => (
               <button
                 key={q}
                 type="button"
@@ -291,7 +384,7 @@ export default function AiChat() {
               </button>
             ))}
             <a
-              href={WA.booking}
+              href={waFor("booking", locale)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-full bg-gradient-to-b from-gold-soft to-gold px-3 py-1.5 text-[11px] font-semibold text-emerald-deep"
@@ -307,16 +400,16 @@ export default function AiChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-              placeholder="Напишите сообщение..."
+              placeholder={copy.placeholder}
               disabled={loading}
               className="flex-1 rounded-full border border-white/15 bg-emerald-900/60 px-4 py-2.5 text-[13px] text-white placeholder:text-white/40 focus:border-gold/60 disabled:opacity-60"
-              aria-label="Сообщение помощнику"
+              aria-label={copy.inputAria}
             />
             <button
               type="button"
               onClick={() => sendMessage(input)}
               disabled={loading}
-              aria-label="Отправить"
+              aria-label={copy.send}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-gold-soft to-gold text-emerald-deep transition-transform hover:scale-105 disabled:opacity-60"
             >
               <IconSend className="h-5 w-5" />
@@ -324,7 +417,7 @@ export default function AiChat() {
           </div>
 
           <p className="bg-emerald-900/60 py-2 text-center text-[10px] tracking-wide text-white/45">
-            Ответы предварительные · бронь подтверждает администратор
+            {copy.footer}
           </p>
         </div>
       )}
