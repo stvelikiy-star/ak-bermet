@@ -61,7 +61,7 @@ export default async function GardenSection() {
 
             <Photo
               src={garden.img}
-              alt={garden.alt}
+              alt={t(garden.alt, locale)}
               className="min-h-[260px] w-full lg:min-h-full"
             />
           </div>
