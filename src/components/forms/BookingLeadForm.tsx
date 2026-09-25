@@ -97,7 +97,7 @@ export default function BookingLeadForm({
       <section id={anchorId} className="scroll-mt-28">
         <FormSuccess
           message={t("Заявка принята предварительно. Администратор проверит наличие и свяжется с вами для подтверждения.", locale)}
-          whatsappUrl={whatsAppToMain(createBookingWhatsAppText(toLead()))}
+          whatsappUrl={whatsAppToMain(createBookingWhatsAppText(toLead(), locale))}
           locale={locale}
           onReset={() => {
             setForm(initialForm());
@@ -249,7 +249,7 @@ export default function BookingLeadForm({
               {status === "submitting" ? t("Отправляем…", locale) : t("Отправить заявку", locale)}
             </button>
             <a
-              href={whatsAppToMain(createBookingWhatsAppText(toLead()))}
+              href={whatsAppToMain(createBookingWhatsAppText(toLead(), locale))}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-6 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
