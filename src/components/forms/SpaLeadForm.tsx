@@ -63,7 +63,7 @@ export default function SpaLeadForm({
         <FormSuccess
           message={t("Заявка принята. Администратор уточнит условия посещения и свободное время.", locale)}
           locale={locale}
-          whatsappUrl={whatsAppToMain(createSpaWhatsAppText(toLead()))}
+          whatsappUrl={whatsAppToMain(createSpaWhatsAppText(toLead(), locale))}
           onReset={() => {
             setForm({ ...empty, spaService: defaultService });
             reset();
@@ -163,7 +163,7 @@ export default function SpaLeadForm({
               {status === "submitting" ? t("Отправляем…", locale) : t("Отправить заявку", locale)}
             </button>
             <a
-              href={whatsAppToMain(createSpaWhatsAppText(toLead()))}
+              href={whatsAppToMain(createSpaWhatsAppText(toLead(), locale))}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-6 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
