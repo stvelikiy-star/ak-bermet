@@ -32,10 +32,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const room = getRoomDetail(slug);
-  if (!room) return { title: "Номер не найден" };
+  const locale = await getLocale();
+  if (!room) return { title: t("Номер не найден", locale) };
   return {
-    title: room.title,
-    description: room.metaDescription,
+    title: t(room.title, locale),
+    description: t(room.metaDescription, locale),
     alternates: { canonical: `/rooms/${room.slug}` },
   };
 }
