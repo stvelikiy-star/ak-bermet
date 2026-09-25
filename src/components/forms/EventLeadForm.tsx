@@ -72,7 +72,7 @@ export default function EventLeadForm({
         <FormSuccess
           message={t("Заявка на мероприятие принята. Администратор уточнит зал, питание, проживание и условия.", locale)}
           locale={locale}
-          whatsappUrl={whatsAppToMain(createEventWhatsAppText(toLead()))}
+          whatsappUrl={whatsAppToMain(createEventWhatsAppText(toLead(), locale))}
           onReset={() => {
             setForm(empty);
             reset();
@@ -205,7 +205,7 @@ export default function EventLeadForm({
                 : t("Отправить заявку на мероприятие", locale)}
             </button>
             <a
-              href={whatsAppToMain(createEventWhatsAppText(toLead()))}
+              href={whatsAppToMain(createEventWhatsAppText(toLead(), locale))}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-6 py-3.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"

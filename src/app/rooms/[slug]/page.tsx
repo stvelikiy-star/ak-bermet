@@ -51,6 +51,7 @@ export default async function RoomDetailPage({
   const locale = await getLocale();
 
   const waHref = WA[room.whatsappKey];
+  const hasPendingPhotos = room.gallery.some((g) => g.src.endsWith("/photo-pending.svg"));
 
   return (
     <main>
@@ -121,7 +122,12 @@ export default async function RoomDetailPage({
             ))}
           </div>
           <p className="mt-4 text-center text-xs text-muted">
-            {t("Фотографии приведены для примера. Реальные фото номеров уточняйте у администратора.", locale)}
+            {t(
+              hasPendingPhotos
+                ? "Для этой категории подтверждённая фотография ещё не загружена. Конкретный номер и фото уточняйте у администратора."
+                : "В галерее используются подтверждённые фотографии AK BERMET для этой категории.",
+              locale,
+            )}
           </p>
         </Container>
       </section>
