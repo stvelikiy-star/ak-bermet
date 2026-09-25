@@ -231,7 +231,7 @@ try {
   const missingPage = await get("/this-page-must-not-exist-ak-bermet");
   assert.equal(missingPage.status, 404, "Unknown public route must return HTTP 404");
   const missingHtml = await missingPage.text();
-  assert.match(missingHtml, /404\\s*·\\s*AK BERMET/i, "Branded 404 page must render");
+  assert.match(missingHtml, /404\s*·\s*AK BERMET/i, "Branded 404 page must render");
   assert.match(missingHtml, /Страница не найдена/i, "Default-locale 404 copy must render");
 
   const sitemap = await get("/sitemap.xml");
