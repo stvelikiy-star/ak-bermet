@@ -87,7 +87,7 @@ test("public Hero and Contacts read published overrides without exposing operati
   assert.doesNotMatch(registry, /phoneRaw|phoneDisplay|springsPhoneRaw|springsPhoneDisplay|mapUrl|address/);
   assert.match(contacts, /SITE\.address/);
   assert.match(contacts, /SITE\.phoneRaw/);
-  assert.match(contacts, /WA\.booking/);
+  assert.match(contacts, /waFor\("booking", locale\)/);
 });
 
 test("manager CMS is read-only for manager and editable only by owner/admin", () => {
