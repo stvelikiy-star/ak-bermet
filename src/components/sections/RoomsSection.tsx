@@ -1,7 +1,7 @@
 import Photo from "@/components/ui/Photo";
 import Link from "next/link";
 import { rooms, roomsNote } from "@/data/rooms";
-import { WA } from "@/data/site";
+import { waFor } from "@/data/site";
 import WhatsAppIcon from "@/components/ui/WhatsAppIcon";
 import { IconArrowRight } from "@/components/ui/icons";
 import { getLocale } from "@/i18n/locale.server";
@@ -64,7 +64,7 @@ export default async function RoomsSection() {
                     {t("Подробнее", locale)} <IconArrowRight className="h-4 w-4" />
                   </Link>
                   <a
-                    href={WA.availability}
+                    href={waFor("availability", locale)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/40 bg-cream px-5 py-2.5 text-sm font-semibold text-emerald-deep transition-colors hover:border-gold hover:text-gold-dark"
