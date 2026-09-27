@@ -140,7 +140,7 @@ export default function BookingLeadForm({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t("Дата заезда", locale)} htmlFor="b-in">
+            <Field label={t("Дата заезда", locale)} htmlFor="b-in" error={errors.checkIn}>
               <TextInput
                 id="b-in"
                 type="date"
