@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: stvelikiy-star/resort-os
-          ref: marina-smart/agent-access-20260927
+          ref: ad6a4ee21ff54ac9cd6b2ed4b5c41a3d8488b868
           path: resort-os
           persist-credentials: false
 
