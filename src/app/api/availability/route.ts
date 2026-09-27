@@ -19,6 +19,7 @@ import {
 import type { AvailabilityHoldRpcClient } from "@/lib/supabase-admin";
 import { getSupabasePublicClient } from "@/lib/supabase/public-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { fetchMarinaAvailability, isMarinaBookingSource } from "@/lib/marina-core";
 import type {
   AvailabilityItem,
   AvailabilityQuery,
@@ -83,6 +84,28 @@ function isExplicitLocalMockAvailabilityAllowed(): boolean {
   return localRuntime && process.env.AVAILABILITY_SOURCE === "mock";
 }
 
+function marinaCategoryMatches(selected: string | undefined, name: string): boolean {
+  const value = selected?.trim();
+  if (!value) return true;
+  const normalized = name.toLocaleLowerCase("ru");
+  switch (value) {
+    case "Garden Rooms":
+      return normalized.includes("garden");
+    case "Стандарт":
+      return normalized.includes("стандарт") && !normalized.includes("полулюкс");
+    case "Люкс":
+      return normalized.includes("люкс") && !normalized.includes("полулюкс");
+    case "Полулюкс":
+      return normalized.includes("полулюкс");
+    case "Семейный 4-местный":
+      return normalized.includes("семейн");
+    case "Коттеджи и срубы":
+      return normalized.includes("коттедж") || normalized.includes("сруб");
+    default:
+      return normalized.includes(value.toLocaleLowerCase("ru"));
+  }
+}
+
 function availabilityErrorResponse(error: AvailabilityError) {
   return NextResponse.json(
     { ok: false, code: error.code, message: error.message },
@@ -109,6 +132,56 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof AvailabilityError) return availabilityErrorResponse(error);
     throw error;
+  }
+
+  if (isMarinaBookingSource()) {
+    try {
+      const marina = await fetchMarinaAvailability({
+        checkIn: query.checkIn!,
+        checkOut: query.checkOut!,
+        adults: guests ?? 1,
+        children: 0,
+      });
+
+      const items: AvailabilityItem[] = marina.results
+        .filter((item) => item.available_count > 0)
+        .filter((item) => item.pricing?.sellable !== false)
+        .filter((item) => marinaCategoryMatches(query.category, item.room_type_name))
+        .flatMap((item) => {
+          const buildings = Array.from(
+            new Set(
+              item.available_rooms
+                .map((room) => room.building_or_zone?.trim())
+                .filter((value): value is string => Boolean(value)),
+            ),
+          );
+          const targetBuildings = buildings.length ? buildings : ["AK BERMET"];
+          return targetBuildings.map((building) => ({
+            category: item.room_type_name,
+            building,
+            capacity: item.capacity_adults,
+            preliminary: true as const,
+          }));
+        });
+
+      return NextResponse.json({
+        ok: true,
+        message: AVAILABILITY_MESSAGE,
+        query,
+        items,
+        source: "marina",
+      });
+    } catch (error) {
+      console.error("[AVAILABILITY] MARINA Core failed", error instanceof Error ? error.message : "unknown");
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "availability_unknown",
+          message: "Не удалось проверить доступность номеров. Повторите запрос позже.",
+        },
+        { status: 503 },
+      );
+    }
   }
 
   if (isExplicitLocalMockAvailabilityAllowed()) {
