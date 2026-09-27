@@ -74,3 +74,14 @@ test("public availability RPC ACL is explicit", () => {
     /grant execute on function public\.fn_public_availability\(date, date, integer, text\) to anon, authenticated;/,
   );
 });
+
+
+test("MARINA Core integration is explicit, server-side and fail-closed", () => {
+  assert.match(route, /isMarinaBookingSource/);
+  assert.match(route, /fetchMarinaAvailability/);
+  assert.match(route, /source: "marina"/);
+  assert.match(route, /available_count > 0/);
+  assert.match(route, /pricing\?\.sellable !== false/);
+  assert.match(route, /\[AVAILABILITY\] MARINA Core failed/);
+  assert.match(route, /status:\s*503/);
+});
