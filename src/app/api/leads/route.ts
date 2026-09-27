@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         isReservation: false,
       });
     } catch (error) {
-      console.error("[LEAD] MARINA ReservationRequest failed", error instanceof Error ? error.message : "unknown");
+      console.error("[LEAD] MARINA ReservationRequest failed");
       return NextResponse.json(
         {
           ok: false,
