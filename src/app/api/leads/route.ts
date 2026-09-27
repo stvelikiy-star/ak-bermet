@@ -3,8 +3,23 @@ import type { LeadInput } from "@/types/lead";
 import { validateLead } from "@/lib/lead-schema";
 import { buildLead } from "@/lib/lead-utils";
 import { persistPublicLead } from "@/lib/public-lead-persistence";
+import { createMarinaReservationRequest, isMarinaBookingSource } from "@/lib/marina-core";
 
 export const runtime = "nodejs";
+
+function marinaBookingNotes(input: LeadInput): string {
+  const facts = [
+    input.roomCategory ? `Категория с сайта: ${input.roomCategory}` : null,
+    input.childrenAges ? `Возраст детей: ${input.childrenAges}` : null,
+    input.wantsDoubleBed ? "Пожелание: двуспальная кровать" : null,
+    input.needsExtraBed ? "Пожелание: дополнительное место" : null,
+    input.needsWifi ? "Пожелание: Wi-Fi" : null,
+    input.needsLowerFloor ? "Пожелание: нижний этаж" : null,
+    input.message?.trim() ? `Комментарий: ${input.message.trim()}` : null,
+    `Исходный interest: ${input.interest}`,
+  ].filter(Boolean);
+  return facts.join("\n").slice(0, 2000);
+}
 
 export async function POST(request: Request) {
   let input: Partial<LeadInput>;
@@ -23,6 +38,55 @@ export async function POST(request: Request) {
     const message =
       Object.values(errors)[0] ?? "Проверьте правильность заполнения";
     return NextResponse.json({ ok: false, message, errors }, { status: 422 });
+  }
+
+  if (
+    isMarinaBookingSource() &&
+    (input.interest === "rooms" || input.interest === "garden")
+  ) {
+    const marinaErrors: Record<string, string> = {};
+    if (!input.checkIn) marinaErrors.checkIn = "Укажите дату заезда";
+    if (!input.checkOut) marinaErrors.checkOut = "Укажите дату выезда";
+    if (!input.adults || input.adults < 1) marinaErrors.adults = "Укажите количество взрослых";
+    if (Object.keys(marinaErrors).length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: Object.values(marinaErrors)[0],
+          errors: marinaErrors,
+        },
+        { status: 422 },
+      );
+    }
+
+    try {
+      const marina = await createMarinaReservationRequest({
+        guest_name: input.name!.trim(),
+        phone: input.phone!.trim(),
+        check_in: input.checkIn!,
+        check_out: input.checkOut!,
+        adults: input.adults!,
+        children: input.children ?? 0,
+        source: "WEB_AK_BERMET",
+        notes: marinaBookingNotes(input as LeadInput),
+      });
+      return NextResponse.json({
+        ok: true,
+        leadId: marina.id,
+        source: "marina",
+        isReservation: false,
+      });
+    } catch (error) {
+      console.error("[LEAD] MARINA ReservationRequest failed");
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Заявка сейчас не может быть надёжно сохранена в системе бронирования. Пожалуйста, повторите позже или напишите в WhatsApp.",
+        },
+        { status: 503 },
+      );
+    }
   }
 
   // The public request path has exactly one durable write contract:

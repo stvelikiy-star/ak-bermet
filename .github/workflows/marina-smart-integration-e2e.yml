@@ -1,0 +1,162 @@
+name: MARINA SMART Integration E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/app/api/availability/**'
+      - 'src/app/api/leads/**'
+      - 'src/lib/marina-core.ts'
+      - 'src/components/forms/BookingLeadForm.tsx'
+      - '.env.example'
+      - '.github/workflows/marina-smart-integration-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ak_bermet_marina_e2e
+          POSTGRES_USER: marina_e2e
+          POSTGRES_PASSWORD: marina_e2e_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_e2e -d ak_bermet_marina_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      GOOGLE_SHEETS_ENABLED: "false"
+      AI_PROVIDER: mock
+      AI_ENABLE_REAL_CALLS: "false"
+      BOOKING_SOURCE: marina
+      MARINA_CORE_BASE_URL: http://127.0.0.1:8000
+      DATABASE_URL: postgresql://marina_e2e:marina_e2e_password@127.0.0.1:5432/ak_bermet_marina_e2e?schema=public
+      PROPERTY_CODE: AK_BERMET_TEST
+      MARINA_PROPERTY_NAME: AK BERMET MARINA SMART TEST
+      RATE_PLAN_CODE: AKB_DIRECT_2026
+
+    steps:
+      - name: Checkout AK BERMET
+        uses: actions/checkout@v4
+
+      - name: Checkout MARINA SMART
+        uses: actions/checkout@v4
+        with:
+          repository: stvelikiy-star/resort-os
+          ref: ad6a4ee21ff54ac9cd6b2ed4b5c41a3d8488b868
+          path: resort-os
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare MARINA Core
+        working-directory: resort-os
+        run: |
+          pip install -r services/api/requirements.txt
+          cd packages/database
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+          cd ../..
+          python scripts/bootstrap_ak_bermet_test.py
+
+      - name: Start MARINA Core
+        working-directory: resort-os
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 >/tmp/marina-core.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl --fail -sS http://127.0.0.1:8000/health/ready >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat /tmp/marina-core.log
+          exit 1
+
+      - name: Build AK BERMET in MARINA mode
+        run: |
+          npm ci
+          npm run test:availability-authority
+          npm run test:lead-durability
+          npx tsc --noEmit --incremental false
+          npm run build
+
+      - name: Start AK BERMET
+        run: |
+          nohup npm run start -- -p 3000 >/tmp/akb-site.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl --fail -sS http://127.0.0.1:3000/ >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          cat /tmp/akb-site.log
+          exit 1
+
+      - name: Verify site availability from MARINA
+        run: |
+          curl --fail -sS 'http://127.0.0.1:3000/api/availability?checkIn=2026-10-01&checkOut=2026-10-03&guests=2' >/tmp/availability.json
+          python - <<'PY'
+          import json
+          body=json.load(open('/tmp/availability.json'))
+          assert body['ok'] is True
+          assert body['source']=='marina'
+          assert body['items']
+          assert all(item['preliminary'] is True for item in body['items'])
+          assert not any(item['building']=='Коттеджи кирпичные' for item in body['items'])
+          print('SITE_MARINA_AVAILABILITY_PASS')
+          PY
+
+      - name: Verify site request persists in MARINA without auto reservation
+        run: |
+          curl --fail -sS -H 'Content-Type: application/json'             -d '{"source":"website","interest":"rooms","name":"Site E2E Guest","phone":"+996555123456","checkIn":"2026-10-01","checkOut":"2026-10-03","adults":2,"children":0,"roomCategory":"Люкс","preferredContact":"whatsapp"}'             http://127.0.0.1:3000/api/leads >/tmp/lead.json
+          python - <<'PY'
+          import asyncio, json, os, uuid
+          import asyncpg
+
+          body=json.load(open('/tmp/lead.json'))
+          assert body['ok'] is True
+          assert body['source']=='marina'
+          assert body['isReservation'] is False
+          request_id=body['leadId']
+
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  req=await conn.fetchrow(
+                      'SELECT source,"guestName",status::text FROM reservation_requests WHERE id=$1',
+                      uuid.UUID(request_id),
+                  )
+                  assert req
+                  assert req['source']=='WEB_AK_BERMET'
+                  assert req['guestName']=='Site E2E Guest'
+                  count=await conn.fetchval(
+                      'SELECT count(*)::int FROM reservations WHERE "requestId"=$1',
+                      uuid.UUID(request_id),
+                  )
+                  assert count == 0
+              finally:
+                  await conn.close()
+
+          asyncio.run(main())
+          print('SITE_TO_MARINA_REQUEST_PASS', request_id)
+          PY
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          cat /tmp/marina-core.log 2>/dev/null || true
+          cat /tmp/akb-site.log 2>/dev/null || true
