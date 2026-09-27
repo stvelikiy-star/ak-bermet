@@ -75,3 +75,16 @@ test("unresolved room category is preserved by the RPC instead of losing the lea
   assert.match(leadRpcSource, /v_message := concat_ws/);
   assert.match(leadRpcSource, /p_room_category_name/);
 });
+
+
+test("MARINA booking lead mode creates only a ReservationRequest and fails closed", () => {
+  assert.match(routeSource, /isMarinaBookingSource/);
+  assert.match(routeSource, /input\.interest === "rooms"/);
+  assert.match(routeSource, /input\.interest === "garden"/);
+  assert.match(routeSource, /createMarinaReservationRequest/);
+  assert.match(routeSource, /source:\s*"WEB_AK_BERMET"/);
+  assert.match(routeSource, /isReservation:\s*false/);
+  assert.match(routeSource, /\[LEAD\] MARINA ReservationRequest failed/);
+  assert.match(routeSource, /status:\s*503/);
+  assert.doesNotMatch(routeSource, /X-Resort-Service-Key/);
+});
