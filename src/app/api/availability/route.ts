@@ -17,7 +17,6 @@ import {
   createAvailabilityHoldRpc,
 } from "@/lib/supabase-admin";
 import type { AvailabilityHoldRpcClient } from "@/lib/supabase-admin";
-import { getSupabasePublicClient } from "@/lib/supabase/public-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { fetchMarinaAvailability, MarinaSmartError } from "@/lib/marina-smart";
 import type {
@@ -31,15 +30,6 @@ export const runtime = "nodejs";
 
 const HOLD_CREATOR_ROLES = ["owner", "administrator", "manager"] as const;
 
-type PublicAvailabilityRpcRow = {
-  category: string;
-  building: string;
-  capacity: number;
-  view: string | null;
-  has_wifi: boolean | null;
-  repair_level: string | null;
-  preliminary: boolean;
-};
 
 function availabilityHoldRpcErrorResponse(code: string | undefined): {
   status: number;
