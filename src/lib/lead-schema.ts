@@ -123,6 +123,7 @@ export function validateLead(input: Partial<LeadInput>): ValidationResult {
   for (const [field, value] of [
     ["childrenAges", input.childrenAges],
     ["roomCategory", input.roomCategory],
+    ["roomTypeCode", input.roomTypeCode],
     ["eventType", input.eventType],
     ["hallSize", input.hallSize],
     ["spaService", input.spaService],
@@ -150,6 +151,22 @@ export function validateLead(input: Partial<LeadInput>): ValidationResult {
     input.checkOut <= input.checkIn
   ) {
     errors.checkOut = "Дата выезда должна быть позже даты заезда";
+  }
+
+  const accommodationInterest =
+    input.interest === "rooms" ||
+    input.interest === "garden" ||
+    input.interest === "promo";
+  if (accommodationInterest) {
+    if (!input.checkIn) errors.checkIn = "Укажите дату заезда";
+    if (!input.checkOut) errors.checkOut = "Укажите дату выезда";
+    if (
+      typeof input.adults !== "number" ||
+      !Number.isInteger(input.adults) ||
+      input.adults < 1
+    ) {
+      errors.adults = "Укажите количество взрослых";
+    }
   }
 
   validateOptionalInteger(errors, "adults", input.adults, 1, MAX_STAY_GUESTS);
