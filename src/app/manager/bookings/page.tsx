@@ -138,7 +138,7 @@ export default async function ManagerBookingsPage() {
               <div className="flex flex-wrap items-end justify-between gap-2 border-b border-gold/10 p-4">
                 <div>
                   <h2 className="font-display text-lg font-semibold text-emerald-deep">Брони в CRM</h2>
-                  <p className="mt-1 text-xs text-muted">Последние 100 записей. Подтверждение требует минимум 20% предоплаты; заселение — с 13:00 и только в готовый номер. При отмене CRM фиксирует правило возврата, но деньги автоматически не списывает и не возвращает.</p>
+                  <p className="mt-1 text-xs text-muted">Архив последних 100 записей старой CRM. Новые брони, предоплата, заселение и изменения проживания ведутся в MARINA SMART.</p>
                 </div>
                 <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-emerald-deep ring-1 ring-gold/15">{bookings.length} броней</span>
               </div>
@@ -157,7 +157,7 @@ export default async function ManagerBookingsPage() {
                         <th className="px-4 py-3">Гости</th>
                         <th className="px-4 py-3">Статус</th>
                         <th className="px-4 py-3">Сумма</th>
-                        <th className="px-4 py-3">20%</th>
+                        <th className="px-4 py-3">Предоплата (архив)</th>
                         <th className="px-4 py-3">Действия</th>
                       </tr>
                     </thead>
