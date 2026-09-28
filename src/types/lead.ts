@@ -47,6 +47,7 @@ export interface Lead {
   childrenAges?: string;
 
   roomCategory?: string;
+  roomTypeCode?: string;
   wantsDoubleBed?: boolean;
   needsExtraBed?: boolean;
   needsWifi?: boolean;
