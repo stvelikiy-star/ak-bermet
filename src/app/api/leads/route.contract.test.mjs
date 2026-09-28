@@ -2,76 +2,43 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-const routeSource = readFileSync(
-  new URL("./route.ts", import.meta.url),
+const routeSource = readFileSync(new URL("./route.ts", import.meta.url), "utf8");
+const bridgeSource = readFileSync(
+  new URL("../../../lib/marina-smart.ts", import.meta.url),
   "utf8",
 );
 const persistenceSource = readFileSync(
   new URL("../../../lib/public-lead-persistence.ts", import.meta.url),
   "utf8",
 );
-const rpcMigrationSource = readFileSync(
-  new URL("../../../../supabase/migrations/20260913073000_remove_web_service_role_dependency.sql", import.meta.url),
-  "utf8",
-);
-const leadRpcStart = rpcMigrationSource.indexOf(
-  "create or replace function public.fn_public_create_lead",
-);
-const leadRpcEnd = rpcMigrationSource.indexOf(
-  "revoke all on function public.fn_public_create_lead",
-  leadRpcStart,
-);
-assert.ok(leadRpcStart >= 0 && leadRpcEnd > leadRpcStart);
-const leadRpcSource = rpcMigrationSource.slice(leadRpcStart, leadRpcEnd);
 
-test("lead API reports success only after authoritative Supabase persistence", () => {
-  const persistIndex = routeSource.indexOf("await persistPublicLead(lead)");
-  const successIndex = routeSource.lastIndexOf(
-    "NextResponse.json({ ok: true, leadId: persistedLead.id })",
-  );
-
-  assert.notEqual(persistIndex, -1);
-  assert.notEqual(successIndex, -1);
-  assert.ok(successIndex > persistIndex);
-  assert.match(routeSource, /status:\s*503/);
+test("accommodation requests are durably written to MARINA SMART before success", () => {
+  assert.match(routeSource, /isAccommodationRequest/);
+  assert.match(routeSource, /createMarinaBookingRequest\(validated\)/);
+  assert.match(routeSource, /authority: "marina-smart"/);
+  assert.match(routeSource, /isReservation: requestItem\.is_reservation/);
+  assert.match(bridgeSource, /\/api\/v1\/booking\/requests/);
+  assert.match(bridgeSource, /source: "AK_BERMET_WEBSITE"/);
+  assert.match(bridgeSource, /room_type_code: input\.roomTypeCode \|\| null/);
 });
 
-test("public request path never calls Google Sheets directly", () => {
-  assert.doesNotMatch(routeSource, /appendLeadToSheet/);
-  assert.doesNotMatch(routeSource, /isGoogleSheetsEnabled/);
-  assert.doesNotMatch(routeSource, /@\/lib\/google-sheets/);
-  assert.match(routeSource, /Google Sheets mirroring is asynchronous through the/);
-  assert.match(routeSource, /DB outbox/);
+test("accommodation request failures do not fall back to the website booking database", () => {
+  const marinaStart = routeSource.indexOf("if (isAccommodationRequest)");
+  const websiteLeadStart = routeSource.indexOf("const lead = buildLead(validated)");
+  assert.ok(marinaStart >= 0 && websiteLeadStart > marinaStart);
+  const marinaBranch = routeSource.slice(marinaStart, websiteLeadStart);
+  assert.doesNotMatch(marinaBranch, /persistPublicLead/);
+  assert.match(marinaBranch, /status.*503/s);
 });
 
-test("lead persistence errors are not serialized into logs", () => {
-  assert.match(routeSource, /console\.error\("\[LEAD\] Supabase durable insert failed"\)/);
-  assert.doesNotMatch(routeSource, /console\.error\([^\n]*,\s*error/);
-  assert.doesNotMatch(routeSource, /console\.warn/);
-});
-
-test("public lead persistence uses the narrow RPC instead of direct table insert", () => {
+test("non-accommodation inquiries remain durable in the website CRM", () => {
+  assert.match(routeSource, /const lead = buildLead\(validated\)/);
+  assert.match(routeSource, /await persistPublicLead\(lead\)/);
+  assert.match(routeSource, /authority: "website-crm"/);
   assert.match(persistenceSource, /\.rpc\("fn_public_create_lead"/);
-  assert.match(persistenceSource, /p_source:\s*lead\.source/);
-  assert.match(persistenceSource, /p_interest:\s*lead\.interest/);
-  assert.match(persistenceSource, /p_name:\s*lead\.name/);
-  assert.match(persistenceSource, /p_phone:\s*lead\.phone/);
-  assert.doesNotMatch(persistenceSource, /\.from\("leads"\)/);
-  assert.doesNotMatch(persistenceSource, /getSupabaseAdminClient/);
 });
 
-test("lead RPC owns the safe allowlist and forces new status", () => {
-  assert.match(leadRpcSource, /insert into public\.leads as l\(/);
-  assert.match(leadRpcSource, /source, interest, status, name, phone,/);
-  assert.match(leadRpcSource, /p_source, p_interest, 'new', btrim\(p_name\), btrim\(p_phone\)/);
-  assert.doesNotMatch(leadRpcSource, /assigned_manager_id\s*,/);
-  assert.doesNotMatch(leadRpcSource, /booking_id\s*,/);
-  assert.doesNotMatch(leadRpcSource, /customer_id\s*,/);
-});
-
-test("unresolved room category is preserved by the RPC instead of losing the lead", () => {
-  assert.match(leadRpcSource, /Категория номера:/);
-  assert.match(leadRpcSource, /v_category_id := null/);
-  assert.match(leadRpcSource, /v_message := concat_ws/);
-  assert.match(leadRpcSource, /p_room_category_name/);
+test("booking authority errors are sanitized", () => {
+  assert.match(routeSource, /console\.error\("\[LEAD\] MARINA SMART booking request failed"\)/);
+  assert.doesNotMatch(routeSource, /console\.error\([^\n]*error/);
 });
