@@ -6,7 +6,8 @@ Unified hotel website + PMS/CRM/operations platform for AK BERMET.
 
 - Next.js `15.5.25` (App Router) + TypeScript + Tailwind CSS.
 - Node.js `22.x` runtime contract.
-- Supabase/PostgreSQL is the transactional source of truth.
+- MARINA SMART/PostgreSQL is the operational source of truth for accommodation availability, booking requests and hotel operations.
+- Website Supabase/PostgreSQL remains the source of truth for website CMS and non-accommodation inquiries; legacy booking writes are disabled in production after cutover.
 - Google Sheets is a reporting/integration mirror only and is **not** the authority for public availability.
 - Supabase Auth + RBAC + RLS protect staff access.
 - Public website supports RU / KG / EN / KZ.
@@ -27,7 +28,7 @@ Current reconciled 2026 room master:
 
 Commercial/legal core:
 
-- Prepayment: 20%.
+- Prepayment: first night of the stay.
 - Check-in: 13:00.
 - Check-out: 11:00.
 - Cancellation: >=7 days — refund may be possible subject to applicable fee/admin procedure; <7 days — non-refundable; no-show — non-refundable.
