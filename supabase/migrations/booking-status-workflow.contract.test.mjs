@@ -80,5 +80,5 @@ test("CRM exposes receptionist lifecycle controls", () => {
   assert.match(actions, /No-show/);
   assert.match(actions, /method: "PATCH"/);
   assert.match(page, /<BookingStatusActions/);
-  assert.match(page, /минимум 20% предоплаты/);
+  assert.match(page, /Новые брони, предоплата, заселение и изменения проживания ведутся в MARINA SMART/);
 });
