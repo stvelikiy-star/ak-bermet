@@ -19,6 +19,7 @@ import {
 import type { AvailabilityHoldRpcClient } from "@/lib/supabase-admin";
 import { getSupabasePublicClient } from "@/lib/supabase/public-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { fetchMarinaAvailability, MarinaSmartError } from "@/lib/marina-smart";
 import type {
   AvailabilityItem,
   AvailabilityQuery,
@@ -90,8 +91,36 @@ function availabilityErrorResponse(error: AvailabilityError) {
   );
 }
 
-// Public production availability is exposed by a narrow SECURITY DEFINER RPC.
-// The publishable key is safe to ship and cannot bypass the RPC/table ACLs.
+// Public accommodation availability is read from MARINA SMART so the website
+// and hotel operations use one inventory/occupancy authority.
+function matchesPublicCategory(roomTypeName: string, requested?: string): boolean {
+  if (!requested?.trim()) return true;
+  const name = roomTypeName.toLocaleLowerCase("ru");
+  const category = requested.toLocaleLowerCase("ru");
+
+  if (category.includes("garden")) return name.includes("garden");
+  if (category.includes("полулюкс")) return name.includes("полулюкс");
+  if (category === "люкс") return name.includes("люкс") && !name.includes("полулюкс");
+  if (category.includes("стандарт")) return name.includes("стандарт");
+  if (category.includes("семейн")) return name.includes("семейн");
+  if (category.includes("коттедж") || category.includes("сруб")) {
+    return name.includes("коттедж") || name.includes("сруб");
+  }
+  return name.includes(category);
+}
+
+function marinaCapacity(item: {
+  capacity_adults: number;
+  capacity_children?: number | null;
+  available_rooms: Array<{ max_capacity?: number | null }>;
+}): number {
+  const explicit = item.available_rooms
+    .map((room) => room.max_capacity)
+    .filter((value): value is number => typeof value === "number" && value > 0);
+  if (explicit.length) return Math.max(...explicit);
+  return item.capacity_adults + Math.max(0, item.capacity_children ?? 0);
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
@@ -128,49 +157,95 @@ export async function GET(request: Request) {
     }
   }
 
-  const publicClient = getSupabasePublicClient();
-  const { data, error } = await publicClient.rpc("fn_public_availability", {
-    p_check_in: query.checkIn ?? null,
-    p_check_out: query.checkOut ?? null,
-    p_guests: guests ?? 1,
-    p_category: query.category?.trim() || null,
-  });
+  if (!query.checkIn || !query.checkOut) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "invalid_date_range",
+        message: "Укажите даты заезда и выезда.",
+      },
+      { status: 400 },
+    );
+  }
 
-  if (error || !data) {
-    console.error("[AVAILABILITY] Public Supabase RPC failed", error?.code ?? "unknown");
+  try {
+    const marina = await fetchMarinaAvailability({
+      checkIn: query.checkIn,
+      checkOut: query.checkOut,
+      adults: guests ?? 1,
+      children: 0,
+    });
+
+    const items: AvailabilityItem[] = marina.results
+      .filter(
+        (item) =>
+          item.available_count > 0 &&
+          item.pricing?.sellable === true &&
+          matchesPublicCategory(item.room_type_name, query.category),
+      )
+      .map((item) => {
+        const buildings = Array.from(
+          new Set(
+            item.available_rooms
+              .map((room) => room.building_or_zone?.trim())
+              .filter((value): value is string => Boolean(value)),
+          ),
+        );
+
+        return {
+          roomTypeCode: item.room_type_code,
+          category: item.room_type_name,
+          building:
+            buildings.length === 0
+              ? "AK BERMET"
+              : buildings.length === 1
+                ? buildings[0]
+                : buildings.join(" / "),
+          capacity: marinaCapacity(item),
+          preliminary: true as const,
+        };
+      });
+
+    return NextResponse.json({
+      ok: true,
+      message:
+        "Доступность и цены проверены в MARINA SMART. Конкретный номер и бронь подтверждает администратор.",
+      query,
+      items,
+      source: "marina-smart",
+    });
+  } catch (error) {
+    console.error("[AVAILABILITY] MARINA SMART availability failed");
+    const status =
+      error instanceof MarinaSmartError && error.status === 422 ? 422 : 503;
     return NextResponse.json(
       {
         ok: false,
         code: "availability_unknown",
-        message: "Не удалось проверить доступность номеров. Повторите запрос позже.",
+        message:
+          "Не удалось проверить доступность номеров в MARINA SMART. Повторите запрос позже.",
       },
-      { status: 503 }
+      { status },
     );
   }
-
-  const items: AvailabilityItem[] = (data as PublicAvailabilityRpcRow[]).map((row) => ({
-    category: row.category,
-    building: row.building,
-    capacity: row.capacity,
-    view: row.view ?? undefined,
-    hasWifi: row.has_wifi ?? undefined,
-    repairLevel: row.repair_level ?? undefined,
-    preliminary: true,
-  }));
-
-  return NextResponse.json({
-    ok: true,
-    message: AVAILABILITY_MESSAGE,
-    query,
-    items,
-    source: "supabase",
-  });
 }
 
 // Production creates a hold through the existing authenticated RPC. The RPC
 // receives the real staff JWT via the cookie-bound server client; service-role
 // bypass is intentionally not used.
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "legacy_booking_authority_disabled",
+        message:
+          "Удержания и новые бронирования ведутся в MARINA SMART. Используйте систему управления отелем.",
+      },
+      { status: 409 },
+    );
+  }
+
   let body: Partial<CreateHoldRequest>;
   try {
     body = await request.json();
