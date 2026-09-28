@@ -7,6 +7,13 @@ import type { RoleName } from "@/types/auth";
 // входа для всех трёх разделов. Легаси PIN-cookie (FNV-1a) удалён:
 // он был offline-подбираемым (см. AK_BERMET_CODEX_AUDIT_001.md, H-03) и
 // не должен использоваться как production-аутентификация.
+const LEGACY_OPERATIONAL_WRITE_PREFIXES = [
+  "/api/availability",
+  "/api/manager/bookings",
+  "/api/manager/payments",
+  "/api/manager/guest-qr",
+] as const;
+
 const STAFF_AREAS: { prefix: string; roles: RoleName[] }[] = [
   { prefix: "/manager", roles: ["owner", "administrator", "manager"] },
   { prefix: "/housekeeping", roles: ["housekeeping"] },
@@ -28,6 +35,24 @@ function redirectToUnauthorized(req: NextRequest) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  const legacyOperationalWrite =
+    req.method !== "GET" &&
+    req.method !== "HEAD" &&
+    LEGACY_OPERATIONAL_WRITE_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    );
+  if (process.env.NODE_ENV === "production" && legacyOperationalWrite) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "MARINA_SMART_OPERATIONAL_AUTHORITY",
+        message:
+          "Операционные бронирования, оплаты и гостевые QR ведутся в MARINA SMART.",
+      },
+      { status: 409 },
+    );
+  }
 
   const area = STAFF_AREAS.find((a) => pathname.startsWith(a.prefix));
   if (!area) return NextResponse.next();
@@ -93,5 +118,13 @@ function extractRoleNames(rows: RoleRow[] | null): RoleName[] {
 }
 
 export const config = {
-  matcher: ["/manager/:path*", "/housekeeping/:path*", "/technician/:path*"],
+  matcher: [
+    "/manager/:path*",
+    "/housekeeping/:path*",
+    "/technician/:path*",
+    "/api/availability",
+    "/api/manager/bookings/:path*",
+    "/api/manager/payments/:path*",
+    "/api/manager/guest-qr/:path*",
+  ],
 };
