@@ -1,4 +1,4 @@
-// Модель доступности: Supabase — операционный источник истины; mock только для явного local dev/test режима.
+// Модель доступности: MARINA SMART — операционный источник истины для публичного бронирования; mock только для явного local dev/test режима.
 
 export type RoomStatus = "active" | "maintenance" | "do_not_sell";
 
@@ -102,6 +102,7 @@ export type AvailabilityErrorCode =
 
 // Один вариант в ответе предварительной проверки
 export interface AvailabilityItem {
+  roomTypeCode?: string;
   category: string;
   building: string;
   capacity: number;

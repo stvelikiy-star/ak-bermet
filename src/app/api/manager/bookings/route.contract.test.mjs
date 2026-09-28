@@ -29,8 +29,9 @@ test("manual booking API uses strict calendar validation", () => {
 test("manual booking request and response expose no payment fiction", () => {
   assert.match(route, /p_total_amount_kgs: payload\.totalAmountKgs/);
   assert.doesNotMatch(route, /paid_amount|payment_status|payment_reference/);
-  assert.match(form, /Предоплата 20%/);
-  assert.match(form, /numericTotal \* 20/);
+  assert.match(form, /Новые брони создаются в MARINA SMART/);
+  assert.match(form, /process\.env\.NODE_ENV === "production"/);
+  assert.doesNotMatch(form, /numericTotal \* 20/);
 });
 
 test("manual booking maps overlap and authorization failures safely", () => {

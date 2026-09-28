@@ -239,7 +239,7 @@ export default async function RoomDetailPage({
               ))}
               <li className="flex items-start gap-2.5 text-sm leading-relaxed text-muted">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-                {t("Бронирование подтверждает администратор после проверки наличия. Предоплата — 20%. Цены и наличие уточняются.", locale)}
+                {t("Бронирование подтверждает администратор после проверки наличия. Предоплата — за первые сутки проживания. Цены и наличие уточняются.", locale)}
               </li>
             </ul>
             <div className="mt-6 flex flex-wrap gap-4 border-t border-gold/15 pt-5 text-sm">

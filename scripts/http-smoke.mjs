@@ -175,11 +175,11 @@ try {
   assert.equal(
     availability.status,
     200,
-    "Production availability must work through the public Supabase RPC without a service-role secret",
+    "Production availability must work through MARINA SMART without a second booking authority",
   );
   const availabilityJson = await availability.json();
-  assert.equal(availabilityJson.ok, true, "Availability RPC must report success");
-  assert.equal(availabilityJson.source, "supabase", "Availability authority must remain Supabase");
+  assert.equal(availabilityJson.ok, true, "Availability must report success");
+  assert.equal(availabilityJson.source, "marina-smart", "Availability authority must be MARINA SMART");
   assert.ok(Array.isArray(availabilityJson.items), "Availability response must contain an items array");
   assert.ok(availabilityJson.items.length > 0, "Known future availability should return at least one preliminary option");
 

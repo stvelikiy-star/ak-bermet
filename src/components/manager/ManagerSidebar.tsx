@@ -15,16 +15,20 @@ import {
   IconQr,
 } from "@/components/ui/icons";
 
+const MARINA_ADMIN_URL =
+  process.env.NEXT_PUBLIC_MARINA_SMART_ADMIN_URL ||
+  "https://admin-production-80a1.up.railway.app";
+
 const NAV = [
   { href: "/manager", label: "Обзор", icon: IconCalendar },
   { href: "/manager/leads", label: "Заявки", icon: IconUsers },
-  { href: "/manager/bookings", label: "Бронирования", icon: IconCalendar },
-  { href: "/manager/availability", label: "Шахматка", icon: IconBed },
+  { href: "/manager/bookings", label: "Архив бронирований", icon: IconCalendar },
+  { href: "/manager/availability", label: "Архив шахматки", icon: IconBed },
   { href: "/manager/rooms", label: "Номерной фонд", icon: IconBed2 },
-  { href: "/manager/qr", label: "QR гостей", icon: IconQr },
-  { href: "/manager/operations", label: "Операции", icon: IconClock },
+  { href: "/manager/qr", label: "Архив QR гостей", icon: IconQr },
+  { href: "/manager/operations", label: "Архив операций", icon: IconClock },
   { href: "/manager/inspections", label: "Проверки", icon: IconEye },
-  { href: "/manager/payments", label: "Оплаты", icon: IconGift },
+  { href: "/manager/payments", label: "Архив оплат", icon: IconGift },
   { href: "/manager/reports", label: "Отчёты", icon: IconWaves },
   { href: "/manager/content", label: "Сайт / контент", icon: IconEye },
   { href: "/manager/settings", label: "Настройки", icon: IconShield },
@@ -47,6 +51,18 @@ export default function ManagerSidebar({
           КАБИНЕТ МЕНЕДЖЕРА
         </p>
       </div>
+      <a
+        href={MARINA_ADMIN_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mb-3 rounded-xl border border-gold/40 bg-gold/15 px-3 py-3 text-sm font-semibold text-gold-soft transition-colors hover:bg-gold/20"
+        onClick={onNavigate}
+      >
+        MARINA SMART · управление ↗
+        <span className="mt-1 block text-[10px] font-normal leading-relaxed text-white/55">
+          Брони, шахматка, оплаты, QR и операционная работа
+        </span>
+      </a>
       {NAV.map((item) => {
         const active =
           item.href === "/manager"

@@ -23,3 +23,14 @@ test("public lead validation requires real YYYY-MM-DD calendar dates", () => {
   assert.match(schema, /!validDateOnly\(input\.checkOut\)/);
   assert.match(schema, /input\.checkOut <= input\.checkIn/);
 });
+
+
+test("accommodation leads require dates and adults for MARINA SMART", () => {
+  assert.match(schema, /input\.interest === "rooms"/);
+  assert.match(schema, /input\.interest === "garden"/);
+  assert.match(schema, /input\.interest === "promo"/);
+  assert.match(schema, /if \(!input\.checkIn\) errors\.checkIn/);
+  assert.match(schema, /if \(!input\.checkOut\) errors\.checkOut/);
+  assert.match(schema, /errors\.adults = "Укажите количество взрослых"/);
+  assert.match(schema, /\["roomTypeCode", input\.roomTypeCode\]/);
+});

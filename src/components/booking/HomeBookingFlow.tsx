@@ -17,6 +17,7 @@ export default function HomeBookingFlow({ locale = "ru" }: { locale?: Locale }) 
         selection.checkIn,
         selection.checkOut,
         selection.guests,
+        selection.roomTypeCode ?? "",
         selection.category,
         selection.building,
       ].join("|")
@@ -48,6 +49,7 @@ export default function HomeBookingFlow({ locale = "ru" }: { locale?: Locale }) 
             key={selectionKey}
             anchorId="home-booking-form"
             defaultCategory={selection?.category ?? ""}
+            defaultRoomTypeCode={selection?.roomTypeCode ?? ""}
             initialCheckIn={selection?.checkIn ?? ""}
             initialCheckOut={selection?.checkOut ?? ""}
             initialAdults={selection?.guests ?? 2}

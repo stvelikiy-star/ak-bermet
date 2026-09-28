@@ -3,74 +3,51 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const route = fs.readFileSync(new URL("./route.ts", import.meta.url), "utf8");
-const migration = fs.readFileSync(
-  new URL("../../../../supabase/migrations/20260913073000_remove_web_service_role_dependency.sql", import.meta.url),
-  "utf8"
-).toLowerCase();
-const types = fs.readFileSync(
-  new URL("../../../types/availability.ts", import.meta.url),
-  "utf8"
+const bridge = fs.readFileSync(
+  new URL("../../../lib/marina-smart.ts", import.meta.url),
+  "utf8",
 );
 
-test("public availability uses Supabase RPC authority, never Google Sheets or service role", () => {
-  assert.doesNotMatch(route, /@\/lib\/google-sheets/);
-  assert.doesNotMatch(route, /getRoomsFromSheet|getOccupancyFromSheet|isGoogleSheetsEnabled/);
-  assert.match(route, /getSupabasePublicClient/);
-  assert.match(route, /fn_public_availability/);
-  assert.match(route, /source: "supabase"/);
-  assert.doesNotMatch(route, /loadAuthoritativeAvailability|getSupabaseAdminClient/);
+test("public accommodation availability uses MARINA SMART as the production authority", () => {
+  assert.match(route, /fetchMarinaAvailability/);
+  assert.match(route, /source: "marina-smart"/);
+  assert.match(bridge, /\/api\/v1\/booking\/check-availability/);
+  assert.doesNotMatch(route, /Public Supabase RPC failed/);
+  assert.doesNotMatch(route, /source: "supabase"/);
 });
 
-test("mock availability requires explicit local selection", () => {
+test("MARINA SMART availability fails closed instead of falling back to a second inventory", () => {
+  assert.match(route, /MARINA SMART availability failed/);
+  assert.match(route, /"availability_unknown"/);
+  assert.match(route, /status.*503/s);
+  assert.doesNotMatch(route, /getSupabasePublicClient/);
+  assert.doesNotMatch(route, /fn_public_availability/);
+});
+
+test("only sellable MARINA SMART room types are exposed to the public site", () => {
+  assert.match(route, /item\.available_count > 0/);
+  assert.match(route, /item\.pricing\?\.sellable === true/);
+  assert.match(route, /roomTypeCode: item\.room_type_code/);
+});
+
+test("broad website categories are mapped without inventing room-type codes", () => {
+  assert.match(route, /matchesPublicCategory/);
+  assert.match(route, /category\.includes\("garden"\)/);
+  assert.match(route, /category\.includes\("полулюкс"\)/);
+  assert.match(route, /category === "люкс"/);
+  assert.match(route, /category\.includes\("стандарт"\)/);
+  assert.match(route, /category\.includes\("семейн"\)/);
+  assert.match(route, /category\.includes\("коттедж"\)/);
+});
+
+test("mock availability remains limited to explicit local development or test", () => {
   assert.match(route, /NODE_ENV === "development"/);
   assert.match(route, /NODE_ENV === "test"/);
   assert.match(route, /AVAILABILITY_SOURCE === "mock"/);
 });
 
-test("public availability RPC exposes only active ready rooms", () => {
-  assert.match(migration, /ru\.sellable_status = 'active'/);
-  assert.match(migration, /ru\.operational_status = 'ready'/);
-  assert.match(migration, /from public\.room_units/);
-  assert.match(migration, /public\.occupancy_periods/);
-});
-
-test("expired holds do not block public availability", () => {
-  assert.match(migration, /op\.period_type <> 'hold'/);
-  assert.match(migration, /ah\.status = 'active'/);
-  assert.match(migration, /ah\.expires_at > now\(\)/);
-  assert.match(migration, /op\.period && daterange/);
-});
-
-test("technical and stop-sale occupancy remain blocking", () => {
-  assert.match(types, /\| "maintenance_block"/);
-  assert.match(types, /\| "stop_sale"/);
-  assert.match(types, /"maintenance_block",/);
-  assert.match(types, /"stop_sale",/);
-});
-
-test("authoritative RPC failure fails closed with sanitized 503", () => {
-  assert.match(route, /Public Supabase RPC failed/);
-  assert.match(route, /"availability_unknown"/);
-  assert.match(route, /case "availability_unknown":\s*return 503/);
-  assert.match(route, /error\?\.code/);
-  assert.doesNotMatch(route, /console\.error\([^)]*JSON\.stringify/);
-});
-
-test("atomic production hold RPC uses real staff JWT and role gate", () => {
-  assert.match(route, /createAvailabilityHoldRpc/);
-  assert.match(route, /createSupabaseServerClient/);
-  assert.match(route, /HOLD_CREATOR_ROLES/);
-  assert.match(route, /owner/);
-  assert.match(route, /administrator/);
-  assert.match(route, /manager/);
-  assert.match(route, /createAvailabilityHoldRpc\([\s\S]*serverClient/);
-});
-
-test("public availability RPC ACL is explicit", () => {
-  assert.match(migration, /security definer/);
-  assert.match(migration, /set search_path = ''/);
-  assert.match(
-    migration,
-    /grant execute on function public\.fn_public_availability\(date, date, integer, text\) to anon, authenticated;/,
-  );
+test("legacy website holds are fail-closed in production", () => {
+  assert.match(route, /process\.env\.NODE_ENV === "production"/);
+  assert.match(route, /legacy_booking_authority_disabled/);
+  assert.match(route, /Удержания и новые бронирования ведутся в MARINA SMART/);
 });

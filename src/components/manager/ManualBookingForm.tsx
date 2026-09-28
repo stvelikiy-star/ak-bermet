@@ -70,9 +70,6 @@ export default function ManualBookingForm({
   const [total, setTotal] = useState("0");
 
   const selectedRoom = useMemo(() => rooms.find((room) => room.id === roomId) ?? null, [roomId, rooms]);
-  const numericTotal = Number(total);
-  const prepayment = Number.isFinite(numericTotal) && numericTotal >= 0 ? Math.round(numericTotal * 20) / 100 : 0;
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
@@ -122,6 +119,27 @@ export default function ManualBookingForm({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return (
+      <div className="rounded-xl border border-gold/20 bg-cream/40 p-5">
+        <h2 className="font-display text-lg font-semibold text-emerald-deep">
+          Новые брони создаются в MARINA SMART
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          Старый модуль сайта переведён в архивный режим, чтобы не создавать параллельные брони.
+        </p>
+        <a
+          href="https://admin-production-80a1.up.railway.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex rounded-lg bg-emerald-deep px-4 py-2 text-sm font-semibold text-white"
+        >
+          Открыть MARINA SMART ↗
+        </a>
+      </div>
+    );
   }
 
   return (
@@ -219,8 +237,8 @@ export default function ManualBookingForm({
           />
         </label>
         <div className="rounded-lg border border-gold/15 bg-cream/40 px-3 py-2">
-          <div className="text-xs text-muted">Предоплата 20%</div>
-          <div className="mt-1 font-semibold text-emerald-deep">{money(prepayment)} сом</div>
+          <div className="text-xs text-muted">Правило предоплаты</div>
+          <div className="mt-1 font-semibold text-emerald-deep">Первые сутки</div>
         </div>
       </div>
 

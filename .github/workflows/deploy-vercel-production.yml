@@ -27,6 +27,8 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       NEXT_PUBLIC_SUPABASE_URL: https://ednqgzgjhnalsiiuekmw.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_7cDXEzFLEL41Rr9FCEqQUQ_b_5mBOQK
+      MARINA_SMART_API_URL: https://api-production-f1171.up.railway.app
+      NEXT_PUBLIC_MARINA_SMART_ADMIN_URL: https://admin-production-80a1.up.railway.app
       PRODUCTION_ALIAS: https://ak-bermet-functional-preview-v2-202.vercel.app
     steps:
       - name: Checkout current main
@@ -81,9 +83,13 @@ jobs:
           payload="$(jq -n \
             --arg url "$NEXT_PUBLIC_SUPABASE_URL" \
             --arg publishable "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            --arg marina "$MARINA_SMART_API_URL" \
+            --arg marinaAdmin "$NEXT_PUBLIC_MARINA_SMART_ADMIN_URL" \
             '[
               {key:"NEXT_PUBLIC_SUPABASE_URL",value:$url,type:"plain",target:["production"]},
-              {key:"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",value:$publishable,type:"plain",target:["production"]}
+              {key:"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",value:$publishable,type:"plain",target:["production"]},
+              {key:"MARINA_SMART_API_URL",value:$marina,type:"plain",target:["production"]},
+              {key:"NEXT_PUBLIC_MARINA_SMART_ADMIN_URL",value:$marinaAdmin,type:"plain",target:["production"]}
             ]')"
           curl --fail --silent --show-error \
             --request POST \
@@ -118,4 +124,9 @@ jobs:
             cat /tmp/availability.json
             exit 2
           fi
-          echo "PRODUCTION_SMOKE_PASS: root=200 availability=200"
+          if [ "$(jq -r '.source // empty' /tmp/availability.json)" != "marina-smart" ]; then
+            echo "AVAILABILITY_AUTHORITY_FAILED: expected marina-smart"
+            cat /tmp/availability.json
+            exit 2
+          fi
+          echo "PRODUCTION_SMOKE_PASS: root=200 availability=200 authority=marina-smart"

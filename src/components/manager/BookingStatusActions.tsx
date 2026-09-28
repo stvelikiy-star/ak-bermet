@@ -10,7 +10,7 @@ interface Props {
 }
 
 const ERROR_MESSAGE: Record<string, string> = {
-  PREPAYMENT_REQUIRED: "Сначала зафиксируйте предоплату не меньше 20% в разделе «Оплаты».",
+  PREPAYMENT_REQUIRED: "Сначала зафиксируйте требуемую предоплату в MARINA SMART.",
   CHECK_IN_TOO_EARLY: "Дата заезда ещё не наступила.",
   ROOM_NOT_READY_FOR_CHECK_IN: "Заселение заблокировано: номер не готов, снят с продажи или находится в техническом статусе.",
   BOOKING_ROOM_MISSING: "У брони нет активного размещения в номере.",
