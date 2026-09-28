@@ -3,6 +3,7 @@ import type { LeadInput } from "@/types/lead";
 import { validateLead } from "@/lib/lead-schema";
 import { buildLead } from "@/lib/lead-utils";
 import { persistPublicLead } from "@/lib/public-lead-persistence";
+import { createMarinaBookingRequest, MarinaSmartError } from "@/lib/marina-smart";
 
 export const runtime = "nodejs";
 
@@ -25,16 +26,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message, errors }, { status: 422 });
   }
 
-  // The public request path has exactly one durable write contract:
-  // Supabase/PostgreSQL. Google Sheets mirroring is asynchronous through the
-  // DB outbox and is never called from this HTTP request.
-  const lead = buildLead(input as LeadInput);
+  const validated = input as LeadInput;
+  const isAccommodationRequest =
+    validated.interest === "rooms" ||
+    validated.interest === "garden" ||
+    validated.interest === "promo";
+
+  if (isAccommodationRequest) {
+    try {
+      const requestItem = await createMarinaBookingRequest(validated);
+      return NextResponse.json({
+        ok: true,
+        leadId: requestItem.id,
+        authority: "marina-smart",
+        isReservation: requestItem.is_reservation,
+      });
+    } catch (error) {
+      console.error("[LEAD] MARINA SMART booking request failed");
+      const status =
+        error instanceof MarinaSmartError && error.status === 422 ? 422 : 503;
+      const message =
+        error instanceof MarinaSmartError
+          ? error.message
+          : "MARINA SMART временно недоступна. Заявка не была сохранена.";
+      return NextResponse.json({ ok: false, message }, { status });
+    }
+  }
+
+  // Non-accommodation inquiries (SPA, events, food, general) remain in the
+  // website CRM. Accommodation availability and booking requests have one
+  // operational authority: MARINA SMART.
+  const lead = buildLead(validated);
 
   let persistedLead: Awaited<ReturnType<typeof persistPublicLead>>;
   try {
     persistedLead = await persistPublicLead(lead);
   } catch {
-    // Do not serialize/log database errors, request payloads or credentials.
     console.error("[LEAD] Supabase durable insert failed");
     return NextResponse.json(
       {
@@ -46,7 +73,11 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, leadId: persistedLead.id });
+  return NextResponse.json({
+    ok: true,
+    leadId: persistedLead.id,
+    authority: "website-crm",
+  });
 }
 
 export async function GET() {
