@@ -430,7 +430,7 @@ export default function SuperChessboard({ data }: { data: BookingChessboardData 
                       <div className="rounded-lg bg-cream/60 p-3"><div className="text-[10px] uppercase text-muted">Проживание</div><div className="mt-1 font-semibold text-emerald-deep">{humanDate(selectedBooking.start)} — {humanDate(selectedBooking.end)}</div></div>
                       <div className="rounded-lg bg-cream/60 p-3"><div className="text-[10px] uppercase text-muted">Гости</div><div className="mt-1 font-semibold text-emerald-deep">{selectedBooking.booking.adults} взр. · {selectedBooking.booking.children} дет. · {selectedBooking.booking.extraBeds} доп.</div></div>
                       <div className="rounded-lg bg-cream/60 p-3"><div className="text-[10px] uppercase text-muted">Сумма</div><div className="mt-1 font-semibold text-emerald-deep">{money(selectedBooking.booking.totalAmountKgs)} сом</div></div>
-                      <div className="rounded-lg bg-cream/60 p-3"><div className="text-[10px] uppercase text-muted">Предоплата 20%</div><div className="mt-1 font-semibold text-emerald-deep">{money(selectedBooking.booking.prepaymentRequiredKgs)} сом</div></div>
+                      <div className="rounded-lg bg-cream/60 p-3"><div className="text-[10px] uppercase text-muted">Предоплата (архив)</div><div className="mt-1 font-semibold text-emerald-deep">{money(selectedBooking.booking.prepaymentRequiredKgs)} сом</div></div>
                     </div>
                     {selectedBooking.booking.notes ? <div className="mt-3 rounded-lg border border-gold/10 p-3 text-sm text-muted">{selectedBooking.booking.notes}</div> : null}
                   </section>
