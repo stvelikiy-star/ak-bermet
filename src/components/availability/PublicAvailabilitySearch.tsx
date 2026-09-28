@@ -5,6 +5,7 @@ import { t } from "@/i18n/dictionary";
 import type { Locale } from "@/i18n/locale";
 
 export type AvailabilityItem = {
+  roomTypeCode?: string;
   category: string;
   building: string;
   capacity: number;
@@ -18,6 +19,7 @@ export type AvailabilitySelection = {
   checkIn: string;
   checkOut: string;
   guests: number;
+  roomTypeCode?: string;
   category: string;
   building: string;
 };
@@ -211,6 +213,7 @@ export default function PublicAvailabilitySearch({
                         checkIn,
                         checkOut,
                         guests: Math.max(1, Number(guests) || 1),
+                        roomTypeCode: item.roomTypeCode,
                         category: item.category,
                         building: item.building,
                       })
