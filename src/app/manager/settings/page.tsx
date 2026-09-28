@@ -135,7 +135,7 @@ export default function ManagerSettingsPage() {
             Параметры бронирования
           </h2>
           <dl>
-            <Row label="Предоплата" value="20%" />
+            <Row label="Предоплата" value="Первые сутки проживания" />
             <Row label="Заезд" value="13:00" />
             <Row label="Выезд" value="11:00" />
             <Row
