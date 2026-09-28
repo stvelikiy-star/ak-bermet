@@ -68,10 +68,10 @@ test("public FAQ carries the same approved cancellation meaning", () => {
   assert.match(faqPage, /faq\.localizedAnswer \? faqAnswer\(faq, locale\)/);
 });
 
-test("approved prepayment and check-in/out rules remain unchanged", () => {
+test("approved first-night prepayment and check-in/out rules remain unchanged", () => {
   assert.match(
     legal,
-    /prepayment: "20% от стоимости бронирования, если иное не согласовано с администрацией"/
+    /prepayment: "стоимость первых суток проживания, если иное не согласовано с администрацией"/
   );
   assert.match(legal, /checkIn: "с 13:00"/);
   assert.match(legal, /checkOut: "до 11:00"/);
