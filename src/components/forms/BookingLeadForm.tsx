@@ -16,6 +16,7 @@ import type { Locale } from "@/i18n/locale";
 type Props = {
   interest?: LeadInterest;
   defaultCategory?: string;
+  defaultRoomTypeCode?: string;
   anchorId?: string;
   title?: string;
   subtitle?: string;
@@ -35,6 +36,7 @@ const empty = {
   children: "0",
   childrenAges: "",
   roomCategory: "",
+  roomTypeCode: "",
   wantsDoubleBed: false,
   needsExtraBed: false,
   needsWifi: false,
@@ -45,6 +47,7 @@ const empty = {
 export default function BookingLeadForm({
   interest = "rooms",
   defaultCategory = "",
+  defaultRoomTypeCode = "",
   anchorId = "booking-form",
   title = "Оставить заявку на бронирование",
   subtitle = "Администратор проверит наличие и свяжется с вами для подтверждения.",
@@ -60,6 +63,7 @@ export default function BookingLeadForm({
     checkOut: initialCheckOut,
     adults: String(Math.max(1, initialAdults || 1)),
     roomCategory: defaultCategory,
+    roomTypeCode: defaultRoomTypeCode,
     message: initialMessage,
   });
   const [form, setForm] = useState(initialForm);
@@ -79,6 +83,7 @@ export default function BookingLeadForm({
     children: form.children ? Number(form.children) : undefined,
     childrenAges: form.childrenAges || undefined,
     roomCategory: form.roomCategory || undefined,
+    roomTypeCode: form.roomTypeCode || undefined,
     wantsDoubleBed: form.wantsDoubleBed || undefined,
     needsExtraBed: form.needsExtraBed || undefined,
     needsWifi: form.needsWifi || undefined,
@@ -140,30 +145,33 @@ export default function BookingLeadForm({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t("Дата заезда", locale)} htmlFor="b-in">
+            <Field label={t("Дата заезда", locale)} htmlFor="b-in" required error={errors.checkIn}>
               <TextInput
                 id="b-in"
                 type="date"
                 value={form.checkIn}
                 onChange={(e) => set("checkIn", e.target.value)}
+                required
               />
             </Field>
-            <Field label={t("Дата выезда", locale)} htmlFor="b-out" error={errors.checkOut}>
+            <Field label={t("Дата выезда", locale)} htmlFor="b-out" required error={errors.checkOut}>
               <TextInput
                 id="b-out"
                 type="date"
                 value={form.checkOut}
                 onChange={(e) => set("checkOut", e.target.value)}
+                required
               />
             </Field>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label={t("Взрослые", locale)} htmlFor="b-adults" error={errors.adults}>
+            <Field label={t("Взрослые", locale)} htmlFor="b-adults" required error={errors.adults}>
               <TextInput
                 id="b-adults"
                 type="number"
                 min={1}
+                required
                 value={form.adults}
                 onChange={(e) => set("adults", e.target.value)}
               />
@@ -191,7 +199,10 @@ export default function BookingLeadForm({
             <Select
               id="b-cat"
               value={form.roomCategory}
-              onChange={(e) => set("roomCategory", e.target.value)}
+              onChange={(e) => {
+                set("roomCategory", e.target.value);
+                set("roomTypeCode", "");
+              }}
             >
               <option value="">{t("Не выбрано / подберите вариант", locale)}</option>
               {roomCategories.map((c) => (
@@ -260,7 +271,7 @@ export default function BookingLeadForm({
           </div>
 
           <p className="text-xs leading-relaxed text-muted">
-            {t("Финальное наличие и бронь подтверждает администратор после проверки системы и предоплаты 20%.", locale)}
+            {t("Финальное наличие и бронь подтверждает администратор после проверки системы и предоплаты за первые сутки.", locale)}
           </p>
 
           <LegalConsent locale={locale} />
