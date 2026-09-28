@@ -47,7 +47,7 @@ test("termination snapshots the seven-day refund policy without moving money", (
   assert.match(page, /≥7 дней · возврат\/штраф — на проверку/);
   assert.match(page, /<7 дней · без возврата/);
   assert.match(page, /No-show · без возврата/);
-  assert.match(page, /деньги автоматически не списывает и не возвращает/);
+  assert.match(page, /Архив последних 100 записей старой CRM/);
 });
 
 test("booking status SECURITY DEFINER functions are fixed-path and management-gated", () => {
